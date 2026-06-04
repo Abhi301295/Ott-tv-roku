@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Root scene placeholder. The full ViewManager + screen stack is built
-     out per ROKU_IMPLEMENTATION_PLAN.md (Phase 1 onward). -->
 <component name="MainScene" extends="Scene">
   <interface>
     <field id="launchArgs" type="assocarray" />
   </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+
   <children>
-    <Label
-      id="bootLabel"
-      text="OTT Accelerator — Roku"
-      translation="[660, 520]" />
+    <Rectangle id="bootBg" width="1920" height="1080" color="0x0b1120" />
+    <ThemeManager id="themeManager" />
+    <ViewManager id="viewManager" visible="false" />
   </children>
 </component>
