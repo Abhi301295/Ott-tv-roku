@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Screen stack + navigation (parity with react-router + location.state). -->
+<component name="ViewManager" extends="Group">
+  <interface>
+    <field id="currentRoute" type="string" alwaysNotify="true" />
+    <field id="navState" type="assocarray" />
+    <field id="overlayOpen" type="boolean" value="false" />
+    <field id="overlayDismiss" type="boolean" alwaysNotify="true" />
+    <function name="NavigatePush" />
+    <function name="NavigateReplace" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/components/core/ViewManager.brs" />
+
+  <children>
+    <Group id="screenHost" translation="[0, 0]" />
+  </children>
+</component>
