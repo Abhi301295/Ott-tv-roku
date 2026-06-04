@@ -1,27 +1,48 @@
 # OTT Accelerator - Roku channel build/deploy
-# Sideloads to a Roku device in developer mode.
 #
 # Usage:
-#   make build                       # zip the channel into out/
-#   make install ROKU_DEV_TARGET=<ip>  # build + sideload to device
+#   make zip                           # validate (bsc) + zip into out/
+#   make sim                           # zip + install to BrightScript Simulator
+#   make install ROKU_DEV_TARGET=<ip>  # zip + sideload to a physical Roku
 #   make clean
+#
+# IMPORTANT: Do not ship empty folders under components/, fonts/, or locale/.
+# The BrightScript Simulator SceneGraph loader throws ENODATA and fails to
+# register ANY components (including MainScene) when it hits an empty directory.
 
 APP_NAME          ?= ott-tv-roku
 OUT_DIR           ?= out
 ROKU_DEV_TARGET   ?= 192.168.1.100
 ROKU_DEV_PASSWORD ?= rokudev
+ROKU_SIM_HOST     ?= 127.0.0.1
+ROKU_SIM_PORT     ?= 8080
 
-PKG_CONTENTS = manifest source components images fonts locale
+.PHONY: build zip validate install sim clean
 
-.PHONY: build install clean
+build: zip
 
-build:
+validate:
+	@bsc --project bsconfig.json
+
+# Only ship directories that contain real channel files.
+zip: validate
 	@mkdir -p $(OUT_DIR)
 	@rm -f $(OUT_DIR)/$(APP_NAME).zip
-	@zip -r -q $(OUT_DIR)/$(APP_NAME).zip $(PKG_CONTENTS) -x "*.DS_Store"
+	@zip -r -q $(OUT_DIR)/$(APP_NAME).zip manifest source components images \
+		-x "*.DS_Store" -x "*/.gitkeep"
+	@if [ -d fonts ] && [ -n "$$(find fonts -type f ! -name '.gitkeep' 2>/dev/null | head -1)" ]; then \
+		zip -r -q $(OUT_DIR)/$(APP_NAME).zip fonts -x "*.DS_Store" -x "*/.gitkeep"; \
+	fi
+	@if [ -d locale ] && [ -n "$$(find locale -type f ! -name '.gitkeep' 2>/dev/null | head -1)" ]; then \
+		zip -r -q $(OUT_DIR)/$(APP_NAME).zip locale -x "*.DS_Store" -x "*/.gitkeep"; \
+	fi
+	@if [ -f config.json ]; then zip -q $(OUT_DIR)/$(APP_NAME).zip config.json; fi
 	@echo "Built $(OUT_DIR)/$(APP_NAME).zip"
 
-install: build
+sim: zip
+	@bash scripts/roku-sim-deploy.sh
+
+install: zip
 	@curl -s -S -F "mysubmit=Install" -F "archive=@$(OUT_DIR)/$(APP_NAME).zip" \
 		--user rokudev:$(ROKU_DEV_PASSWORD) --digest \
 		http://$(ROKU_DEV_TARGET)/plugin_install > /dev/null

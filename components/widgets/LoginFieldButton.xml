@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="LoginFieldButton" extends="Group">
+  <interface>
+    <field id="label" type="string" onChange="OnLabelChanged" />
+    <field id="value" type="string" value="" onChange="OnValueChanged" />
+    <field id="fieldWidth" type="integer" value="800" onChange="OnSizeChanged" />
+    <field id="secure" type="boolean" value="false" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/widgets/LoginFieldButton.brs" />
+  <children>
+    <Rectangle id="bg" width="800" height="52" color="0x1f1f22ff" />
+    <Label id="text" text="" translation="[16, 12]" width="768" font="font:MediumSystemFont" color="0xfafafaff" />
+  </children>
+</component>

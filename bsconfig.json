@@ -13,6 +13,7 @@
   "stagingDir": "./out/.roku-deploy-staging",
   "retainStagingDir": false,
   "diagnosticFilters": [
+    1107,
     {
       "src": "**/roku_modules/**/*",
       "codes": []

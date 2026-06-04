@@ -59,7 +59,8 @@ function GeneratePrimaryShades(baseHex as string) as object
 end function
 
 function HexToRgb(hex as string) as object
-    clean = hex.Replace("#", "")
+    clean = hex
+    if Left(clean, 1) = "#" then clean = Mid(clean, 2)
     if Len(clean) <> 6 then return invalid
 
     return {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="LoginTabButton" extends="Group">
+  <interface>
+    <field id="label" type="string" onChange="OnLabelChanged" />
+    <field id="selected" type="boolean" value="false" onChange="OnSelectedChanged" />
+    <field id="buttonWidth" type="integer" value="280" onChange="OnSizeChanged" />
+    <field id="activeColor" type="string" value="0x4d57eaff" onChange="ApplyColors" />
+    <field id="inactiveColor" type="string" value="0x1f1f22ff" onChange="ApplyColors" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/widgets/LoginTabButton.brs" />
+  <children>
+    <Rectangle id="bg" width="280" height="56" color="0x1f1f22ff" />
+    <Label id="text" text="" translation="[24, 14]" width="232" horizAlign="center" font="font:MediumBoldSystemFont" color="0xfafafaff" />
+  </children>
+</component>

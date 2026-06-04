@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Login screen — parity with src/features/login/index.tsx + emailLogin.tsx -->
+<component name="LoginScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/NextStep.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/LoginCopy.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/LoginService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/LoginScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x0b1120ff" />
+    <Poster id="bgImage" width="1920" height="1080" loadDisplayMode="scaleToFill" visible="false" />
+    <Rectangle id="bgOverlay" width="1920" height="1080" color="0x000000b3" />
+
+    <Poster id="logoPoster" translation="[810, 50]" width="300" height="80" loadDisplayMode="scaleToFit" visible="false" />
+    <Label id="logoLabel" text="OTT Accelerator" translation="[760, 62]" width="400" horizAlign="center"
+      font="font:LargeBoldSystemFont" color="0x4d57eaff" visible="false" />
+
+    <Label id="title" text="Choose how to Sign In" translation="[0, 230]" width="1920" horizAlign="center"
+      font="font:LargeBoldSystemFont" color="0xfafafaff" />
+
+    <LoginTabButton id="phoneTab" label="Use Phone" translation="[632, 320]" buttonWidth="320" />
+    <LoginTabButton id="remoteTab" label="Use Remote" translation="[968, 320]" buttonWidth="320" />
+
+    <!-- Phone panel card: w922 h470, border neutral-500, bg ui-background -->
+    <Rectangle id="phoneCardBorder" translation="[499, 400]" width="922" height="470" color="0x6b7280ff" visible="true" />
+    <Rectangle id="phoneCard" translation="[501, 402]" width="918" height="466" color="0x1f1f22ff" visible="true" />
+
+    <Group id="phonePanel" translation="[501, 402]" visible="true">
+      <Rectangle id="step1Badge" translation="[64, 52]" width="32" height="32" color="0xfafafaff" />
+      <Label id="step1Num" text="1" translation="[64, 52]" width="32" height="32" horizAlign="center" vertAlign="center"
+        font="font:SmallBoldSystemFont" color="0x0a0a0aff" />
+      <Label id="step1Text" translation="[64, 104]" width="540" height="120" wrap="true" lineSpacing="8"
+        font="font:MediumSystemFont" color="0x9ca3afff" />
+
+      <!-- QR pad: neutral-50, p-16, inner 150x150 -->
+      <Rectangle id="qrPad" translation="[200, 248]" width="182" height="182" color="0xfafafaff" />
+      <Skeleton id="qrSkeleton" translation="[216, 264]" boxWidth="150" boxHeight="150"
+        baseColor="0xffffffff" highlightColor="0xf3f3f3ff" visible="false" />
+      <Poster id="qrImage" translation="[216, 264]" width="150" height="150" loadDisplayMode="scaleToFit" visible="false" />
+      <Label id="qrErrorLabel" translation="[216, 264]" width="150" height="150" wrap="true" horizAlign="center" vertAlign="center"
+        font="font:SmallSystemFont" color="0x4d57eaff" visible="false" />
+
+      <Rectangle id="dividerTop" translation="[640, 120]" width="2" height="160" color="0x52525bff" />
+      <Label id="orLabel" text="or" translation="[620, 280]" width="44" height="40" horizAlign="center" vertAlign="center"
+        font="font:MediumSystemFont" color="0x9ca3afff" />
+      <Rectangle id="dividerBottom" translation="[640, 320]" width="2" height="160" color="0x52525bff" />
+
+      <Rectangle id="step2Badge" translation="[700, 52]" width="32" height="32" color="0xfafafaff" />
+      <Label id="step2Num" text="2" translation="[700, 52]" width="32" height="32" horizAlign="center" vertAlign="center"
+        font="font:SmallBoldSystemFont" color="0x0a0a0aff" />
+      <Label id="step2Text" translation="[700, 104]" width="540" height="80" wrap="true"
+        font="font:MediumSystemFont" color="0x9ca3afff" />
+      <Label id="userCodeLabel" translation="[700, 280]" width="540" height="120" wrap="true" lineSpacing="12"
+        horizAlign="center" font="font:LargeBoldSystemFont" color="0xfafafaff" />
+    </Group>
+
+    <!-- Remote panel card -->
+    <Rectangle id="remoteCardBorder" translation="[499, 400]" width="922" height="470" color="0x6b7280ff" visible="false" />
+    <Rectangle id="remoteCard" translation="[501, 402]" width="918" height="466" color="0x1f1f22ff" visible="false" />
+
+    <Group id="remotePanel" translation="[581, 432]" visible="false">
+      <Label id="formError" text="" translation="[0, 0]" width="760" height="60" wrap="true" horizAlign="center"
+        font="font:SmallSystemFont" color="0x4d57eaff" visible="false" />
+      <LoginFieldButton id="emailField" label="Email" translation="[0, 72]" fieldWidth="760" />
+      <LoginFieldButton id="passwordField" label="Password" translation="[0, 196]" fieldWidth="760" secure="true" />
+      <LoginTabButton id="loginBtn" label="Login" translation="[0, 320]" buttonWidth="760" />
+      <BusySpinner id="loginSpinner" translation="[360, 330]" visible="false" />
+    </Group>
+
+    <Timer id="pollTimer" repeat="true" duration="6" />
+    <Timer id="pollTimeout" repeat="false" duration="300" />
+    <Timer id="onboardRetry" repeat="false" duration="5" />
+  </children>
+</component>
