@@ -11,6 +11,16 @@ sub init()
     m.remoteCardBorder = m.top.findNode("remoteCardBorder")
     m.phonePanel = m.top.findNode("phonePanel")
     m.remotePanel = m.top.findNode("remotePanel")
+    m.step1Badge = m.top.findNode("step1Badge")
+    m.step2Badge = m.top.findNode("step2Badge")
+    m.step1Num = m.top.findNode("step1Num")
+    m.step2Num = m.top.findNode("step2Num")
+    m.step1Text = m.top.findNode("step1Text")
+    m.step2Text = m.top.findNode("step2Text")
+    m.orLabel = m.top.findNode("orLabel")
+    m.dividerTop = m.top.findNode("dividerTop")
+    m.dividerBottom = m.top.findNode("dividerBottom")
+    m.qrPad = m.top.findNode("qrPad")
     m.qrSkeleton = m.top.findNode("qrSkeleton")
     m.qrErrorLabel = m.top.findNode("qrErrorLabel")
     m.qrImage = m.top.findNode("qrImage")
@@ -19,6 +29,9 @@ sub init()
     m.passwordField = m.top.findNode("passwordField")
     m.loginBtn = m.top.findNode("loginBtn")
     m.formError = m.top.findNode("formError")
+    m.formErrorBox = m.top.findNode("formErrorBox")
+    m.formErrorBg = m.top.findNode("formErrorBg")
+    m.formErrorBorder = m.top.findNode("formErrorBorder")
     m.loginSpinner = m.top.findNode("loginSpinner")
     m.pollTimer = m.top.findNode("pollTimer")
     m.pollTimeout = m.top.findNode("pollTimeout")
@@ -56,43 +69,210 @@ sub init()
     m.phoneTab.observeField("hasFocus", "OnPhoneTabFocus")
     m.remoteTab.observeField("hasFocus", "OnRemoteTabFocus")
 
+    LoadThemeTokens()
     ApplyLoginBranding()
-    ApplyThemeToTabs()
+    ApplyThemeColors()
+    UpdateTabColors()
+    UpdateLoginButton()
 
-    if GetCognitoToken() <> "" then
-        RedirectIfAlreadyAuthenticated()
-        return
-    end if
+    ' Startup auto-redirect — commented out for the login-only branch. We must NOT
+    ' navigate to other screens yet; a successful login only shows a toast. Restore
+    ' this block once post-login navigation is implemented in a later branch.
+    ' if GetCognitoToken() <> "" then
+    '     RedirectIfAlreadyAuthenticated()
+    '     return
+    ' end if
+
+    ' TEMP (login-only branch): clear any existing session on entry so we always land
+    ' on a fresh, logged-out login screen. Remove together with the block above.
+    ClearStorage()
 
     LoginScreen_ApplyFocus()
     FetchOnboardDevice()
 end sub
 
-sub ApplyThemeToTabs()
-    active = "0x4d57eaff"
-    inactive = "0x1f1f22ff"
+sub LoadThemeTokens()
+    m.tokens = {}
     tm = m.top.getScene().findNode("themeManager")
-    if tm <> invalid then
-        if tm.primary600 <> invalid and tm.primary600 <> "" then
-            active = HexColorToRg(tm.primary600)
-        end if
-    end if
-    m.phoneTab.activeColor = active
-    m.phoneTab.inactiveColor = inactive
-    m.remoteTab.activeColor = active
-    m.remoteTab.inactiveColor = inactive
-    m.loginBtn.activeColor = active
-    m.loginBtn.inactiveColor = "0x52525bff"
+    if tm <> invalid and tm.themeTokens <> invalid then m.tokens = tm.themeTokens
+
+    ' Cache the colors used by interactive states (parity with Tailwind tokens).
+    m.cActive = TC("primary-600", "#0760bb")        ' bg-primary-600 (active tab / focused btn)
+    m.cShadow = TC("primary-700", "#04478b")         ' shadow-primary-700
+    m.cInactive = TC("background", "#ffffff")        ' bg-ui-background (inactive tab)
+    m.cTabText = TC("neutral-50", "#f8f1f7")         ' text-neutral-50
+    m.cBtnEnabledBg = TC("primary-500", "#0b75e0")   ' bg-primary-500 (enabled, unfocused)
+    m.cBtnFocusBg = m.cActive                        ' bg-primary-600 (enabled, focused)
+    m.cBtnDisabledBg = TC("neutral-600", "#a12189")  ' bg-neutral-600 (disabled)
+    m.cBtnDisabledText = TC("neutral-400", "#ce4fb6")' text-neutral-400 (disabled)
+    m.cFieldBg = TC("neutral-700", "#ffffff")        ' bg-neutral-700 (input bg, unfocused)
+    m.cFieldBgFocus = TC("neutral-900", "#ffffff")   ' bg-neutral-900 (input bg, focused)
+    m.cFieldText = TC("neutral-50", "#f8f1f7")       ' text-neutral-50 (typed text + unfocused placeholder)
+    m.cFieldBorder = TC("neutral-100", "#efdceb")    ' border-neutral-100 (focused input)
+    ' Focused placeholder = browser-default muted gray (web drops the neutral-50
+    ' override when focused). Not a theme token, so hardcode like the badge number.
+    m.cFieldPlaceholderFocus = "0x9ea4b0ff"
 end sub
 
-function HexColorToRg(hex as string) as string
-    if hex = invalid or hex = "" then return "0x4d57eaff"
-    h = hex
-    if Left(h, 1) = "#" then h = Mid(h, 2)
-    if Len(h) = 6 then return "0x" + h + "ff"
-    if Len(h) = 8 then return "0x" + h
-    return "0x4d57eaff"
+function TC(name as string, fallbackHex as string) as string
+    return ThemeTokenColor(m.tokens, name, fallbackHex)
 end function
+
+' Emulate CSS tracking-widest (letter-spacing ~0.1em) by inserting a thin space
+' between characters. Also lets the hyphenated code wrap like the web (2 lines).
+function TrackWide(s as string) as string
+    if s = invalid or s = "" then return ""
+    sp = Chr(8201) ' THIN SPACE
+    out = ""
+    for i = 1 to Len(s)
+        out = out + Mid(s, i, 1)
+        if i < Len(s) then out = out + sp
+    end for
+    return out
+end function
+
+' One-time recolor of all static (non-interactive) elements from theme tokens.
+sub ApplyThemeColors()
+    m.title.color = TC("neutral-50", "#f8f1f7")
+    m.logoLabel.color = TC("primary-500", "#0b75e0")
+
+    cardBg = TC("background", "#ffffff")
+    cardBorder = TC("neutral-500", "#e279ce")
+    m.phoneCard.blendColor = cardBg
+    m.phoneCardBorder.blendColor = cardBorder
+    m.remoteCard.blendColor = cardBg
+    m.remoteCardBorder.blendColor = cardBorder
+
+    ' Badge bg uses neutral-50 (theme), but the number uses text-neutral-950 which
+    ' is NOT mapped in the web Tailwind config — it falls back to Tailwind's default
+    ' #0a0a0a (dark). So hardcode dark to match React/LG (not the white theme token).
+    badgeBg = TC("neutral-50", "#f8f1f7")
+    m.step1Badge.blendColor = badgeBg
+    m.step2Badge.blendColor = badgeBg
+    m.step1Num.color = "0x0a0a0aff"
+    m.step2Num.color = "0x0a0a0aff"
+
+    bodyText = TC("neutral-500", "#e279ce")
+    m.step1Text.color = bodyText
+    m.step2Text.color = bodyText
+    m.orLabel.color = bodyText
+
+    dividerColor = TC("neutral-600", "#a12189")
+    m.dividerTop.color = dividerColor
+    m.dividerBottom.color = dividerColor
+
+    m.userCodeLabel.color = TC("neutral-50", "#f8f1f7")
+    m.qrPad.blendColor = TC("neutral-50", "#f8f1f7")
+    m.qrErrorLabel.color = TC("primary-500", "#0b75e0")
+    ' Error box — web: bg-primary-800/20, border-primary-500, text-primary-500
+    m.formError.color = TC("primary-500", "#0b75e0")
+    m.formErrorBorder.blendColor = TC("primary-500", "#0b75e0")
+    m.formErrorBg.blendColor = TC("primary-800", "#0b3a82")
+
+    m.emailField.bgColor = m.cFieldBg
+    m.emailField.bgColorFocused = m.cFieldBgFocus
+    m.emailField.textColor = m.cFieldText
+    m.emailField.placeholderColor = m.cFieldText
+    m.emailField.placeholderColorFocused = m.cFieldPlaceholderFocus
+    m.emailField.borderColor = m.cFieldBorder
+    m.passwordField.bgColor = m.cFieldBg
+    m.passwordField.bgColorFocused = m.cFieldBgFocus
+    m.passwordField.textColor = m.cFieldText
+    m.passwordField.placeholderColor = m.cFieldText
+    m.passwordField.placeholderColorFocused = m.cFieldPlaceholderFocus
+    m.passwordField.borderColor = m.cFieldBorder
+end sub
+
+' Tab colors follow selection (onFocus switches mode in the web app).
+sub UpdateTabColors()
+    isPhone = (m.mode = "phone")
+    if isPhone then
+        m.phoneTab.bgColor = m.cActive
+        m.remoteTab.bgColor = m.cInactive
+    else
+        m.phoneTab.bgColor = m.cInactive
+        m.remoteTab.bgColor = m.cActive
+    end if
+    m.phoneTab.textColor = m.cTabText
+    m.remoteTab.textColor = m.cTabText
+
+    ' shadow-primary-700 on the selected tab (parity with shadow-lg shadow-primary-700)
+    shadow = m.cShadow
+    m.phoneTab.shadowColor = shadow
+    m.remoteTab.shadowColor = shadow
+    m.phoneTab.showShadow = isPhone
+    m.remoteTab.showShadow = not isPhone
+end sub
+
+' Login button has 3 states (disabled / enabled / enabled+focused), parity with emailLogin.tsx.
+sub UpdateLoginButton()
+    valid = ValidateEmail(m.email) and (m.password <> "")
+    loading = (m.loginSpinner <> invalid and m.loginSpinner.visible = true)
+
+    if (not valid) or loading then
+        m.loginBtn.bgColor = m.cBtnDisabledBg
+        m.loginBtn.textColor = m.cBtnDisabledText
+    else if m.focusIndex = m.FOCUS_LOGIN_BTN then
+        m.loginBtn.bgColor = m.cBtnFocusBg
+        m.loginBtn.textColor = m.cTabText
+    else
+        m.loginBtn.bgColor = m.cBtnEnabledBg
+        m.loginBtn.textColor = m.cTabText
+    end if
+
+    ' While loading, the button text is replaced by the in-button spinner (web parity).
+    if loading then
+        m.loginBtn.label = ""
+    else
+        m.loginBtn.label = CopyLoginBtn()
+    end if
+
+    ' shadow-primary-700 when the (enabled) Login button is focused — parity with
+    ' the web focused state. Also acts as the TV focus indicator.
+    m.loginBtn.shadowColor = m.cShadow
+    m.loginBtn.showShadow = (m.focusIndex = m.FOCUS_LOGIN_BTN and valid and not loading)
+end sub
+
+' Toggle the in-button loader (spinner inside the Login button + disabled style).
+sub SetLoginLoading(loading as boolean)
+    ' BusySpinner animates automatically while visible.
+    m.loginSpinner.visible = loading
+    UpdateLoginButton()
+end sub
+
+' Error box — show/hide the bordered container together with its text (web parity).
+' Showing the error pushes the fields + button down so the error sits above them
+' (web flow), instead of overlaying the top of the card.
+sub ShowFormError(msg as string)
+    m.formError.text = msg
+    m.formError.visible = true
+    if m.formErrorBox <> invalid then m.formErrorBox.visible = true
+    LayoutForm(true)
+end sub
+
+sub HideFormError()
+    m.formError.text = ""
+    m.formError.visible = false
+    if m.formErrorBox <> invalid then m.formErrorBox.visible = false
+    LayoutForm(false)
+end sub
+
+' Top-aligned form. Without an error the fields sit near the top (space at bottom);
+' with an error the error box takes the top slot and everything shifts down ~68px.
+sub LayoutForm(hasError as boolean)
+    if m.emailField = invalid then return
+    if hasError then
+        m.emailField.translation = [64, 103]
+        m.passwordField.translation = [64, 191]
+        m.loginBtn.translation = [64, 295]
+    else
+        m.emailField.translation = [64, 35]
+        m.passwordField.translation = [64, 123]
+        m.loginBtn.translation = [64, 227]
+    end if
+    by = m.loginBtn.translation[1]
+    m.loginSpinner.translation = [443, by + 12]
+end sub
 
 sub ApplyLoginBranding()
     resolved = invalid
@@ -124,6 +304,9 @@ sub OnRemoteKeyField()
 end sub
 
 sub LoginScreen_ApplyFocus()
+    m.emailField.focusedState = (m.focusIndex = m.FOCUS_EMAIL)
+    m.passwordField.focusedState = (m.focusIndex = m.FOCUS_PASSWORD)
+
     if m.focusIndex = m.FOCUS_PHONE_TAB then
         SetLoginMode("phone")
         m.phoneTab.setFocus(true)
@@ -140,6 +323,8 @@ sub LoginScreen_ApplyFocus()
         SetLoginMode("remote")
         m.loginBtn.setFocus(true)
     end if
+
+    UpdateLoginButton()
 end sub
 
 sub RedirectIfAlreadyAuthenticated()
@@ -174,8 +359,7 @@ sub SetLoginMode(mode as string)
     m.remoteCard.visible = not isPhone
     m.remoteCardBorder.visible = not isPhone
 
-    m.phoneTab.selected = isPhone
-    m.remoteTab.selected = not isPhone
+    UpdateTabColors()
 
     if isPhone then
         if m.deviceCode <> "" then StartPollTimers()
@@ -220,10 +404,15 @@ sub FetchOnboardDevice()
 end sub
 
 sub OnOnboardResponse()
-    m.onboardInFlight = false
-
     api = m.onboardTask.apiResult
-    if api = invalid or not api.ok or api.result = invalid then
+    ' apiResult is invalid while the request is in flight (and observeField can fire on
+    ' registration). Ignore those — keep showing the shimmer until the real result, so
+    ' the QR doesn't flash "Failed to load" before the code appears.
+    if api = invalid then return
+
+    m.onboardInFlight = false
+    if HandleSessionExpiry(m.top, api) then return
+    if not api.ok or api.result = invalid then
         ShowQrError(CopyQrLoadFailed())
         MaybeToastApiError(api)
         ScheduleOnboardRetry()
@@ -244,7 +433,7 @@ sub OnOnboardResponse()
 
     m.userCode = userCode
     m.deviceCode = deviceId
-    m.userCodeLabel.text = FormatQRCodeNumber(userCode)
+    m.userCodeLabel.text = TrackWide(FormatQRCodeNumber(userCode))
 
     if userCode <> "" then
         ShowQrCode(userCode)
@@ -318,13 +507,13 @@ sub OnPollResponse()
 
     api = task.apiResult
     if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
 
-    ' Only complete when tokens arrive — pending/empty result keeps polling (web parity).
-    if api.ok and api.result <> invalid and HasLoginTokens(api.result) then
-        StopPollTimers()
-        CancelOnboardRetry()
-        vm = FindViewManager(m.top)
-        HandleLoginRedirect(api.result, vm, m.top)
+    ' Complete on tokens OR an explicit device-limit result; otherwise keep polling
+    ' (pending/empty keeps the QR alive, web parity).
+    if api.ok and api.result <> invalid and (HasLoginTokens(api.result) or api.result.nextStep = NextStepDeviceLimit()) then
+        ' TEMP: no navigation — toast the outcome + temp logout, then restart the flow.
+        FinishLoginForNow(api.result)
         return
     end if
 
@@ -341,16 +530,63 @@ sub MaybeToastApiError(api as object)
     ShowAlert(m.top, 2, api.message)
 end sub
 
+' TEMP (login-only branch): a successful login does NOT navigate yet. We show a toast
+' describing the outcome, then log the (just-created) session out and restart the QR /
+' form so the login screen stays testable. Real navigation lands in a later branch.
+sub FinishLoginForNow(token as object)
+    nextStep = ""
+    if token <> invalid and token.nextStep <> invalid then nextStep = token.nextStep
+
+    ShowAlert(m.top, LoginOutcomeType(nextStep), LoginOutcomeMessage(nextStep))
+
+    ClearStorage()
+    RestartLoginFlow()
+end sub
+
+' Device-limit is a warning (type 2); every other outcome is a success (type 1).
+function LoginOutcomeType(nextStep as string) as integer
+    if nextStep = NextStepDeviceLimit() then return 2
+    return 1
+end function
+
+function LoginOutcomeMessage(nextStep as string) as string
+    if nextStep = NextStepDeviceLimit() then return MsgDeviceLimitExceeded()
+    if nextStep = NextStepSelectProfile() then return MsgLoginSelectProfile()
+    if nextStep = NextStepHomePage() then return MsgLoginHomePage()
+    if nextStep = NextStepVerify() then return MsgLoginVerify()
+    if nextStep = NextStepSetup() then return MsgLoginSetup()
+    if nextStep = NextStepSignup() then return MsgLoginSignup()
+    return MsgLoginSuccess()
+end function
+
+' Reset the screen to a fresh, logged-out state: stop polling, clear the code + form,
+' and re-onboard so a new QR appears (and polling resumes for the phone flow).
+sub RestartLoginFlow()
+    StopPollTimers()
+    CancelOnboardRetry()
+    m.userCode = ""
+    m.deviceCode = ""
+    m.userCodeLabel.text = ""
+    m.email = ""
+    m.password = ""
+    m.emailField.value = ""
+    m.passwordField.value = ""
+    HideFormError()
+    SetLoginLoading(false)
+    m.onboardInFlight = false
+    m.pollInFlight = false
+    UpdateLoginButton()
+    FetchOnboardDevice()
+end sub
+
 sub SubmitEmailLogin()
-    m.formError.visible = false
-    m.formError.text = ""
+    HideFormError()
     if not ValidateEmail(m.email) or m.password = "" then
-        m.formError.text = CopyFormInvalid()
-        m.formError.visible = true
+        ShowFormError(CopyFormInvalid())
         return
     end if
 
-    m.loginSpinner.visible = true
+    SetLoginLoading(true)
     path = Endpoints().LOGIN.EMAIL_TOKEN
     m.emailTask = ApiPatch(path, { email: m.email, password: m.password })
     m.emailTask.observeField("apiResult", "OnEmailResponse")
@@ -358,41 +594,46 @@ sub SubmitEmailLogin()
 end sub
 
 sub OnEmailResponse()
-    m.loginSpinner.visible = false
     api = m.emailTask.apiResult
-    if api = invalid or not api.ok or api.result = invalid then
-        if api <> invalid and api.message <> "" then
-            m.formError.text = api.message
+    ' apiResult is invalid while the request is in flight (and observeField can fire on
+    ' registration). Ignore those spurious fires — only act on the final result, so the
+    ' button keeps its spinner instead of flashing "Login failed" then the real error.
+    if api = invalid then return
+
+    SetLoginLoading(false)
+    if HandleSessionExpiry(m.top, api) then return
+
+    ' Device limit exceeded → always a toast (web parity: showAlert(2, DEVICE_LIMIT_EXCEEDED)),
+    ' never the inline error. Checked first so it works regardless of HTTP status.
+    if api.result <> invalid and api.result.nextStep = NextStepDeviceLimit() then
+        FinishLoginForNow(api.result)
+        return
+    end if
+
+    ' API responded but login did not succeed. Web shows a fixed inline message (no toast):
+    '  - no HTTP response at all (network failure) → "Login failed. Please try again." (catch)
+    '  - server rejected the request (4xx)        → "Invalid email or password"
+    if not api.ok or api.result = invalid then
+        if m.emailTask.httpStatus <= 0 then
+            ShowFormError(CopyLoginFailed())
         else
-            m.formError.text = CopyInvalidCredentials()
+            ShowFormError(CopyInvalidCredentials())
         end if
-        m.formError.visible = true
-        MaybeToastApiError(api)
         return
     end if
 
     token = api.result
-    vm = FindViewManager(m.top)
 
-    if token.nextStep = NextStepDeviceLimit() then
-        ApplyLoginTokens(token)
-        ShowAlert(m.top, 2, MsgDeviceLimitExceeded())
-        if vm <> invalid then
-            vm.callFunc("NavigateReplace", RouteLoginProfile(), { directLogin: true })
-        end if
-        return
-    end if
-
+    ' Success (tokens) → TEMP: toast the outcome + temp logout, no nav.
     if token.authToken <> invalid and token.authToken <> "" then
         deviceToken = {
             cognitoAccessToken: token.authToken
             cognitoRefreshToken: token.refreshToken
             nextStep: token.nextStep
         }
-        HandleLoginRedirect(deviceToken, vm, m.top)
+        FinishLoginForNow(deviceToken)
     else
-        m.formError.text = CopyInvalidCredentials()
-        m.formError.visible = true
+        ShowFormError(CopyInvalidCredentials())
     end if
 end sub
 
@@ -405,17 +646,37 @@ function ValidateEmail(email as string) as boolean
 end function
 
 sub ShowKeyboardDialog(field as string, initial as string, secure as boolean)
-    dialog = CreateObject("roSGNode", "KeyboardDialog")
+    ' Prefer StandardKeyboardDialog (Roku's recommended replacement for the legacy
+    ' KeyboardDialog — enhanced graphics + keyboardDomain/voice support). On hosts
+    ' that don't implement it yet (e.g. the simulator's brs-scenegraph v0.1.0 falls
+    ' back to a blank Node), drop down to the legacy KeyboardDialog so it still works.
+    ' Detect real support via hasField: an unimplemented type is created as a
+    ' bare Node (no "keyboard" field), while a real (Standard)KeyboardDialog has it.
+    isStandard = true
+    dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
+    if dialog = invalid or not dialog.hasField("keyboard") then
+        isStandard = false
+        dialog = CreateObject("roSGNode", "KeyboardDialog")
+    end if
+
     if field = "email" then
         dialog.title = CopyEmailHint()
+        if isStandard then dialog.keyboardDomain = "email"
     else
         dialog.title = CopyPasswordHint()
+        if isStandard then dialog.keyboardDomain = "generic"
     end if
     dialog.text = initial
     dialog.buttons = ["OK", "Cancel"]
 
-    kb = dialog.findNode("keyboard")
+    ' Secure (password) masking — set on the internal keyboard and, when present,
+    ' its textEditBox (accessed via node fields; findNode by id is unreliable here).
+    kb = dialog.keyboard
     if kb <> invalid then kb.secureMode = secure
+    if isStandard then
+        teb = dialog.textEditBox
+        if teb <> invalid then teb.secureMode = secure
+    end if
 
     m.activeField = field
     m.keyboardDialog = dialog
@@ -441,6 +702,7 @@ sub OnKeyboardButton()
             m.focusIndex = m.FOCUS_LOGIN_BTN
             LoginScreen_ApplyFocus()
         end if
+        UpdateLoginButton()
     end if
 
     CloseKeyboardDialog()
@@ -469,7 +731,9 @@ function LoginScreen_OnKey(key as string, press as boolean) as boolean
 
     if key = "right" or key = "down" then
         if m.focusIndex = fi then
-            m.focusIndex = m.FOCUS_REMOTE_TAB
+            ' Switch to Remote: focus the email field by default (remote tab stays
+            ' visually active). The tabs remain reachable via Up from email.
+            m.focusIndex = m.FOCUS_EMAIL
             LoginScreen_ApplyFocus()
             return true
         else if m.focusIndex = m.FOCUS_REMOTE_TAB then
@@ -495,7 +759,7 @@ function LoginScreen_OnKey(key as string, press as boolean) as boolean
             LoginScreen_ApplyFocus()
             return true
         end if
-    else if key = "OK" then
+    else if key = "ok" then
         if m.focusIndex = fi or m.focusIndex = m.FOCUS_REMOTE_TAB then
             LoginScreen_ApplyFocus()
             return true

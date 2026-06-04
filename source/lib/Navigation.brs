@@ -44,8 +44,11 @@ function ExitApp(fromNode as object) as void
 end function
 
 function GetInitialRoute() as string
-    if HasActiveSession() then
-        return RouteLoginProfile()
-    end if
+    ' TEMP (login-only branch): always boot into Login so we can see + test the login
+    ' flow. A leftover session must not route us to other screens yet. Restore the
+    ' session check below once post-login navigation is implemented.
+    ' if HasActiveSession() then
+    '     return RouteLoginProfile()
+    ' end if
     return RouteLogin()
 end function

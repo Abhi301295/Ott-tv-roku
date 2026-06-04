@@ -7,7 +7,7 @@
     <field id="alertType" type="integer" value="2" />
   </interface>
 
-  <script type="text/brightscript" uri="pkg:/source/lib/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />

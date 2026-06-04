@@ -17,6 +17,7 @@
     <field id="primary700" type="string" />
     <field id="secondaryColor" type="string" />
     <field id="tertiaryColor" type="string" />
+    <field id="themeTokens" type="assocarray" />
     <field id="bootBackgroundColor" type="string" value="#0b1120" />
 
     <field id="reelsEnabled" type="boolean" value="false" />
@@ -27,12 +28,12 @@
   <children>
   </children>
 
-  <script type="text/brightscript" uri="pkg:/source/lib/Config.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/AuthInterceptor.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/ApiClient.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/BusinessConfig.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/AuthInterceptor.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/ThemeManager.brs" />
 </component>
