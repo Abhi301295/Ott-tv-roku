@@ -16,7 +16,11 @@ ott-tv-roku/
 ├── config.example.json      # copy to config.json (gitignored) and fill values
 ├── source/
 │   ├── main.brs             # channel entry point
-│   └── lib/                 # BrightScript libs (http, registry, theme, helpers)
+│   └── lib/                 # shared BrightScript libs, grouped by domain
+│       ├── net/             # Config, Endpoints, ApiClient, AuthInterceptor
+│       ├── theme/           # ColorShade, BusinessConfig
+│       ├── login/           # NextStep, LoginService, LoginStrings
+│       └── *.brs            # cross-cutting: Registry, Alert, Navigation, Routes
 ├── components/
 │   ├── MainScene.xml/.brs   # root scene (hosts the ViewManager)
 │   ├── core/                # ViewManager, ThemeManager, BusinessConfig, tasks

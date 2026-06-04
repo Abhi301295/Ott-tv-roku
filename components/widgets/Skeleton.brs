@@ -27,7 +27,12 @@ sub ApplySize()
     if bandWidth < 24 then bandWidth = 24
     m.shine.width = bandWidth
     m.clip.clippingRect = [0, 0, w, h]
-    m.interp.keyValue = [[-1 * bandWidth, 0], [w, 0]]
+    ' Keep the band fully inside the box [0 .. w-band]. The simulator doesn't honor
+    ' clippingRect, so sweeping from -band would let the shine spill out the left of
+    ' the pad into the card. Staying in-bounds keeps the shimmer within its container.
+    travelEnd = w - bandWidth
+    if travelEnd < 0 then travelEnd = 0
+    m.interp.keyValue = [[0, 0], [travelEnd, 0]]
 end sub
 
 sub ApplyColors()

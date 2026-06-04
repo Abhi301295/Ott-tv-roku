@@ -46,9 +46,9 @@ end sub
 sub ApplyFallbackTheme()
     resolved = EmptyResolved()
     cfg = AppConfig()
-    resolved.portalPrimaryColor = "#4d57ea"
-    resolved.portalSecondaryColor = "#ffffff"
-    resolved.portalTertiaryColor = "#1f1f22"
+    resolved.portalPrimaryColor = "#0b75e0"
+    resolved.portalSecondaryColor = "#e279ce"
+    resolved.portalTertiaryColor = "#ffffff"
     resolved.brandingLogo = ""
     resolved.appName = "OTT Accelerator"
     ApplyResolvedTheme(m.top, resolved)

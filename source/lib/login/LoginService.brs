@@ -1,6 +1,6 @@
 ' LoginService.brs — device onboard, token poll, redirect (parity with login services).
 
-' Included by LoginScreen; MsgDeviceLimitExceeded lives in LoginCopy.brs.
+' Included by LoginScreen; MsgDeviceLimitExceeded lives in LoginStrings.brs.
 
 function LoginDevicePayload() as object
     return {
@@ -116,4 +116,29 @@ function FindViewManager(fromNode as object) as object
     scene = fromNode.getScene()
     if scene = invalid then return invalid
     return scene.findNode("viewManager")
+end function
+
+' Session-expiry handler — parity with axios.instance.ts 403 handler + logoutSession():
+' when an API result is flagged shouldLogout (HTTP 403), clear all tokens and send
+' the user back to Login. Returns true when it handled a logout so the caller can
+' stop processing the (now invalid) response.
+function HandleSessionExpiry(fromNode as object, api as object) as boolean
+    if api = invalid then return false
+    if api.shouldLogout <> true then return false
+
+    ' HttpTask already clears storage on shouldLogout; repeat defensively (idempotent)
+    ' so this also works when called from non-task paths.
+    ClearStorage()
+
+    msg = "Session expired. Please log in again."
+    if api.message <> invalid and api.message <> "" then msg = api.message
+    ShowAlert(fromNode, 2, msg)
+
+    ' Replace with Login — but not if we're already on Login (avoids a reload loop
+    ' when a pre-login call on the login screen itself returns 403).
+    vm = FindViewManager(fromNode)
+    if vm <> invalid and vm.currentRoute <> RouteLogin() then
+        vm.callFunc("NavigateReplace", RouteLogin(), {})
+    end if
+    return true
 end function
