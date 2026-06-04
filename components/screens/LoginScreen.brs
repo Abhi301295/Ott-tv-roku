@@ -75,17 +75,12 @@ sub init()
     UpdateTabColors()
     UpdateLoginButton()
 
-    ' Startup auto-redirect — commented out for the login-only branch. We must NOT
-    ' navigate to other screens yet; a successful login only shows a toast. Restore
-    ' this block once post-login navigation is implemented in a later branch.
-    ' if GetCognitoToken() <> "" then
-    '     RedirectIfAlreadyAuthenticated()
-    '     return
-    ' end if
-
-    ' TEMP (login-only branch): clear any existing session on entry so we always land
-    ' on a fresh, logged-out login screen. Remove together with the block above.
-    ClearStorage()
+    ' If a session already exists, skip login and go straight to profile selection
+    ' (parity with web's authenticated-route guard).
+    if HasActiveSession() then
+        RedirectIfAlreadyAuthenticated()
+        return
+    end if
 
     LoginScreen_ApplyFocus()
     FetchOnboardDevice()
@@ -512,8 +507,10 @@ sub OnPollResponse()
     ' Complete on tokens OR an explicit device-limit result; otherwise keep polling
     ' (pending/empty keeps the QR alive, web parity).
     if api.ok and api.result <> invalid and (HasLoginTokens(api.result) or api.result.nextStep = NextStepDeviceLimit()) then
-        ' TEMP: no navigation — toast the outcome + temp logout, then restart the flow.
-        FinishLoginForNow(api.result)
+        StopPollTimers()
+        CancelOnboardRetry()
+        vm = FindViewManager(m.top)
+        HandleLoginRedirect(api.result, vm, m.top)
         return
     end if
 
@@ -528,55 +525,6 @@ sub MaybeToastApiError(api as object)
     if api.httpStatus = 401 then return
     if api.message = invalid or api.message = "" then return
     ShowAlert(m.top, 2, api.message)
-end sub
-
-' TEMP (login-only branch): a successful login does NOT navigate yet. We show a toast
-' describing the outcome, then log the (just-created) session out and restart the QR /
-' form so the login screen stays testable. Real navigation lands in a later branch.
-sub FinishLoginForNow(token as object)
-    nextStep = ""
-    if token <> invalid and token.nextStep <> invalid then nextStep = token.nextStep
-
-    ShowAlert(m.top, LoginOutcomeType(nextStep), LoginOutcomeMessage(nextStep))
-
-    ClearStorage()
-    RestartLoginFlow()
-end sub
-
-' Device-limit is a warning (type 2); every other outcome is a success (type 1).
-function LoginOutcomeType(nextStep as string) as integer
-    if nextStep = NextStepDeviceLimit() then return 2
-    return 1
-end function
-
-function LoginOutcomeMessage(nextStep as string) as string
-    if nextStep = NextStepDeviceLimit() then return MsgDeviceLimitExceeded()
-    if nextStep = NextStepSelectProfile() then return MsgLoginSelectProfile()
-    if nextStep = NextStepHomePage() then return MsgLoginHomePage()
-    if nextStep = NextStepVerify() then return MsgLoginVerify()
-    if nextStep = NextStepSetup() then return MsgLoginSetup()
-    if nextStep = NextStepSignup() then return MsgLoginSignup()
-    return MsgLoginSuccess()
-end function
-
-' Reset the screen to a fresh, logged-out state: stop polling, clear the code + form,
-' and re-onboard so a new QR appears (and polling resumes for the phone flow).
-sub RestartLoginFlow()
-    StopPollTimers()
-    CancelOnboardRetry()
-    m.userCode = ""
-    m.deviceCode = ""
-    m.userCodeLabel.text = ""
-    m.email = ""
-    m.password = ""
-    m.emailField.value = ""
-    m.passwordField.value = ""
-    HideFormError()
-    SetLoginLoading(false)
-    m.onboardInFlight = false
-    m.pollInFlight = false
-    UpdateLoginButton()
-    FetchOnboardDevice()
 end sub
 
 sub SubmitEmailLogin()
@@ -606,7 +554,8 @@ sub OnEmailResponse()
     ' Device limit exceeded → always a toast (web parity: showAlert(2, DEVICE_LIMIT_EXCEEDED)),
     ' never the inline error. Checked first so it works regardless of HTTP status.
     if api.result <> invalid and api.result.nextStep = NextStepDeviceLimit() then
-        FinishLoginForNow(api.result)
+        vm = FindViewManager(m.top)
+        HandleLoginRedirect(api.result, vm, m.top)
         return
     end if
 
@@ -624,14 +573,17 @@ sub OnEmailResponse()
 
     token = api.result
 
-    ' Success (tokens) → TEMP: toast the outcome + temp logout, no nav.
+    ' Success → store tokens and navigate per nextStep (parity with handleRedirect).
     if token.authToken <> invalid and token.authToken <> "" then
         deviceToken = {
+            authToken: token.authToken
             cognitoAccessToken: token.authToken
+            refreshToken: token.refreshToken
             cognitoRefreshToken: token.refreshToken
             nextStep: token.nextStep
         }
-        FinishLoginForNow(deviceToken)
+        vm = FindViewManager(m.top)
+        HandleLoginRedirect(deviceToken, vm, m.top)
     else
         ShowFormError(CopyInvalidCredentials())
     end if

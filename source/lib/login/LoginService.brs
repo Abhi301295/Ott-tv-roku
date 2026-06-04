@@ -97,9 +97,14 @@ sub HandleLoginRedirect(deviceToken as object, viewManager as object, fromNode =
 
     ApplyLoginTokens(deviceToken)
 
+    ' Web: SelectProfile(60) → Home (profile already chosen server-side);
+    '      HomePage(40)      → profile picker.
+    ' TEMP (profile branch): Home isn't built yet, so the 60 case also lands on the
+    ' profile picker. Restore the Home navigation below once the Home screen exists.
     if nextStep = NextStepSelectProfile() then
         SetValueByKey(SK_SelectedItem(), "Home", "app")
-        viewManager.callFunc("NavigateReplace", RouteHome(), {})
+        ' viewManager.callFunc("NavigateReplace", RouteHome(), {})
+        viewManager.callFunc("NavigateReplace", RouteLoginProfile(), { directLogin: true })
         return
     end if
 
