@@ -1,0 +1,19 @@
+# Roku build artifacts
+out/
+dist/
+*.pkg
+*.zip
+*.squashfs
+
+# Local runtime config (copy from config.example.json)
+config.json
+
+# Roku module manager
+roku_modules/
+node_modules/
+
+# Editor / OS
+.DS_Store
+*.log
+.vscode/
+.idea/

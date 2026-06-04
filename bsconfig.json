@@ -1,0 +1,21 @@
+{
+  "rootDir": "./",
+  "files": [
+    "manifest",
+    "source/**/*",
+    "components/**/*",
+    "images/**/*",
+    "fonts/**/*",
+    "locale/**/*"
+  ],
+  "autoImportComponentScript": true,
+  "createPackage": false,
+  "stagingDir": "./out/.roku-deploy-staging",
+  "retainStagingDir": false,
+  "diagnosticFilters": [
+    {
+      "src": "**/roku_modules/**/*",
+      "codes": []
+    }
+  ]
+}
