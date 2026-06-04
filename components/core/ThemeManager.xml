@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Fetches business config on load and exposes theme + feature flags to the app. -->
+<component name="ThemeManager" extends="Node">
+  <interface>
+    <field id="loading" type="boolean" value="true" alwaysNotify="true" />
+    <field id="error" type="string" alwaysNotify="true" />
+    <field id="ready" type="boolean" value="false" alwaysNotify="true" />
+
+    <field id="appName" type="string" />
+    <field id="brandingLogo" type="string" />
+    <field id="loginBackgroundImage" type="string" />
+    <field id="fontFamily" type="string" />
+
+    <field id="primaryColor" type="string" />
+    <field id="primary500" type="string" />
+    <field id="primary600" type="string" />
+    <field id="primary700" type="string" />
+    <field id="secondaryColor" type="string" />
+    <field id="tertiaryColor" type="string" />
+    <field id="bootBackgroundColor" type="string" value="#0b1120" />
+
+    <field id="reelsEnabled" type="boolean" value="false" />
+    <field id="geoBlockingEnabled" type="boolean" value="true" />
+    <field id="subscriptionEnabled" type="boolean" value="true" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/AuthInterceptor.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/components/core/ThemeManager.brs" />
+</component>
