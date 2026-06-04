@@ -30,9 +30,7 @@ function SK_TimeZone() as string: return "timezone": end function
 function RegistryRead(key as string, section = "auth" as string) as string
     sec = CreateObject("roRegistrySection", section)
     if sec.Exists(key) then
-        val = ""
-        sec.Read(key, val)
-        return val
+        return sec.Read(key)
     end if
     return ""
 end function
@@ -186,9 +184,9 @@ function GenerateUUID() as string
         else if i = 19
             r = Rnd(16)
             n = (r and 3) or 8
-            uuid = uuid + hex.Mid(n, 1)
+            uuid = uuid + Mid(hex, n + 1, 1)
         else
-            uuid = uuid + hex.Mid(Rnd(16), 1)
+            uuid = uuid + Mid(hex, Rnd(16) + 1, 1)
         end if
     end for
     return uuid

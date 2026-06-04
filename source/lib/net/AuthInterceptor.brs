@@ -13,6 +13,14 @@ function BuildDefaultHeaders() as object
     }
 end function
 
+' True when url contains any of the given path substrings.
+function UrlMatchesAny(url as string, paths as object) as boolean
+    for each p in paths
+        if p <> invalid and p <> "" and Instr(1, url, p) > 0 then return true
+    end for
+    return false
+end function
+
 ' Picks Bearer access / refresh / Basic auth based on URL path substring.
 function ApplyAuthHeader(url as string, headers as object) as object
     ep = Endpoints()
@@ -20,45 +28,45 @@ function ApplyAuthHeader(url as string, headers as object) as object
     refreshToken = GetRefreshToken()
     authKey = GetAuthBase64Key()
 
-    ' Profile flows (web uses access token for these paths)
-    if authToken <> "" and (
-        Instr(1, url, ep.PROFILE.GET_LOGIN_PROFILES) > 0 or
-        Instr(1, url, ep.PROFILE.SELECT_PROFILE_TO_WATCH_BEFORE_LOGIN) > 0 or
-        Instr(1, url, ep.PROFILE.VERIFY_PIN_BEFORE_LOGIN) > 0
-    ) then
-        headers["authorization"] = "Bearer " + authToken
-        return headers
-    end if
+    profilePaths = [
+        ep.PROFILE.GET_LOGIN_PROFILES
+        ep.PROFILE.SELECT_PROFILE_TO_WATCH_BEFORE_LOGIN
+        ep.PROFILE.VERIFY_PIN_BEFORE_LOGIN
+    ]
 
-    ' Media / content APIs
-    if authToken <> "" and (
-        Instr(1, url, ep.HOME.CATEGORY_LIST) > 0 or
-        Instr(1, url, ep.HOME.CONTINUE_WATCHING) > 0 or
-        Instr(1, url, ep.PROFILE.SELECT_PROFILE) > 0 or
-        Instr(1, url, ep.SERIES.GENERE_LIST) > 0 or
-        Instr(1, url, ep.DETAIL.CONTENT_VIEW) > 0 or
-        Instr(1, url, ep.DETAIL.WATCH_LIST) > 0 or
-        Instr(1, url, ep.DETAIL.SAVE_WATCH_LIST) > 0 or
-        Instr(1, url, ep.DETAIL.UPDATE_VIDEO_PROGRESS) > 0 or
-        Instr(1, url, ep.DETAIL.RECOMENDED_VIDEOS) > 0 or
-        Instr(1, url, ep.COOKIES.GET_COOKIES) > 0 or
-        Instr(1, url, ep.SEARCH.SEARCH_LIST) > 0 or
-        Instr(1, url, ep.GET_NEW_RELEASE_LIST) > 0 or
-        Instr(1, url, ep.SERIES.SERIES_LIST) > 0 or
-        Instr(1, url, ep.MY_LIST.MY_LIST_LISTING) > 0 or
-        Instr(1, url, ep.MY_LIST.MY_LIST_DETAIL) > 0 or
-        Instr(1, url, ep.SAVE_AD_VIEW) > 0 or
-        Instr(1, url, ep.REELS_LIST) > 0
-    ) then
+    mediaPaths = [
+        ep.HOME.CATEGORY_LIST
+        ep.HOME.CONTINUE_WATCHING
+        ep.PROFILE.SELECT_PROFILE
+        ep.SERIES.GENERE_LIST
+        ep.DETAIL.CONTENT_VIEW
+        ep.DETAIL.WATCH_LIST
+        ep.DETAIL.SAVE_WATCH_LIST
+        ep.DETAIL.UPDATE_VIDEO_PROGRESS
+        ep.DETAIL.RECOMENDED_VIDEOS
+        ep.COOKIES.GET_COOKIES
+        ep.SEARCH.SEARCH_LIST
+        ep.GET_NEW_RELEASE_LIST
+        ep.SERIES.SERIES_LIST
+        ep.MY_LIST.MY_LIST_LISTING
+        ep.MY_LIST.MY_LIST_DETAIL
+        ep.SAVE_AD_VIEW
+        ep.REELS_LIST
+    ]
+
+    refreshPaths = [
+        ep.LOGIN.LOGOUT_SESSION
+        ep.LOGIN.REFRESH_TOKEN
+    ]
+
+    ' Profile flows + media / content APIs use the access token.
+    if authToken <> "" and (UrlMatchesAny(url, profilePaths) or UrlMatchesAny(url, mediaPaths)) then
         headers["authorization"] = "Bearer " + authToken
         return headers
     end if
 
     ' Logout / refresh session
-    if refreshToken <> "" and (
-        Instr(1, url, ep.LOGIN.LOGOUT_SESSION) > 0 or
-        Instr(1, url, ep.LOGIN.REFRESH_TOKEN) > 0
-    ) then
+    if refreshToken <> "" and UrlMatchesAny(url, refreshPaths) then
         headers["authorization"] = "Bearer " + refreshToken
         return headers
     end if

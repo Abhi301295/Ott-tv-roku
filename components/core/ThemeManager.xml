@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!-- Fetches business config on load and exposes theme + feature flags to the app. -->
-<component name="ThemeManager" extends="Node">
+<component name="ThemeManager" extends="Group">
   <interface>
     <field id="loading" type="boolean" value="true" alwaysNotify="true" />
     <field id="error" type="string" alwaysNotify="true" />
@@ -17,6 +17,7 @@
     <field id="primary700" type="string" />
     <field id="secondaryColor" type="string" />
     <field id="tertiaryColor" type="string" />
+    <field id="themeTokens" type="assocarray" />
     <field id="bootBackgroundColor" type="string" value="#0b1120" />
 
     <field id="reelsEnabled" type="boolean" value="false" />
@@ -24,12 +25,15 @@
     <field id="subscriptionEnabled" type="boolean" value="true" />
   </interface>
 
-  <script type="text/brightscript" uri="pkg:/source/lib/Config.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/Endpoints.brs" />
+  <children>
+  </children>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/AuthInterceptor.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/ApiClient.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/BusinessConfig.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/AuthInterceptor.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/ThemeManager.brs" />
 </component>

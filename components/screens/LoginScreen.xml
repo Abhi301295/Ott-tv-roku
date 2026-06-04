@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Login screen — parity with src/features/login/index.tsx + emailLogin.tsx -->
+<component name="LoginScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/LoginScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x0b1120ff" />
+    <Poster id="bgImage" width="1920" height="1080" loadDisplayMode="scaleToFill" visible="false" />
+    <Rectangle id="bgOverlay" width="1920" height="1080" color="0x000000a6" />
+
+    <Poster id="logoPoster" translation="[810, 56]" width="300" height="72" loadDisplayMode="scaleToFit" visible="false" />
+    <Label id="logoLabel" text="OTT Accelerator" translation="[760, 70]" width="400" horizAlign="center"
+      font="font:LargeBoldSystemFont" color="0x0b75e0ff" visible="false" />
+
+    <Label id="title" text="Choose how to Sign In" translation="[0, 228]" width="1920" horizAlign="center" color="0xf8f1f7ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="36" />
+    </Label>
+
+    <!-- Tabs: DM Sans SemiBold 20, p-x-32 (pill = text+64), gap-16, radius-8, shadow-primary-700 when selected -->
+    <LoginTabButton id="phoneTab" label="Use Phone" translation="[776, 296]" buttonWidth="168" buttonHeight="56"
+      shapeUri="pkg:/images/ui/tab_phone.png" shadowUri="pkg:/images/ui/tab_phone_shadow.png" />
+    <LoginTabButton id="remoteTab" label="Use Remote" translation="[960, 296]" buttonWidth="184" buttonHeight="56"
+      shapeUri="pkg:/images/ui/tab_remote.png" shadowUri="pkg:/images/ui/tab_remote_shadow.png" />
+
+    <!-- Phone card w922 h470 radius-16 border-2 -->
+    <Poster id="phoneCardBorder" translation="[497, 388]" width="926" height="524" uri="pkg:/images/ui/card_out_phone.png" blendColor="0xe279ceff" visible="true" />
+    <Poster id="phoneCard" translation="[499, 390]" width="922" height="520" uri="pkg:/images/ui/card_in_phone.png" blendColor="0xffffffff" visible="true" />
+
+    <!-- Inner padding p-x-40. Two 413px columns, divider ~461 (React: absolute ml-96).
+         Caption fonts pinned to exact px (fs-16/18 × 1.2 LARGE) so wrapping matches web. -->
+    <Group id="phonePanel" translation="[499, 390]" visible="true">
+      <Poster id="step1Badge" translation="[40, 44]" width="34" height="34" uri="pkg:/images/ui/badge.png" blendColor="0xf8f1f7ff" />
+      <Label id="step1Num" text="1" translation="[40, 44]" width="34" height="34" horizAlign="center" vertAlign="center" color="0x0a0a0aff">
+        <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="16" />
+      </Label>
+      <Label id="step1Text" translation="[40, 94]" width="413" height="92" wrap="true" lineSpacing="6" color="0xe279ceff">
+        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="19" />
+      </Label>
+
+      <Poster id="qrPad" translation="[160, 230]" width="182" height="182" uri="pkg:/images/ui/qr_pad.png" blendColor="0xf8f1f7ff" />
+      <Skeleton id="qrSkeleton" translation="[176, 246]" boxWidth="150" boxHeight="150"
+        baseColor="0xffffffff" highlightColor="0xf3f3f3ff" visible="false" />
+      <Poster id="qrImage" translation="[176, 246]" width="150" height="150" loadDisplayMode="scaleToFit" visible="false" />
+      <Label id="qrErrorLabel" translation="[176, 246]" width="150" height="150" wrap="true" lineSpacing="4"
+        horizAlign="center" vertAlign="center" color="0x0b75e0ff" visible="false">
+        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="13" />
+      </Label>
+
+      <Rectangle id="dividerTop" translation="[490, 61]" width="2" height="171" color="0xa12189ff" />
+      <Label id="orLabel" text="or" translation="[468, 232]" width="46" height="36" horizAlign="center" vertAlign="center" color="0xe279ceff">
+        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="18" />
+      </Label>
+      <Rectangle id="dividerBottom" translation="[490, 276]" width="2" height="174" color="0xa12189ff" />
+
+      <Poster id="step2Badge" translation="[528, 44]" width="34" height="34" uri="pkg:/images/ui/badge.png" blendColor="0xf8f1f7ff" />
+      <Label id="step2Num" text="2" translation="[528, 44]" width="34" height="34" horizAlign="center" vertAlign="center" color="0x0a0a0aff">
+        <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="16" />
+      </Label>
+      <Label id="step2Text" translation="[528, 94]" width="354" height="80" wrap="true" horizAlign="center" color="0xe279ceff">
+        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="22" />
+      </Label>
+      <!-- Code: font-serif fw-700 (tracking-widest) — Liberation Serif (Times-compatible) -->
+      <Label id="userCodeLabel" translation="[528, 206]" width="354" height="110" wrap="true" lineSpacing="8"
+        horizAlign="center" color="0xf8f1f7ff">
+        <Font role="font" uri="pkg:/fonts/Serif-Bold.ttf" size="34" />
+      </Label>
+    </Group>
+
+    <!-- Remote card w922 h387 radius-24 -->
+    <Poster id="remoteCardBorder" translation="[497, 388]" width="926" height="391" uri="pkg:/images/ui/card_out_remote.png" blendColor="0xe279ceff" visible="false" />
+    <Poster id="remoteCard" translation="[499, 390]" width="922" height="387" uri="pkg:/images/ui/card_in_remote.png" blendColor="0xffffffff" visible="false" />
+
+    <!-- Inner padding: p-x-64 / p-t-64. Fields full width = 922 - 2*64 = 794. -->
+    <Group id="remotePanel" translation="[499, 390]" visible="false">
+      <!-- Error box — parity with web: p-12 bg-primary-800/20 border-primary-500 radius-8 text-primary-500 fs-14 centered.
+           Positions below are the no-error baseline; LayoutForm() shifts fields down when the error shows. -->
+      <Group id="formErrorBox" translation="[64, 35]" visible="false">
+        <Poster id="formErrorBg" translation="[0, 0]" width="794" height="52" uri="pkg:/images/ui/error_bg.png" blendColor="0x0b3a82ff" opacity="0.2" />
+        <Poster id="formErrorBorder" translation="[0, 0]" width="794" height="52" uri="pkg:/images/ui/error_border.png" blendColor="0x0b75e0ff" />
+        <Label id="formError" text="" translation="[16, 0]" width="762" height="52" wrap="true" horizAlign="center" vertAlign="center" color="0x0b75e0ff">
+          <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="15" />
+        </Label>
+      </Group>
+      <LoginFieldButton id="emailField" label="Email" translation="[64, 35]" fieldWidth="794" fieldHeight="60" />
+      <LoginFieldButton id="passwordField" label="Password" translation="[64, 123]" fieldWidth="794" fieldHeight="60" secure="true" />
+      <LoginTabButton id="loginBtn" label="Login" translation="[64, 227]" buttonWidth="794" buttonHeight="60"
+        shapeUri="pkg:/images/ui/btn_login.png" shadowUri="pkg:/images/ui/btn_login_shadow.png"
+        fontUri="pkg:/fonts/DMSans-Bold.ttf" fontSize="22" />
+      <!-- In-button loader (parity with web's spinner inside the Login button) -->
+      <BusySpinner id="loginSpinner" translation="[443, 239]" visible="false">
+        <Poster role="poster" uri="pkg:/images/ui/spinner.png" width="36" height="36" />
+      </BusySpinner>
+    </Group>
+
+    <Timer id="pollTimer" repeat="true" duration="6" />
+    <Timer id="pollTimeout" repeat="false" duration="300" />
+    <Timer id="onboardRetry" repeat="false" duration="5" />
+  </children>
+</component>

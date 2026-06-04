@@ -16,16 +16,19 @@ ott-tv-roku/
 ├── config.example.json      # copy to config.json (gitignored) and fill values
 ├── source/
 │   ├── main.brs             # channel entry point
-│   └── lib/                 # BrightScript libs (http, registry, theme, helpers)
+│   └── lib/                 # shared BrightScript libs, grouped by domain
+│       ├── net/             # Config, Endpoints, ApiClient, AuthInterceptor
+│       ├── theme/           # ColorShade, BusinessConfig
+│       ├── login/           # NextStep, LoginService, LoginStrings
+│       └── *.brs            # cross-cutting: Registry, Alert, Navigation, Routes
 ├── components/
 │   ├── MainScene.xml/.brs   # root scene (hosts the ViewManager)
 │   ├── core/                # ViewManager, ThemeManager, BusinessConfig, tasks
 │   ├── screens/             # Login, Profile, Home, Detail, Player, Search, etc.
-│   ├── widgets/             # Toast, Spinner, Skeleton, Keyboard, popups
-│   └── cards/               # Horizontal / Vertical / Continue / Banner cards
-├── images/                  # icons, splash, focus assets, placeholders
-├── fonts/                   # bundled TTFs (Inter/Roboto/Poppins/...)
-└── locale/                  # i18n string tables
+│   └── widgets/             # Toast, Spinner, Skeleton, Keyboard, popups
+├── images/                  # icons, splash (required by manifest)
+├── fonts/                   # optional — only packaged when TTFs are present
+└── locale/                  # optional — only packaged when string files exist
 ```
 
 ## Local config
@@ -35,13 +38,24 @@ cp config.example.json config.json   # config.json is gitignored
 # then fill in apiBaseUrl, businessDomain, basic auth, etc.
 ```
 
-## Build & sideload
-
-Enable Developer Mode on the Roku, then:
+## Build & run
 
 ```bash
-make build                              # creates out/ott-tv-roku.zip
-make install ROKU_DEV_TARGET=<roku-ip>  # build + sideload
+make zip                    # validate + out/ott-tv-roku.zip
+make sim                    # install to BrightScript Simulator (dev slot)
+```
+
+**BrightScript Simulator:** File → Open Channel Package → `out/ott-tv-roku.zip`,
+or run `make sim` (uses `http://127.0.0.1:8080`, password `rokudev`).
+
+Do **not** put empty folders under `components/` in the zip (e.g. placeholder
+`cards/` with only `.gitkeep`). The simulator SceneGraph loader fails with
+`ENODATA` and will not register **any** components, including `MainScene`.
+
+**Physical Roku** (developer mode enabled):
+
+```bash
+make install ROKU_DEV_TARGET=<roku-ip> ROKU_DEV_PASSWORD=<password>
 ```
 
 ## Branching model

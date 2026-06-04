@@ -11,9 +11,9 @@
     <field id="shouldLogout" type="boolean" alwaysNotify="true" />
   </interface>
 
-  <script type="text/brightscript" uri="pkg:/source/lib/Config.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/AuthInterceptor.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/AuthInterceptor.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/HttpTask.brs" />
 </component>

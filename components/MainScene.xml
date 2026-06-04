@@ -2,8 +2,12 @@
 <component name="MainScene" extends="Scene">
   <interface>
     <field id="launchArgs" type="assocarray" />
+    <!-- Global toast (parity with showAlert). Any screen sets alertMessage via ShowAlert(). -->
+    <field id="alertMessage" type="string" alwaysNotify="true" />
+    <field id="alertType" type="integer" value="2" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
@@ -13,5 +17,13 @@
     <Rectangle id="bootBg" width="1920" height="1080" color="0x0b1120" />
     <ThemeManager id="themeManager" />
     <ViewManager id="viewManager" visible="false" />
+
+    <!-- Last child = top z-order; toast floats above all screens. -->
+    <Group id="toastBanner" translation="[460, 30]" visible="false">
+      <Rectangle id="toastBg" width="1000" height="64" color="0x282828d9" />
+      <Label id="toastLabel" translation="[24, 16]" width="952" height="32" horizAlign="center"
+        vertAlign="center" font="font:MediumSystemFont" color="0xfafafaff" text="" />
+    </Group>
+    <Timer id="alertTimer" duration="3" repeat="false" />
   </children>
 </component>

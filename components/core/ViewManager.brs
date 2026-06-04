@@ -24,7 +24,7 @@ sub ShowRoute(route as string, state as object, replace as boolean)
         m.stack.Pop()
     end if
 
-    screen = CreatePlaceholderScreen(route, state)
+    screen = CreateScreenForRoute(route, state)
     m.screenHost.appendChild(screen)
 
     m.stack.Push({
@@ -37,6 +37,15 @@ sub ShowRoute(route as string, state as object, replace as boolean)
     m.top.navState = state
     screen.setFocus(true)
 end sub
+
+function CreateScreenForRoute(route as string, state as object) as object
+    if route = RouteLogin() then
+        screen = CreateObject("roSGNode", "LoginScreen")
+        screen.navState = state
+        return screen
+    end if
+    return CreatePlaceholderScreen(route, state)
+end function
 
 function CreatePlaceholderScreen(route as string, state as object) as object
     group = CreateObject("roSGNode", "Group")

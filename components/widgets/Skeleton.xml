@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Shimmer skeleton (parity with react-loading-skeleton SkeletonBox).
+     A highlight band sweeps left→right across a base rectangle, looping. -->
+<component name="Skeleton" extends="Group">
+  <interface>
+    <field id="boxWidth" type="float" value="150" onChange="OnSizeChanged" />
+    <field id="boxHeight" type="float" value="150" onChange="OnSizeChanged" />
+    <field id="baseColor" type="string" value="0xffffffff" onChange="OnColorsChanged" />
+    <field id="highlightColor" type="string" value="0xf3f3f3ff" onChange="OnColorsChanged" />
+    <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/Skeleton.brs" />
+
+  <children>
+    <Group id="clip" clippingRect="[0,0,150,150]">
+      <Rectangle id="base" width="150" height="150" color="0xffffffff" />
+      <Rectangle id="shine" width="60" height="150" color="0xf3f3f3ff" opacity="0.85" />
+    </Group>
+    <Animation id="anim" duration="1.2" repeat="true" easeFunction="linear">
+      <Vector2DFieldInterpolator id="interp" key="[0.0,1.0]"
+        keyValue="[[-60,0],[150,0]]" fieldToInterp="shine.translation" />
+    </Animation>
+  </children>
+</component>
