@@ -255,13 +255,12 @@ function BuildThemeTokens(resolved as object) as object
         end for
     end if
 
-    secondary = NormalizeHex(resolved.portalSecondaryColor)
-    if secondary <> "" then
-        ns = GenerateShades(secondary)
-        for each k in ns
-            if Val(k) <= 600 then tokens["neutral-" + k] = ns[k]
-        end for
-    end if
+    ' NOTE: We intentionally do NOT generate the light neutral shades (50–600) from
+    ' portalDesign.secondaryColor. That secondary (#e279ce here) is the web *portal*
+    ' brand color; the TV app (LG/webOS reference) renders nav/body text with the
+    ' static dark-theme neutrals (neutral-50 #ffffff, neutral-200 #e5e5e5 — verified
+    ' by sampling the LG render = #edeced white, not pink). Keeping DarkThemeTokens
+    ' neutrals here is what makes Roku text match LG instead of going pink.
 
     tertiary = NormalizeHex(resolved.portalTertiaryColor)
     if tertiary <> "" then

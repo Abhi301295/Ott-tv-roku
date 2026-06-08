@@ -38,15 +38,15 @@
     <Group id="metaHost" translation="[64, 500]">
       <Label id="titleLabel" text="" width="700" height="120" wrap="true"
         color="0xf8f1f7ff" horizAlign="left" vertAlign="top">
-        <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="56" />
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="56" />
       </Label>
       <Label id="genreLabel" translation="[0, 118]" text="" width="700" height="32"
         color="0xf8f1f7ff" horizAlign="left" vertAlign="center">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="20" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
       </Label>
       <Label id="descLabel" translation="[0, 158]" text="" width="633" height="96" wrap="true"
         color="0xf8f1f7cc" horizAlign="left" vertAlign="top">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="20" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
       </Label>
       <Group id="dotsHost" translation="[0, 270]" />
     </Group>

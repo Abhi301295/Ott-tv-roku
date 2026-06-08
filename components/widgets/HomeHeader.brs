@@ -22,21 +22,25 @@ sub init()
     m.itemFocusL = []
     m.itemFocusM = []
     m.itemFocusR = []
+    m.itemScaleAnims = []
+    m.itemScaleInterps = []
+    m.itemFocusState = []
 
-    ' React px-4 py-2 + fs-24 → ~40px tall pill (rounded-full radius = half height).
+    ' React: fs-24 = 1.5rem × fontScale LARGE(1.2) = 1.8rem ≈ 28.8px at 16px root.
+    ' px-4 py-2 → 16px / 8px padding. Pill is rounded-full so cap radius = half height.
     m.PAD_X = 16
     m.PAD_Y = 8
-    m.ITEM_H = 40
+    m.ITEM_H = 48
     m.BORDER_W = 2
-    m.CAP_R = 20
+    m.CAP_R = 24
 
     m.fontMedium = CreateObject("roSGNode", "Font")
-    m.fontMedium.uri = "pkg:/fonts/DMSans-Medium.ttf"
-    m.fontMedium.size = 24
+    m.fontMedium.uri = "pkg:/fonts/Inter-Medium.ttf"
+    m.fontMedium.size = 29
 
     m.fontBold = CreateObject("roSGNode", "Font")
-    m.fontBold.uri = "pkg:/fonts/DMSans-Bold.ttf"
-    m.fontBold.size = 24
+    m.fontBold.uri = "pkg:/fonts/Inter-Bold.ttf"
+    m.fontBold.size = 29
 
     m.layoutTimer = CreateObject("roSGNode", "Timer")
     m.layoutTimer.duration = 0.1
@@ -95,6 +99,9 @@ sub BuildMenu()
     m.itemFocusL = []
     m.itemFocusM = []
     m.itemFocusR = []
+    m.itemScaleAnims = []
+    m.itemScaleInterps = []
+    m.itemFocusState = []
     if m.menuRow = invalid then return
 
     count = m.menuRow.getChildCount()
@@ -108,14 +115,17 @@ sub BuildMenu()
     capR = m.CAP_R
     borderY = m.ITEM_H - m.BORDER_W
 
+    idx = 0
     for each t in texts
         root = m.menuRow.createChild("Group")
+        root.id = "hdrItem" + StrI(idx).Trim()
+        root.scale = [1.0, 1.0]
 
         lbl = root.createChild("Label")
         lbl.text = t
         lbl.font = m.fontMedium
         lbl.translation = [m.PAD_X, m.PAD_Y]
-        lbl.height = 24
+        lbl.height = m.ITEM_H - (2 * m.PAD_Y)
         lbl.color = m.top.cNeutral200
 
         ' Selected: straight blue bottom border (border-b-2 border-primary-500).
@@ -156,17 +166,35 @@ sub BuildMenu()
         m.itemFocusL.Push(fL)
         m.itemFocusM.Push(fM)
         m.itemFocusR.Push(fR)
+
+        ' Per-item scale tween (transition-all duration-200): outQuad over 200ms.
+        anim = m.menuRow.createChild("Animation")
+        anim.duration = 0.2
+        anim.easeFunction = "outQuad"
+        interp = anim.createChild("Vector2DFieldInterpolator")
+        interp.fieldToInterp = root.id + ".scale"
+        interp.key = [0.0, 1.0]
+        interp.keyValue = [[1.0, 1.0], [1.0, 1.0]]
+        m.itemScaleAnims.Push(anim)
+        m.itemScaleInterps.Push(interp)
+        m.itemFocusState.Push(false)
+
+        idx = idx + 1
     end for
 
     m.layoutTimer.control = "start"
     ApplyFocus()
 end sub
 
-' Measure label widths after layout, then size borders to the full button (text + px-4).
+' Measure label widths, size each button's borders, and position items manually at a
+' fixed 24px gap. Manual layout (vs LayoutGroup) means a focused item's scale-105 stays
+' purely visual and never pushes its neighbors — parity with React's transform.
 sub OnLayoutTimer()
     capR = m.CAP_R
     borderY = m.ITEM_H - m.BORDER_W
+    gap = 24   ' space-x-6
 
+    x = 0
     for i = 0 to m.itemLabels.Count() - 1
         lbl = m.itemLabels[i]
         if lbl = invalid then continue for
@@ -189,14 +217,19 @@ sub OnLayoutTimer()
         fM.translation = [capR, borderY]
         fM.width = midW
 
-        ' scale-105 anchor = button center.
-        m.itemRoots[i].scaleRotateCenter = [itemW / 2, m.ITEM_H / 2]
+        ' Fixed position + center anchor so scale-105 grows in place without reflow.
+        root = m.itemRoots[i]
+        root.translation = [x, 0]
+        root.scaleRotateCenter = [itemW / 2, m.ITEM_H / 2]
+
+        x = x + itemW + gap
     end for
 
-    rr = m.menuRow.boundingRect()
-    if rr <> invalid and rr.width > 0 then
-        x = Int((1920 - rr.width) / 2)
-        m.menuRow.translation = [x, 34]
+    ' Center the row by its total unscaled width (drop the trailing gap).
+    totalW = x - gap
+    if totalW > 0 then
+        ox = Int((1920 - totalW) / 2)
+        m.menuRow.translation = [ox, 34]
     end if
 
     ApplyFocus()
@@ -252,12 +285,25 @@ sub ApplyFocus()
             lbl.font = m.fontMedium
         end if
 
-        ' scale-105 on the whole button when focused.
-        if root <> invalid then
-            if showRounded then
-                root.scale = [1.05, 1.05]
-            else
-                root.scale = [1.0, 1.0]
+        ' scale-105 on the whole button when focused, eased over 200ms (transition-all
+        ' duration-200). Only (re)start the animation when this item's focus state
+        ' actually changes, so rapid nav stays smooth and doesn't restart mid-tween.
+        if root <> invalid and m.itemScaleAnims <> invalid then
+            if i < m.itemScaleAnims.Count() then
+                wasFocused = m.itemFocusState[i]
+                if showRounded <> wasFocused then
+                    anim = m.itemScaleAnims[i]
+                    interp = m.itemScaleInterps[i]
+                    if anim <> invalid and interp <> invalid then
+                        if showRounded then
+                            interp.keyValue = [[1.0, 1.0], [1.05, 1.05]]
+                        else
+                            interp.keyValue = [[1.05, 1.05], [1.0, 1.0]]
+                        end if
+                        anim.control = "start"
+                    end if
+                    m.itemFocusState[i] = showRounded
+                end if
             end if
         end if
     end for

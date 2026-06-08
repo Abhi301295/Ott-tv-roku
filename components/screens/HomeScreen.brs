@@ -59,13 +59,15 @@ sub LoadThemeTokens()
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then tokens = tm.themeTokens
 
-    m.cPrimary500 = TokenColor(tokens, "primary-500", "#0b75e0")
-    m.cPrimary600 = TokenColor(tokens, "primary-600", "#0760bb")
-    m.cPrimary700 = TokenColor(tokens, "primary-700", "#04478b")
-    m.cNeutral50 = TokenColor(tokens, "neutral-50", "#f8f1f7")
-    m.cNeutral200 = TokenColor(tokens, "neutral-200", "#d4d4d4")
-    m.cNeutral700 = TokenColor(tokens, "neutral-700", "#404040")
-    m.cNeutral800 = TokenColor(tokens, "neutral-800", "#262626")
+    ' Fallbacks mirror the static React dark theme (dark.theme.ts) so colors
+    ' match LG even before BE-driven themeTokens resolve.
+    m.cPrimary500 = TokenColor(tokens, "primary-500", "#0092ff")
+    m.cPrimary600 = TokenColor(tokens, "primary-600", "#459adb")
+    m.cPrimary700 = TokenColor(tokens, "primary-700", "#80bbe9")
+    m.cNeutral50 = TokenColor(tokens, "neutral-50", "#ffffff")
+    m.cNeutral200 = TokenColor(tokens, "neutral-200", "#e5e5e5")
+    m.cNeutral700 = TokenColor(tokens, "neutral-700", "#181818")
+    m.cNeutral800 = TokenColor(tokens, "neutral-800", "#121212")
     m.cNeutral950 = TokenColor(tokens, "neutral-900", "#0a0a0a")
 end sub
 

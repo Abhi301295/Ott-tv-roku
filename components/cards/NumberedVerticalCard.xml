@@ -18,7 +18,7 @@
   <children>
     <Label id="rankLabel" translation="[-20, 44]" width="120" height="120" text="1"
       horizAlign="right" vertAlign="center" color="0xf8f1f7ff">
-      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="96" />
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="96" />
     </Label>
     <Rectangle id="focusBorder" translation="[48, 0]" width="374" height="214" color="0x0b75e0ff" visible="false" />
     <Group id="body" translation="[51, 3]">

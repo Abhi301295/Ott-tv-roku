@@ -31,7 +31,7 @@
         uri="pkg:/images/ui/toast_cross.png" blendColor="0x0b75e0ff" />
       <Label id="toastLabel" translation="[60, 0]" height="60" horizAlign="left"
         vertAlign="center" color="0xfafafaff" text="">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="22" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
       </Label>
     </Group>
     <Timer id="alertTimer" duration="3" repeat="false" />
