@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Continue-watching card — parity with continueWatchCard.tsx (540×286 + progress bar). -->
+<component name="ContinueWatchCard" extends="Group">
+  <interface>
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="progress" type="float" value="0.0" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral950" type="string" value="0x0a0a0aff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/ContinueWatchCard.brs" />
+
+  <children>
+    <Rectangle id="focusBorder" width="556" height="302" color="0x0b75e0ff" visible="false" />
+    <Group id="body" translation="[3, 3]">
+      <Skeleton id="skeleton" boxWidth="540" boxHeight="286" />
+      <Poster id="thumb" width="540" height="286" loadDisplayMode="scaleToFill" visible="false" />
+      <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0x0a0a0aff" />
+      <Rectangle id="progressFill" translation="[0, 278]" width="0" height="8" color="0x0760bbff" />
+    </Group>
+  </children>
+</component>

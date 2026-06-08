@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Horizontal content card — parity with components/cards/horizontalCard.tsx (540×312). -->
+<component name="HorizontalCard" extends="Group">
+  <interface>
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/HorizontalCard.brs" />
+
+  <children>
+    <Rectangle id="focusBorder" width="556" height="328" color="0x0b75e0ff" visible="false" />
+    <Group id="body" translation="[3, 3]">
+      <Skeleton id="skeleton" boxWidth="540" boxHeight="312" />
+      <Poster id="thumb" width="540" height="312" loadDisplayMode="scaleToFill" visible="false" />
+    </Group>
+  </children>
+</component>
