@@ -9,6 +9,7 @@
     <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
     <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
     <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
     <field id="cNeutral950" type="string" value="0x0a0a0aff" onChange="OnThemeChanged" />
   </interface>
 

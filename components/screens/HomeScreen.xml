@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Home screen — data boot + card widget preview (home-data / home-cards).
-     Fetches mirror features/home/index.tsx; card samples render per row type until
-     home-rows wires full RowList scrolling. -->
+<!-- Home screen — Netflix-layout content rows (home-rows). Data boot mirrors
+     features/home/index.tsx; rows mirror netflixContent.tsx + contentRow.tsx. -->
 <component name="HomeScreen" extends="Group">
   <interface>
     <field id="navState" type="assocarray" />
@@ -25,24 +24,11 @@
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
 
   <children>
-    <Rectangle id="bg" width="1920" height="1080" color="0x141414ff" />
+    <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
 
-    <Label id="logoLabel" text="OTT Accelerator" translation="[120, 48]" width="600"
-      color="0x0b75e0ff">
-      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="30" />
-    </Label>
+    <HeroBannerCinematic id="hero" translation="[0, 0]" visible="false" />
 
-    <Label id="statusLabel" text="" translation="[120, 110]" width="1680" height="28"
-      color="0x9ea4b0ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="20" />
-    </Label>
-
-    <Label id="dataLabel" text="" translation="[120, 150]" width="1680" height="100"
-      color="0xf8f1f7ff" wrap="true" visible="false">
-      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="18" />
-    </Label>
-
-    <Group id="cardsContainer" translation="[120, 280]" visible="false" />
+    <Group id="rowsHost" translation="[0, 702]" visible="false" />
 
     <Group id="bootOverlay" visible="true">
       <Rectangle width="1920" height="1080" color="0x141414ff" />

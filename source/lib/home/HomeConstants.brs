@@ -32,3 +32,20 @@ end function
 function HC_HomeLayoutOtt() as string
     return "OTT"
 end function
+
+' Cinematic hero timing (parity with heroBannerCinematic.tsx).
+function HC_HeroHeight() as integer
+    return 918
+end function
+
+function HC_HeroSwipeMs() as integer
+    return 15000
+end function
+
+function HC_HeroCrossfadeSec() as float
+    return 1.2
+end function
+
+function HC_HeroZoomSec() as float
+    return 8.0
+end function
