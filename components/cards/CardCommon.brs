@@ -37,4 +37,5 @@ sub CardApplySkeleton(skeleton as object, neutral700 as string, neutral800 as st
     if highlight = invalid or highlight = "" then highlight = "0x262626ff"
     skeleton.baseColor = base
     skeleton.highlightColor = highlight
+    if skeleton.hasField("animate") then skeleton.animate = false
 end sub

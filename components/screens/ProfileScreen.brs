@@ -462,6 +462,10 @@ sub SelectProfile(profile as object)
 end sub
 
 sub DoSelectProfile(profileId as string)
+    ' Guard against a second trigger (auto-select tick racing a manual press, or a
+    ' double press) starting another select + navigation, which mounts Home twice.
+    if m.selecting then return
+    m.selecting = true
     StopAutoSelect()
     ShowSelectLoader(true)
     m.pendingProfileId = profileId
@@ -487,6 +491,7 @@ sub OnSelectResponse()
     end if
 
     ' Failure: toast + let the user retry (web also surfaces this alert).
+    m.selecting = false
     ShowAlert(m.top, 2, MsgFailedSelectProfile())
     ResetAutoSelect()
     ApplyProfileFocus()

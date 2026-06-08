@@ -20,6 +20,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
 
@@ -30,15 +31,8 @@
 
     <Group id="rowsHost" translation="[0, 702]" visible="false" />
 
-    <Group id="bootOverlay" visible="true">
-      <Rectangle width="1920" height="1080" color="0x141414ff" />
-      <BusySpinner id="bootSpinner" translation="[936, 486]" spinInterval="1" visible="true">
-        <Poster role="poster" uri="pkg:/images/ui/loader_spinner.png" width="48" height="48" />
-      </BusySpinner>
-      <Label text="Loading" translation="[760, 548]" width="400" height="32"
-        horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="22" />
-      </Label>
-    </Group>
+    <HomeSkeleton id="homeSkeleton" visible="true" />
+
+    <HomeHeader id="homeHeader" translation="[0, 0]" />
   </children>
 </component>

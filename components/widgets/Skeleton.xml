@@ -8,6 +8,7 @@
     <field id="baseColor" type="string" value="0xffffffff" onChange="OnColorsChanged" />
     <field id="highlightColor" type="string" value="0xf3f3f3ff" onChange="OnColorsChanged" />
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
+    <field id="animate" type="boolean" value="true" onChange="OnRunningChanged" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/components/widgets/Skeleton.brs" />

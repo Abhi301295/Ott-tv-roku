@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Home loading scaffold — a Netflix-shaped placeholder (hero meta lines + two card
+     rows) shown the instant the screen mounts, so home appears immediately while the
+     boot requests run. Deliberately cheap: plain rectangles sharing ONE opacity pulse
+     (not per-box Skeleton trees) so it paints with no measurable build cost. -->
+<component name="HomeSkeleton" extends="Group">
+  <interface>
+    <field id="boxColor" type="string" value="0x262626ff" onChange="OnColorsChanged" />
+    <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/HomeSkeleton.brs" />
+
+  <children>
+    <Group id="pulse" opacity="0.65">
+      <!-- Hero metadata block (mirrors hero title/genre/description position). -->
+      <Rectangle id="hTitle" translation="[64, 470]" width="520" height="54" color="0x262626ff" />
+      <Rectangle id="hGenre" translation="[64, 548]" width="360" height="22" color="0x262626ff" />
+      <Rectangle id="hDesc1" translation="[64, 590]" width="630" height="18" color="0x262626ff" />
+      <Rectangle id="hDesc2" translation="[64, 618]" width="580" height="18" color="0x262626ff" />
+
+      <!-- First card row (focused position ~702). -->
+      <Rectangle id="r0Title" translation="[64, 700]" width="260" height="30" color="0x262626ff" />
+      <Rectangle translation="[64, 748]"   width="340" height="300" color="0x262626ff" />
+      <Rectangle translation="[428, 748]"  width="340" height="300" color="0x262626ff" />
+      <Rectangle translation="[792, 748]"  width="340" height="300" color="0x262626ff" />
+      <Rectangle translation="[1156, 748]" width="340" height="300" color="0x262626ff" />
+      <Rectangle translation="[1520, 748]" width="340" height="300" color="0x262626ff" />
+    </Group>
+
+    <Animation id="anim" duration="1.0" repeat="true" easeFunction="inOutQuad">
+      <FloatFieldInterpolator id="interp" key="[0.0, 0.5, 1.0]"
+        keyValue="[0.4, 0.85, 0.4]" fieldToInterp="pulse.opacity" />
+    </Animation>
+  </children>
+</component>
