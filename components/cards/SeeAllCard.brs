@@ -1,0 +1,40 @@
+sub init()
+    m.focusBorder = m.top.findNode("focusBorder")
+    m.fill = m.top.findNode("fill")
+    m.label = m.top.findNode("label")
+    ApplyAll()
+end sub
+
+sub OnDataChanged()
+    ApplyAll()
+end sub
+
+sub OnFocusChanged()
+    ApplyAll()
+end sub
+
+sub OnThemeChanged()
+    ApplyAll()
+end sub
+
+sub ApplyAll()
+    w = 240
+    h = 305
+    if m.top.orientation = HC_CardTypeHorizontal() then
+        w = 540
+        h = 320
+    end if
+
+    m.focusBorder.width = w + 6
+    m.focusBorder.height = h + 6
+    m.fill.width = w
+    m.fill.height = h
+    m.fill.color = m.top.cNeutral800
+    m.label.width = w
+    m.label.translation = [0, Int((h - 40) / 2)]
+    m.label.color = m.top.cNeutral50
+    if m.top.focusedState = true then
+        m.label.color = m.top.cPrimary600
+    end if
+    CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
+end sub

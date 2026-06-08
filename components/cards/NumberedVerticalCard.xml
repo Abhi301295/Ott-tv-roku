@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Top-contents numbered card — parity with numberedVerticalCard.tsx (368×208 + rank). -->
+<component name="NumberedVerticalCard" extends="Group">
+  <interface>
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="rank" type="integer" value="0" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/NumberedVerticalCard.brs" />
+
+  <children>
+    <Label id="rankLabel" translation="[-20, 44]" width="120" height="120" text="1"
+      horizAlign="right" vertAlign="center" color="0xf8f1f7ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="96" />
+    </Label>
+    <Rectangle id="focusBorder" translation="[48, 0]" width="374" height="214" color="0x0b75e0ff" visible="false" />
+    <Group id="body" translation="[51, 3]">
+      <Skeleton id="skeleton" boxWidth="368" boxHeight="208" />
+      <Poster id="thumb" width="368" height="208" loadDisplayMode="scaleToFill" visible="false" />
+    </Group>
+  </children>
+</component>

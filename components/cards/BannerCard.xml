@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Promotional banner card — parity with components/cards/banner.tsx (~1770×400). -->
+<component name="BannerCard" extends="Group">
+  <interface>
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="title" type="string" value="" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/BannerCard.brs" />
+
+  <children>
+    <Rectangle id="focusBorder" width="1776" height="406" color="0x04478bff" visible="false" />
+    <Group id="body" translation="[3, 3]">
+      <Rectangle id="fallback" width="1770" height="400" color="0x262626ff" visible="false" />
+      <Skeleton id="skeleton" boxWidth="1770" boxHeight="400" />
+      <Poster id="thumb" width="1770" height="400" loadDisplayMode="scaleToFill" visible="false" />
+      <Label id="titleLabel" translation="[20, 340]" width="1200" height="40" text=""
+        color="0xf8f1f7ff">
+        <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="28" />
+      </Label>
+    </Group>
+  </children>
+</component>

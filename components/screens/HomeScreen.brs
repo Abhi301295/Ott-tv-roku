@@ -2,10 +2,13 @@ sub init()
     m.logoLabel = m.top.findNode("logoLabel")
     m.statusLabel = m.top.findNode("statusLabel")
     m.dataLabel = m.top.findNode("dataLabel")
+    m.cardsContainer = m.top.findNode("cardsContainer")
     m.bootSpinner = m.top.findNode("bootSpinner")
     m.bootOverlay = m.top.findNode("bootOverlay")
 
     m.categories = []
+    m.previewCards = []
+    m.previewFocusIndex = 0
     m.page = HC_HomePageStart()
     m.hasMore = true
     m.homeLayout = HomeLayoutMode()
@@ -41,13 +44,18 @@ sub ApplyColors()
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then tokens = tm.themeTokens
 
-    cPrimary500 = TokenColor(tokens, "primary-500", "#0b75e0")
-    cNeutral50 = TokenColor(tokens, "neutral-50", "#f8f1f7")
-    cNeutral400 = TokenColor(tokens, "neutral-400", "#9ea4b0")
+    m.cPrimary500 = TokenColor(tokens, "primary-500", "#0b75e0")
+    m.cPrimary600 = TokenColor(tokens, "primary-600", "#0760bb")
+    m.cPrimary700 = TokenColor(tokens, "primary-700", "#04478b")
+    m.cNeutral50 = TokenColor(tokens, "neutral-50", "#f8f1f7")
+    m.cNeutral400 = TokenColor(tokens, "neutral-400", "#9ea4b0")
+    m.cNeutral700 = TokenColor(tokens, "neutral-700", "#404040")
+    m.cNeutral800 = TokenColor(tokens, "neutral-800", "#262626")
+    m.cNeutral950 = TokenColor(tokens, "neutral-900", "#0a0a0a")
 
-    m.logoLabel.color = cPrimary500
-    m.statusLabel.color = cNeutral400
-    m.dataLabel.color = cNeutral50
+    m.logoLabel.color = m.cPrimary500
+    m.statusLabel.color = m.cNeutral400
+    m.dataLabel.color = m.cNeutral50
 end sub
 
 function TokenColor(tokens as object, name as string, fallbackHex as string) as string
@@ -206,13 +214,114 @@ sub ShowBootSpinner(show as boolean)
 end sub
 
 sub RenderBootData()
-    if m.dataLabel = invalid then return
-    m.dataLabel.text = BuildCategoryDebugText(m.categories, m.homeLayout, m.showUpdate)
-    m.dataLabel.visible = true
+    if m.dataLabel <> invalid then
+        m.dataLabel.text = BuildCategoryDebugText(m.categories, m.homeLayout, m.showUpdate)
+        m.dataLabel.visible = true
+    end if
     if m.statusLabel <> invalid then
-        m.statusLabel.text = "Home data loaded"
+        m.statusLabel.text = "Home data loaded — use ← → to focus cards, OK for next page"
         m.statusLabel.visible = true
     end if
+    BuildCardPreview()
+end sub
+
+' ── Card preview (home-cards phase — one sample per row type) ────────────────
+
+sub BuildCardPreview()
+    if m.cardsContainer = invalid then return
+    ClearCardPreview()
+
+    x = 0
+    gap = HC_CardGap()
+    seeAllOrientation = HC_CardTypeVertical()
+    maxRows = 6
+    built = 0
+
+    for i = 0 to m.categories.Count() - 1
+        if built >= maxRows then exit for
+        cat = m.categories[i]
+        if cat = invalid then continue for
+        items = cat.result
+        if items = invalid or items.Count() = 0 then continue for
+
+        rowType = ""
+        if cat.type <> invalid then rowType = cat.type
+        cardType = HC_CardTypeVertical()
+        if cat.cardType <> invalid and cat.cardType <> "" then cardType = cat.cardType
+
+        compName = CardComponentForRow(rowType, cardType)
+        if compName = "BannerCard" then continue for
+
+        item = items[0]
+        card = m.cardsContainer.createChild(compName)
+        ConfigurePreviewCard(card, compName, item, cardType, 0)
+        card.translation = [x, 0]
+        m.previewCards.Push(card)
+        x = x + PreviewCardWidth(compName) + gap
+        built = built + 1
+
+        if cardType = HC_CardTypeHorizontal() then seeAllOrientation = HC_CardTypeHorizontal()
+    end for
+
+    seeAll = m.cardsContainer.createChild("SeeAllCard")
+    seeAll.orientation = seeAllOrientation
+    CardInjectTheme(seeAll, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800)
+    seeAll.translation = [x, 0]
+    m.previewCards.Push(seeAll)
+    x = x + PreviewCardWidth("SeeAllCard", seeAllOrientation) + gap
+
+    m.previewFocusIndex = 0
+    ApplyCardPreviewFocus()
+    m.cardsContainer.visible = (m.previewCards.Count() > 0)
+end sub
+
+sub ClearCardPreview()
+    m.previewCards = []
+    if m.cardsContainer = invalid then return
+    count = m.cardsContainer.getChildCount()
+    for i = count - 1 to 0 step -1
+        m.cardsContainer.removeChildIndex(i)
+    end for
+end sub
+
+sub ConfigurePreviewCard(card as object, compName as string, item as object, cardType as string, rank as integer)
+    CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800)
+    card.focusedState = false
+
+    if compName = "ContinueWatchCard" then
+        card.thumbnailUri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
+        card.progress = GetContinueProgressPercent(item)
+        if card.hasField("cNeutral950") then card.cNeutral950 = m.cNeutral950
+        if card.hasField("cNeutral700") then card.cNeutral700 = m.cNeutral700
+    else if compName = "NumberedVerticalCard" then
+        card.thumbnailUri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
+        card.rank = rank
+    else if compName = "HorizontalCard" then
+        card.thumbnailUri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
+    else if compName = "VerticalCard" then
+        card.thumbnailUri = GetCardImgByType(cardType, item.thumbnails)
+    end if
+end sub
+
+function PreviewCardWidth(compName as string, orientation = "" as string) as integer
+    if compName = "HorizontalCard" then return 556
+    if compName = "ContinueWatchCard" then return 556
+    if compName = "NumberedVerticalCard" then return 422
+    if compName = "VerticalCard" then return 256
+    if compName = "SeeAllCard" then
+        if orientation = HC_CardTypeHorizontal() then return 546
+        return 246
+    end if
+    return 256
+end function
+
+sub ApplyCardPreviewFocus()
+    for i = 0 to m.previewCards.Count() - 1
+        card = m.previewCards[i]
+        if card <> invalid and card.hasField("focusedState") then
+            card.focusedState = (i = m.previewFocusIndex)
+        end if
+    end for
 end sub
 
 sub ClearAuthAndGoLogin()
@@ -232,7 +341,17 @@ sub OnKey()
     if not ev.press then return
 
     key = ev.key
-    if key = "OK" or key = "ok" then
+    if key = "left" then
+        if m.previewFocusIndex > 0 then
+            m.previewFocusIndex = m.previewFocusIndex - 1
+            ApplyCardPreviewFocus()
+        end if
+    else if key = "right" then
+        if m.previewFocusIndex < m.previewCards.Count() - 1 then
+            m.previewFocusIndex = m.previewFocusIndex + 1
+            ApplyCardPreviewFocus()
+        end if
+    else if key = "OK" or key = "ok" then
         if m.hasMore and not AnyBootLoading() then LoadMoreCategories()
     end if
 end sub
