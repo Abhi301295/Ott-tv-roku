@@ -1,18 +1,37 @@
 sub init()
     m.logoLabel = m.top.findNode("logoLabel")
-    m.welcome = m.top.findNode("welcome")
-    m.subtitle = m.top.findNode("subtitle")
-    m.switchProfileBtn = m.top.findNode("switchProfileBtn")
+    m.statusLabel = m.top.findNode("statusLabel")
+    m.dataLabel = m.top.findNode("dataLabel")
+    m.bootSpinner = m.top.findNode("bootSpinner")
+    m.bootOverlay = m.top.findNode("bootOverlay")
 
-    scene = m.top.getScene()
-    m.vm = invalid
-    if scene <> invalid then m.vm = scene.findNode("viewManager")
+    m.categories = []
+    m.page = HC_HomePageStart()
+    m.hasMore = true
+    m.homeLayout = HomeLayoutMode()
+    m.showUpdate = false
+
+    m.initialLoading = true
+    m.continueLoading = true
+    m.versionLoading = true
+
+    m.vm = FindViewManager(m.top)
 
     ApplyColors()
     ApplyBranding()
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.observeField("businessResolved", "OnBusinessResolved")
+    end if
 
     m.top.observeField("keyEvent", "OnKey")
-    m.switchProfileBtn.setFocus(true)
+
+    if GetProfileId() = "" then
+        RedirectToProfiles()
+        return
+    end if
+
+    ShowBootSpinner(true)
+    StartBootSequence()
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────
@@ -23,23 +42,14 @@ sub ApplyColors()
     if tm <> invalid and tm.themeTokens <> invalid then tokens = tm.themeTokens
 
     cPrimary500 = TokenColor(tokens, "primary-500", "#0b75e0")
-    cPrimary600 = TokenColor(tokens, "primary-600", "#0760bb")
     cNeutral50 = TokenColor(tokens, "neutral-50", "#f8f1f7")
     cNeutral400 = TokenColor(tokens, "neutral-400", "#9ea4b0")
 
     m.logoLabel.color = cPrimary500
-    m.welcome.color = cNeutral50
-    m.subtitle.color = cNeutral400
-
-    ' Button rendered in its focused/selected style (it's the only focusable item).
-    m.switchProfileBtn.bgColor = cPrimary600
-    m.switchProfileBtn.textColor = cNeutral50
-    m.switchProfileBtn.shadowColor = cPrimary500
-    m.switchProfileBtn.showShadow = true
+    m.statusLabel.color = cNeutral400
+    m.dataLabel.color = cNeutral50
 end sub
 
-' Read a "#rrggbb" theme token as a Roku "0xRRGGBBff" color (inline to avoid
-' pulling the ColorShade/BusinessConfig dependency chain into this screen).
 function TokenColor(tokens as object, name as string, fallbackHex as string) as string
     hex = fallbackHex
     if tokens <> invalid and tokens[name] <> invalid and tokens[name] <> "" then
@@ -51,14 +61,167 @@ function TokenColor(tokens as object, name as string, fallbackHex as string) as 
     return "0x0b75e0ff"
 end function
 
+sub OnBusinessResolved()
+    ApplyColors()
+    ApplyBranding()
+end sub
+
 sub ApplyBranding()
     resolved = invalid
     if m.global <> invalid then resolved = m.global.businessResolved
     if resolved = invalid then return
-
     if resolved.appName <> invalid and resolved.appName <> "" then
         m.logoLabel.text = resolved.appName
     end if
+end sub
+
+' ── Boot sequence (parity with features/home/index.tsx) ──────────────────────
+
+sub StartBootSequence()
+    FetchProfilesBootstrap()
+    FetchContinueWatching()
+    FetchLatestVersion()
+end sub
+
+sub FetchProfilesBootstrap()
+    path = Endpoints().PROFILE.GET_LOGIN_PROFILES
+    m.profilesTask = ApiGet(path)
+    m.profilesTask.observeField("apiResult", "OnProfilesBootstrapResponse")
+    StartHttpTask(m.profilesTask)
+end sub
+
+sub OnProfilesBootstrapResponse()
+    if m.profilesTask = invalid then return
+    api = m.profilesTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
+
+    if not api.ok or api.result = invalid then
+        ClearAuthAndGoLogin()
+        return
+    end if
+
+    profiles = ExtractProfiles(api.result)
+    if profiles.Count() = 0 then
+        ClearAuthAndGoLogin()
+        return
+    end if
+
+    if BootstrapActiveProfile(profiles) = invalid then
+        ClearAuthAndGoLogin()
+    end if
+end sub
+
+sub FetchContinueWatching()
+    path = Endpoints().HOME.CONTINUE_WATCHING
+    m.continueTask = ApiGet(path)
+    m.continueTask.observeField("apiResult", "OnContinueWatchingResponse")
+    StartHttpTask(m.continueTask)
+end sub
+
+sub OnContinueWatchingResponse()
+    if m.continueTask = invalid then return
+    api = m.continueTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
+
+    if api.ok and api.result <> invalid then
+        listing = ExtractCategoryListing(api.result)
+        if listing.Count() > 0 then
+            tagged = TagContinueWatchingRows(listing)
+            m.categories = PrependCategories(m.categories, tagged)
+        end if
+    else if api.message <> invalid and api.message <> "" then
+        ShowAlert(m.top, 2, api.message)
+    end if
+
+    m.continueLoading = false
+    FetchHomeCategories(m.page)
+end sub
+
+sub FetchHomeCategories(pageNum as integer)
+    path = Endpoints().HOME.CATEGORY_LIST
+    m.categoryTask = ApiGetQuery(path, HomeCategoryQuery(pageNum))
+    m.categoryTask.observeField("apiResult", "OnHomeCategoriesResponse")
+    StartHttpTask(m.categoryTask)
+end sub
+
+sub OnHomeCategoriesResponse()
+    if m.categoryTask = invalid then return
+    api = m.categoryTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
+
+    if api.ok and api.result <> invalid then
+        listing = ExtractCategoryListing(api.result)
+        if listing.Count() > 0 then
+            m.categories = AppendCategories(m.categories, listing)
+            m.hasMore = true
+        else
+            m.hasMore = false
+        end if
+    else
+        m.hasMore = false
+        if api.message <> invalid and api.message <> "" then
+            ShowAlert(m.top, 2, api.message)
+        end if
+    end if
+
+    m.initialLoading = false
+    TryFinishBoot()
+end sub
+
+sub FetchLatestVersion()
+    path = Endpoints().LOGIN.CHECK_UPDATE
+    m.versionTask = ApiGet(path)
+    m.versionTask.observeField("apiResult", "OnLatestVersionResponse")
+    StartHttpTask(m.versionTask)
+end sub
+
+sub OnLatestVersionResponse()
+    if m.versionTask = invalid then return
+    api = m.versionTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
+
+    verdict = EvaluateVersionUpdate(api)
+    m.showUpdate = verdict.showUpdate
+    m.versionLoading = false
+    TryFinishBoot()
+end sub
+
+function AnyBootLoading() as boolean
+    return m.initialLoading or m.continueLoading or m.versionLoading
+end function
+
+sub TryFinishBoot()
+    if AnyBootLoading() then return
+    ShowBootSpinner(false)
+    RenderBootData()
+end sub
+
+sub ShowBootSpinner(show as boolean)
+    if m.bootOverlay <> invalid then m.bootOverlay.visible = show
+    if m.bootSpinner <> invalid then m.bootSpinner.visible = show
+end sub
+
+sub RenderBootData()
+    if m.dataLabel = invalid then return
+    m.dataLabel.text = BuildCategoryDebugText(m.categories, m.homeLayout, m.showUpdate)
+    m.dataLabel.visible = true
+    if m.statusLabel <> invalid then
+        m.statusLabel.text = "Home data loaded"
+        m.statusLabel.visible = true
+    end if
+end sub
+
+sub ClearAuthAndGoLogin()
+    ClearStorage()
+    if m.vm <> invalid then m.vm.callFunc("NavigateReplace", RouteLogin(), {})
+end sub
+
+sub RedirectToProfiles()
+    if m.vm <> invalid then m.vm.callFunc("NavigateReplace", RouteLoginProfile(), {})
 end sub
 
 ' ── Key handling ─────────────────────────────────────────────────────────────
@@ -68,9 +231,38 @@ sub OnKey()
     if ev = invalid or ev.key = invalid or ev.press = invalid then return
     if not ev.press then return
 
-    if ev.key = "OK" or ev.key = "ok" then GoToProfiles()
+    key = ev.key
+    if key = "OK" or key = "ok" then
+        if m.hasMore and not AnyBootLoading() then LoadMoreCategories()
+    end if
 end sub
 
-sub GoToProfiles()
-    if m.vm <> invalid then m.vm.callFunc("NavigateReplace", RouteLoginProfile(), {})
+sub LoadMoreCategories()
+    if not m.hasMore then return
+    m.page = m.page + 1
+    m.statusLabel.text = "Loading page " + Str(m.page) + "..."
+    path = Endpoints().HOME.CATEGORY_LIST
+    m.loadMoreTask = ApiGetQuery(path, HomeCategoryQuery(m.page))
+    m.loadMoreTask.observeField("apiResult", "OnLoadMoreResponse")
+    StartHttpTask(m.loadMoreTask)
+end sub
+
+sub OnLoadMoreResponse()
+    if m.loadMoreTask = invalid then return
+    api = m.loadMoreTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
+
+    if api.ok and api.result <> invalid then
+        listing = ExtractCategoryListing(api.result)
+        if listing.Count() > 0 then
+            m.categories = AppendCategories(m.categories, listing)
+            m.hasMore = true
+        else
+            m.hasMore = false
+        end if
+    else
+        m.hasMore = false
+    end if
+    RenderBootData()
 end sub

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Home screen placeholder. Real content lands in a later branch; for now it
-     confirms a profile was selected and offers a "Switch Profile" action that
-     navigates back to the profile-selection screen. -->
+<!-- Home screen — data boot phase: mirrors features/home/index.tsx fetch order
+     (profiles guard → continue watching → home categories + version check).
+     Rows render as debug text until home-rows/cards land in later sub-branches. -->
 <component name="HomeScreen" extends="Group">
   <interface>
     <field id="navState" type="assocarray" />
@@ -9,27 +9,46 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
 
   <children>
     <Rectangle id="bg" width="1920" height="1080" color="0x141414ff" />
 
-    <Label id="logoLabel" text="OTT Accelerator" translation="[120, 64]" width="600"
+    <Label id="logoLabel" text="OTT Accelerator" translation="[120, 48]" width="600"
       color="0x0b75e0ff">
       <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="30" />
     </Label>
 
-    <Label id="welcome" text="Welcome" translation="[150, 440]" width="1200" color="0xf8f1f7ff">
-      <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="48" />
-    </Label>
-    <Label id="subtitle" text="Home experience is coming soon." translation="[152, 510]"
-      width="1200" color="0x9ea4b0ff">
-      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="24" />
+    <Label id="statusLabel" text="" translation="[120, 110]" width="1680" height="28"
+      color="0x9ea4b0ff" visible="false">
+      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="20" />
     </Label>
 
-    <LoginTabButton id="switchProfileBtn" label="Switch Profile" translation="[150, 590]"
-      buttonWidth="200" buttonHeight="65"
-      shapeUri="pkg:/images/ui/btn_logout.png" shadowUri="pkg:/images/ui/btn_logout_shadow.png"
-      fontUri="pkg:/fonts/DMSans-Bold.ttf" fontSize="20" />
+    <Label id="dataLabel" text="" translation="[120, 150]" width="1680" height="860"
+      color="0xf8f1f7ff" wrap="true" visible="false">
+      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="22" />
+    </Label>
+
+    <Group id="bootOverlay" visible="true">
+      <Rectangle width="1920" height="1080" color="0x141414ff" />
+      <BusySpinner id="bootSpinner" translation="[936, 486]" spinInterval="1" visible="true">
+        <Poster role="poster" uri="pkg:/images/ui/loader_spinner.png" width="48" height="48" />
+      </BusySpinner>
+      <Label text="Loading" translation="[760, 548]" width="400" height="32"
+        horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
+        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="22" />
+      </Label>
+    </Group>
   </children>
 </component>
