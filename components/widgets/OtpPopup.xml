@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Parental-lock PIN entry overlay (parity with otp.tsx). 6-digit PIN, 3-col keypad
+     (1-9, blank, 0, delete) + Continue. Screen forwards keys via keyEvent and observes
+     `submitted` (the 6-digit pin). `resetPin` clears after a failed verify. -->
+<component name="OtpPopup" extends="Group">
+  <interface>
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="submitted" type="string" value="" alwaysNotify="true" />
+    <field id="action" type="string" value="" alwaysNotify="true" />
+    <field id="resetPin" type="boolean" value="false" alwaysNotify="true" onChange="OnResetPin" />
+    <field id="verifying" type="boolean" value="false" onChange="OnVerifyingChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" />
+    <field id="cNeutral600" type="string" value="0xa12189ff" />
+    <field id="cNeutral700" type="string" value="0x404040ff" />
+    <field id="cCardBg" type="string" value="0x0a0a0aff" onChange="OnCardBgChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/OtpPopup.brs" />
+
+  <children>
+    <Rectangle id="scrim" width="1920" height="1080" color="0x00000080" />
+    <Poster id="card" translation="[682, 180]" width="556" height="720"
+      uri="pkg:/images/ui/otp_card.png" blendColor="0x0a0a0aff" />
+    <Poster id="closeBg" translation="[1142, 210]" width="44" height="44"
+      uri="pkg:/images/ui/avatar_circle.png" blendColor="0x404040ff" />
+    <Label id="closeLabel" text="X" translation="[1142, 210]" width="44" height="44"
+      horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="22" />
+    </Label>
+
+    <Poster id="lockIcon" translation="[730, 222]" width="40" height="40"
+      uri="pkg:/images/ui/lock.png" blendColor="0xf8f1f7ff" />
+    <Label id="otpTitle" text="Parental Lock" translation="[730, 280]" width="460" color="0xf8f1f7ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="30" />
+    </Label>
+    <Label id="otpSubtitle" text="Use this 6 digit PIN to access all adult profiles"
+      translation="[730, 326]" width="460" wrap="true" lineSpacing="4" color="0x9ea4b0ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="16" />
+    </Label>
+
+    <!-- PIN boxes (6) -->
+    <Group id="pinRow" translation="[0, 0]">
+      <Poster id="pin0" translation="[750, 386]" width="60" height="60" uri="pkg:/images/ui/pin_box.png" blendColor="0xa12189ff" />
+      <Poster id="pin1" translation="[822, 386]" width="60" height="60" uri="pkg:/images/ui/pin_box.png" blendColor="0xa12189ff" />
+      <Poster id="pin2" translation="[894, 386]" width="60" height="60" uri="pkg:/images/ui/pin_box.png" blendColor="0xa12189ff" />
+      <Poster id="pin3" translation="[966, 386]" width="60" height="60" uri="pkg:/images/ui/pin_box.png" blendColor="0xa12189ff" />
+      <Poster id="pin4" translation="[1038, 386]" width="60" height="60" uri="pkg:/images/ui/pin_box.png" blendColor="0xa12189ff" />
+      <Poster id="pin5" translation="[1110, 386]" width="60" height="60" uri="pkg:/images/ui/pin_box.png" blendColor="0xa12189ff" />
+      <Label id="dot0" translation="[750, 386]" width="60" height="60" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" /></Label>
+      <Label id="dot1" translation="[822, 386]" width="60" height="60" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" /></Label>
+      <Label id="dot2" translation="[894, 386]" width="60" height="60" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" /></Label>
+      <Label id="dot3" translation="[966, 386]" width="60" height="60" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" /></Label>
+      <Label id="dot4" translation="[1038, 386]" width="60" height="60" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" /></Label>
+      <Label id="dot5" translation="[1110, 386]" width="60" height="60" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" /></Label>
+    </Group>
+
+    <!-- Keypad (3x4). Blank cell at index 9. -->
+    <Group id="keypad" translation="[0, 0]">
+      <Poster id="key0" translation="[832, 470]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key1" translation="[922, 470]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key2" translation="[1012, 470]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key3" translation="[832, 560]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key4" translation="[922, 560]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key5" translation="[1012, 560]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key6" translation="[832, 650]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key7" translation="[922, 650]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key8" translation="[1012, 650]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key10" translation="[922, 740]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+      <Poster id="key11" translation="[1012, 740]" width="76" height="76" uri="pkg:/images/ui/key.png" blendColor="0x404040ff" />
+
+      <Label id="lab0" text="1" translation="[832, 470]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab1" text="2" translation="[922, 470]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab2" text="3" translation="[1012, 470]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab3" text="4" translation="[832, 560]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab4" text="5" translation="[922, 560]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab5" text="6" translation="[1012, 560]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab6" text="7" translation="[832, 650]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab7" text="8" translation="[922, 650]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab8" text="9" translation="[1012, 650]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab10" text="0" translation="[922, 740]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="26" /></Label>
+      <Label id="lab11" text="DEL" translation="[1012, 740]" width="76" height="76" horizAlign="center" vertAlign="center" color="0xf8f1f7ff"><Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="18" /></Label>
+    </Group>
+
+    <!-- Continue -->
+    <Poster id="continueBtn" translation="[730, 838]" width="460" height="60"
+      uri="pkg:/images/ui/otp_continue.png" blendColor="0x404040ff" />
+    <Label id="continueLabel" text="Continue" translation="[730, 838]" width="460" height="60"
+      horizAlign="center" vertAlign="center" color="0x9ea4b0ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="22" />
+    </Label>
+  </children>
+</component>

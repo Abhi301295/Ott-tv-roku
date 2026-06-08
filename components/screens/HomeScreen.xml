@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Home screen placeholder. Real content lands in a later branch; for now it
+     confirms a profile was selected and offers a "Switch Profile" action that
+     navigates back to the profile-selection screen. -->
+<component name="HomeScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x141414ff" />
+
+    <Label id="logoLabel" text="OTT Accelerator" translation="[120, 64]" width="600"
+      color="0x0b75e0ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="30" />
+    </Label>
+
+    <Label id="welcome" text="Welcome" translation="[150, 440]" width="1200" color="0xf8f1f7ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="48" />
+    </Label>
+    <Label id="subtitle" text="Home experience is coming soon." translation="[152, 510]"
+      width="1200" color="0x9ea4b0ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="24" />
+    </Label>
+
+    <LoginTabButton id="switchProfileBtn" label="Switch Profile" translation="[150, 590]"
+      buttonWidth="200" buttonHeight="65"
+      shapeUri="pkg:/images/ui/btn_logout.png" shadowUri="pkg:/images/ui/btn_logout_shadow.png"
+      fontUri="pkg:/fonts/DMSans-Bold.ttf" fontSize="20" />
+  </children>
+</component>

@@ -97,13 +97,13 @@
           <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="15" />
         </Label>
       </Group>
-      <LoginFieldButton id="emailField" label="Email" translation="[64, 35]" fieldWidth="794" fieldHeight="60" />
-      <LoginFieldButton id="passwordField" label="Password" translation="[64, 123]" fieldWidth="794" fieldHeight="60" secure="true" />
-      <LoginTabButton id="loginBtn" label="Login" translation="[64, 227]" buttonWidth="794" buttonHeight="60"
+      <LoginFieldButton id="emailField" label="Email" translation="[64, 55]" fieldWidth="794" fieldHeight="60" />
+      <LoginFieldButton id="passwordField" label="Password" translation="[64, 143]" fieldWidth="794" fieldHeight="60" secure="true" />
+      <LoginTabButton id="loginBtn" label="Login" translation="[64, 247]" buttonWidth="794" buttonHeight="60"
         shapeUri="pkg:/images/ui/btn_login.png" shadowUri="pkg:/images/ui/btn_login_shadow.png"
         fontUri="pkg:/fonts/DMSans-Bold.ttf" fontSize="22" />
       <!-- In-button loader (parity with web's spinner inside the Login button) -->
-      <BusySpinner id="loginSpinner" translation="[443, 239]" visible="false">
+      <BusySpinner id="loginSpinner" translation="[443, 259]" visible="false">
         <Poster role="poster" uri="pkg:/images/ui/spinner.png" width="36" height="36" />
       </BusySpinner>
     </Group>

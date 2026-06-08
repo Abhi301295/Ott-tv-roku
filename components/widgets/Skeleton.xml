@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!-- Shimmer skeleton (parity with react-loading-skeleton SkeletonBox).
-     A highlight band sweeps left→right across a base rectangle, looping. -->
+     Rounded base + a soft, feathered highlight band that sweeps left→right, looping. -->
 <component name="Skeleton" extends="Group">
   <interface>
     <field id="boxWidth" type="float" value="150" onChange="OnSizeChanged" />
@@ -13,13 +13,15 @@
   <script type="text/brightscript" uri="pkg:/components/widgets/Skeleton.brs" />
 
   <children>
-    <Group id="clip" clippingRect="[0,0,150,150]">
-      <Rectangle id="base" width="150" height="150" color="0xffffffff" />
-      <Rectangle id="shine" width="60" height="150" color="0xf3f3f3ff" opacity="0.85" />
-    </Group>
-    <Animation id="anim" duration="1.2" repeat="true" easeFunction="linear">
-      <Vector2DFieldInterpolator id="interp" key="[0.0,1.0]"
-        keyValue="[[-60,0],[150,0]]" fieldToInterp="shine.translation" />
+    <!-- Rounded base (primary-700) with a highlight overlay (primary-500) that pulses
+         its opacity — fully contained within the rounded box + name bar (the simulator
+         can't clip a sweeping band, so we breathe the fill like react's animate-pulse). -->
+    <Poster id="base" width="150" height="150" uri="pkg:/images/ui/sk_base.png" blendColor="0xffffffff" />
+    <Poster id="shine" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
+      blendColor="0xf3f3f3ff" opacity="0.0" />
+    <Animation id="anim" duration="1.3" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator id="interp" key="[0.0,0.5,1.0]"
+        keyValue="[0.0,0.6,0.0]" fieldToInterp="shine.opacity" />
     </Animation>
   </children>
 </component>

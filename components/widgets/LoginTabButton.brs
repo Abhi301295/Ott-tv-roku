@@ -40,10 +40,11 @@ sub OnSizeChanged()
     m.bg.height = h
     m.text.width = w
     m.text.height = h
-    ' Shadow png is pill size + 48px margin each axis; center it and drop down 8px.
-    m.shadow.width = w + 96
-    m.shadow.height = h + 96
-    m.shadow.translation = [-48, -40]
+    ' Keep focus glow tight. The source PNGs include generous padding; rendering
+    ' them at +96 made logout/home buttons look like a huge background panel.
+    m.shadow.width = w + 32
+    m.shadow.height = h + 32
+    m.shadow.translation = [-16, -12]
 end sub
 
 sub ApplyStyle()
@@ -57,5 +58,7 @@ sub ApplyStyle()
     sc = m.top.shadowColor
     if sc = invalid or sc = "" then sc = "0x04478bff"
     m.shadow.blendColor = sc
-    m.shadow.visible = (m.top.showShadow = true and m.top.shadowUri <> "")
+    ' No external glow/background on focus; selection is communicated by the
+    ' button fill itself, matching the requested Roku TV behavior.
+    m.shadow.visible = false
 end sub

@@ -44,6 +44,16 @@ function CreateScreenForRoute(route as string, state as object) as object
         screen.navState = state
         return screen
     end if
+    if route = RouteLoginProfile() then
+        screen = CreateObject("roSGNode", "ProfileScreen")
+        screen.navState = state
+        return screen
+    end if
+    if route = RouteHome() then
+        screen = CreateObject("roSGNode", "HomeScreen")
+        screen.navState = state
+        return screen
+    end if
     return CreatePlaceholderScreen(route, state)
 end function
 
