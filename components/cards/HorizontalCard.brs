@@ -29,12 +29,12 @@ sub ApplyAll()
         m.thumb.visible = true
         m.skeleton.visible = true
         m.skeleton.running = true
-        m.skeleton.baseColor = m.top.cPrimary700
-        m.skeleton.highlightColor = m.top.cPrimary500
+        CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
     else
         m.thumb.visible = false
         m.skeleton.visible = true
         m.skeleton.running = true
+        CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
     end if
     CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
 end sub

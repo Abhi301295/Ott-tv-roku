@@ -47,7 +47,6 @@ sub ApplyAll()
         m.skeleton.visible = true
         m.skeleton.running = true
     end if
-    m.skeleton.baseColor = m.top.cPrimary700
-    m.skeleton.highlightColor = m.top.cPrimary500
+    CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
     CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
 end sub

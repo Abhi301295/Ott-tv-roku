@@ -18,11 +18,23 @@ sub CardOnPosterLoad(poster as object, skeleton as object)
     end if
 end sub
 
-sub CardInjectTheme(card as object, primary500 as string, primary600 as string, primary700 as string, neutral50 as string, neutral800 as string)
+sub CardInjectTheme(card as object, primary500 as string, primary600 as string, primary700 as string, neutral50 as string, neutral800 as string, neutral700 = "" as string)
     if card = invalid then return
     if card.hasField("cPrimary500") then card.cPrimary500 = primary500
     if card.hasField("cPrimary600") then card.cPrimary600 = primary600
     if card.hasField("cPrimary700") then card.cPrimary700 = primary700
     if card.hasField("cNeutral50") then card.cNeutral50 = neutral50
     if card.hasField("cNeutral800") then card.cNeutral800 = neutral800
+    if neutral700 <> "" and card.hasField("cNeutral700") then card.cNeutral700 = neutral700
+end sub
+
+' Placeholder shimmer — parity with React bg-neutral-700 / neutral-800 pulse.
+sub CardApplySkeleton(skeleton as object, neutral700 as string, neutral800 as string)
+    if skeleton = invalid then return
+    base = neutral700
+    highlight = neutral800
+    if base = invalid or base = "" then base = "0x404040ff"
+    if highlight = invalid or highlight = "" then highlight = "0x262626ff"
+    skeleton.baseColor = base
+    skeleton.highlightColor = highlight
 end sub

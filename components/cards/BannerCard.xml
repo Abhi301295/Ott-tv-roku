@@ -7,6 +7,7 @@
     <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
     <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
     <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
   </interface>
 

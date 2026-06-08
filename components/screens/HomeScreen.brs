@@ -1,14 +1,15 @@
 sub init()
-    m.logoLabel = m.top.findNode("logoLabel")
-    m.statusLabel = m.top.findNode("statusLabel")
-    m.dataLabel = m.top.findNode("dataLabel")
-    m.cardsContainer = m.top.findNode("cardsContainer")
+    m.hero = m.top.findNode("hero")
+    m.rowsHost = m.top.findNode("rowsHost")
     m.bootSpinner = m.top.findNode("bootSpinner")
     m.bootOverlay = m.top.findNode("bootOverlay")
 
     m.categories = []
-    m.previewCards = []
-    m.previewFocusIndex = 0
+    m.rowWidgets = []
+    m.rowIndex = 0
+    m.cardIndex = 0
+    m.loadingMore = false
+
     m.page = HC_HomePageStart()
     m.hasMore = true
     m.homeLayout = HomeLayoutMode()
@@ -20,8 +21,7 @@ sub init()
 
     m.vm = FindViewManager(m.top)
 
-    ApplyColors()
-    ApplyBranding()
+    LoadThemeTokens()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
@@ -39,7 +39,7 @@ end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────
 
-sub ApplyColors()
+sub LoadThemeTokens()
     tokens = {}
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then tokens = tm.themeTokens
@@ -48,14 +48,9 @@ sub ApplyColors()
     m.cPrimary600 = TokenColor(tokens, "primary-600", "#0760bb")
     m.cPrimary700 = TokenColor(tokens, "primary-700", "#04478b")
     m.cNeutral50 = TokenColor(tokens, "neutral-50", "#f8f1f7")
-    m.cNeutral400 = TokenColor(tokens, "neutral-400", "#9ea4b0")
     m.cNeutral700 = TokenColor(tokens, "neutral-700", "#404040")
     m.cNeutral800 = TokenColor(tokens, "neutral-800", "#262626")
     m.cNeutral950 = TokenColor(tokens, "neutral-900", "#0a0a0a")
-
-    m.logoLabel.color = m.cPrimary500
-    m.statusLabel.color = m.cNeutral400
-    m.dataLabel.color = m.cNeutral50
 end sub
 
 function TokenColor(tokens as object, name as string, fallbackHex as string) as string
@@ -70,17 +65,41 @@ function TokenColor(tokens as object, name as string, fallbackHex as string) as 
 end function
 
 sub OnBusinessResolved()
-    ApplyColors()
-    ApplyBranding()
+    LoadThemeTokens()
+    InjectRowTheme()
+    ApplyThemeToHero()
 end sub
 
-sub ApplyBranding()
-    resolved = invalid
-    if m.global <> invalid then resolved = m.global.businessResolved
-    if resolved = invalid then return
-    if resolved.appName <> invalid and resolved.appName <> "" then
-        m.logoLabel.text = resolved.appName
-    end if
+sub InjectRowTheme()
+    for each row in m.rowWidgets
+        if row = invalid then continue for
+        ApplyThemeToRow(row)
+    end for
+end sub
+
+sub ApplyThemeToRow(row as object)
+    if row = invalid then return
+    row.cPrimary500 = m.cPrimary500
+    row.cPrimary600 = m.cPrimary600
+    row.cPrimary700 = m.cPrimary700
+    row.cNeutral50 = m.cNeutral50
+    row.cNeutral800 = m.cNeutral800
+    row.cNeutral950 = m.cNeutral950
+    row.cNeutral700 = m.cNeutral700
+end sub
+
+sub ApplyThemeToHero()
+    if m.hero = invalid then return
+    m.hero.cNeutral50 = m.cNeutral50
+    m.hero.cPrimary500 = m.cPrimary500
+end sub
+
+sub UpdateHeroBanner()
+    if m.hero = invalid then return
+    items = ExtractBannerItems(m.categories)
+    ApplyThemeToHero()
+    m.hero.bannerItems = items
+    m.hero.visible = (items.Count() > 0)
 end sub
 
 ' ── Boot sequence (parity with features/home/index.tsx) ──────────────────────
@@ -205,7 +224,8 @@ end function
 sub TryFinishBoot()
     if AnyBootLoading() then return
     ShowBootSpinner(false)
-    RenderBootData()
+    UpdateHeroBanner()
+    BuildContentRows()
 end sub
 
 sub ShowBootSpinner(show as boolean)
@@ -213,116 +233,79 @@ sub ShowBootSpinner(show as boolean)
     if m.bootSpinner <> invalid then m.bootSpinner.visible = show
 end sub
 
-sub RenderBootData()
-    if m.dataLabel <> invalid then
-        m.dataLabel.text = BuildCategoryDebugText(m.categories, m.homeLayout, m.showUpdate)
-        m.dataLabel.visible = true
-    end if
-    if m.statusLabel <> invalid then
-        m.statusLabel.text = "Home data loaded — use ← → to focus cards, OK for next page"
-        m.statusLabel.visible = true
-    end if
-    BuildCardPreview()
-end sub
+' ── Content rows (parity with netflixContent.tsx row list) ───────────────────
 
-' ── Card preview (home-cards phase — one sample per row type) ────────────────
+sub BuildContentRows()
+    if m.rowsHost = invalid then return
+    ClearContentRows()
 
-sub BuildCardPreview()
-    if m.cardsContainer = invalid then return
-    ClearCardPreview()
-
-    x = 0
-    gap = HC_CardGap()
-    seeAllOrientation = HC_CardTypeVertical()
-    maxRows = 6
-    built = 0
-
-    for i = 0 to m.categories.Count() - 1
-        if built >= maxRows then exit for
-        cat = m.categories[i]
-        if cat = invalid then continue for
-        items = cat.result
-        if items = invalid or items.Count() = 0 then continue for
-
-        rowType = ""
-        if cat.type <> invalid then rowType = cat.type
-        cardType = HC_CardTypeVertical()
-        if cat.cardType <> invalid and cat.cardType <> "" then cardType = cat.cardType
-
-        compName = CardComponentForRow(rowType, cardType)
-        if compName = "BannerCard" then continue for
-
-        item = items[0]
-        card = m.cardsContainer.createChild(compName)
-        ConfigurePreviewCard(card, compName, item, cardType, 0)
-        card.translation = [x, 0]
-        m.previewCards.Push(card)
-        x = x + PreviewCardWidth(compName) + gap
-        built = built + 1
-
-        if cardType = HC_CardTypeHorizontal() then seeAllOrientation = HC_CardTypeHorizontal()
+    contentRows = FilterContentRows(m.categories)
+    y = 0
+    for each cat in contentRows
+        row = m.rowsHost.createChild("ContentRow")
+        ApplyThemeToRow(row)
+        row.categoryData = cat
+        row.translation = [0, y]
+        m.rowWidgets.Push(row)
+        y = y + HC_RowPitch()
     end for
 
-    seeAll = m.cardsContainer.createChild("SeeAllCard")
-    seeAll.orientation = seeAllOrientation
-    CardInjectTheme(seeAll, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800)
-    seeAll.translation = [x, 0]
-    m.previewCards.Push(seeAll)
-    x = x + PreviewCardWidth("SeeAllCard", seeAllOrientation) + gap
-
-    m.previewFocusIndex = 0
-    ApplyCardPreviewFocus()
-    m.cardsContainer.visible = (m.previewCards.Count() > 0)
+    m.rowIndex = 0
+    m.cardIndex = 0
+    m.rowsHost.visible = (m.rowWidgets.Count() > 0)
+    ApplyHomeFocus()
 end sub
 
-sub ClearCardPreview()
-    m.previewCards = []
-    if m.cardsContainer = invalid then return
-    count = m.cardsContainer.getChildCount()
+sub ClearContentRows()
+    m.rowWidgets = []
+    if m.rowsHost = invalid then return
+    count = m.rowsHost.getChildCount()
     for i = count - 1 to 0 step -1
-        m.cardsContainer.removeChildIndex(i)
+        m.rowsHost.removeChildIndex(i)
     end for
 end sub
 
-sub ConfigurePreviewCard(card as object, compName as string, item as object, cardType as string, rank as integer)
-    CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800)
-    card.focusedState = false
+sub ApplyHomeFocus()
+    if m.rowsHost = invalid then return
 
-    if compName = "ContinueWatchCard" then
-        card.thumbnailUri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
-        card.progress = GetContinueProgressPercent(item)
-        if card.hasField("cNeutral950") then card.cNeutral950 = m.cNeutral950
-        if card.hasField("cNeutral700") then card.cNeutral700 = m.cNeutral700
-    else if compName = "NumberedVerticalCard" then
-        card.thumbnailUri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
-        card.rank = rank
-    else if compName = "HorizontalCard" then
-        card.thumbnailUri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
-    else if compName = "VerticalCard" then
-        card.thumbnailUri = GetCardImgByType(cardType, item.thumbnails)
-    end if
-end sub
+    anchorY = HC_NetflixAnchorY() - (m.rowIndex * HC_RowPitch())
+    m.rowsHost.translation = [0, anchorY]
 
-function PreviewCardWidth(compName as string, orientation = "" as string) as integer
-    if compName = "HorizontalCard" then return 556
-    if compName = "ContinueWatchCard" then return 556
-    if compName = "NumberedVerticalCard" then return 422
-    if compName = "VerticalCard" then return 256
-    if compName = "SeeAllCard" then
-        if orientation = HC_CardTypeHorizontal() then return 546
-        return 246
-    end if
-    return 256
-end function
-
-sub ApplyCardPreviewFocus()
-    for i = 0 to m.previewCards.Count() - 1
-        card = m.previewCards[i]
-        if card <> invalid and card.hasField("focusedState") then
-            card.focusedState = (i = m.previewFocusIndex)
+    for i = 0 to m.rowWidgets.Count() - 1
+        row = m.rowWidgets[i]
+        if row = invalid then continue for
+        row.rowFocused = (i = m.rowIndex)
+        row.rowDimmed = (i > m.rowIndex)
+        if i = m.rowIndex then
+            ClampCardIndex()
+            row.cardFocusIndex = m.cardIndex
         end if
     end for
 end sub
+
+sub ClampCardIndex()
+    row = CurrentRow()
+    if row = invalid then
+        m.cardIndex = 0
+        return
+    end if
+    count = row.cardCount
+    if count < 1 then
+        m.cardIndex = 0
+        return
+    end if
+    if m.cardIndex < 0 then m.cardIndex = 0
+    if m.cardIndex >= count then m.cardIndex = count - 1
+end sub
+
+function CurrentRow() as object
+    if m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return invalid
+    return m.rowWidgets[m.rowIndex]
+end function
+
+function LastRowIndex() as integer
+    return m.rowWidgets.Count() - 1
+end function
 
 sub ClearAuthAndGoLogin()
     ClearStorage()
@@ -339,27 +322,43 @@ sub OnKey()
     ev = m.top.keyEvent
     if ev = invalid or ev.key = invalid or ev.press = invalid then return
     if not ev.press then return
+    if AnyBootLoading() or m.rowWidgets.Count() = 0 then return
 
     key = ev.key
     if key = "left" then
-        if m.previewFocusIndex > 0 then
-            m.previewFocusIndex = m.previewFocusIndex - 1
-            ApplyCardPreviewFocus()
+        if m.cardIndex > 0 then
+            m.cardIndex = m.cardIndex - 1
+            ApplyHomeFocus()
         end if
     else if key = "right" then
-        if m.previewFocusIndex < m.previewCards.Count() - 1 then
-            m.previewFocusIndex = m.previewFocusIndex + 1
-            ApplyCardPreviewFocus()
+        row = CurrentRow()
+        if row <> invalid and m.cardIndex < row.cardCount - 1 then
+            m.cardIndex = m.cardIndex + 1
+            ApplyHomeFocus()
+        end if
+    else if key = "up" then
+        if m.rowIndex > 0 then
+            m.rowIndex = m.rowIndex - 1
+            ClampCardIndex()
+            ApplyHomeFocus()
+        end if
+    else if key = "down" then
+        if m.rowIndex < LastRowIndex() then
+            m.rowIndex = m.rowIndex + 1
+            ClampCardIndex()
+            ApplyHomeFocus()
+        else if m.hasMore and not m.loadingMore then
+            LoadMoreCategories()
         end if
     else if key = "OK" or key = "ok" then
-        if m.hasMore and not AnyBootLoading() then LoadMoreCategories()
+        ' Card navigation lands in feature/home-nav.
     end if
 end sub
 
 sub LoadMoreCategories()
-    if not m.hasMore then return
+    if not m.hasMore or m.loadingMore then return
+    m.loadingMore = true
     m.page = m.page + 1
-    m.statusLabel.text = "Loading page " + Str(m.page) + "..."
     path = Endpoints().HOME.CATEGORY_LIST
     m.loadMoreTask = ApiGetQuery(path, HomeCategoryQuery(m.page))
     m.loadMoreTask.observeField("apiResult", "OnLoadMoreResponse")
@@ -367,21 +366,29 @@ sub LoadMoreCategories()
 end sub
 
 sub OnLoadMoreResponse()
+    m.loadingMore = false
     if m.loadMoreTask = invalid then return
     api = m.loadMoreTask.apiResult
     if api = invalid then return
     if HandleSessionExpiry(m.top, api) then return
 
+    prevCount = m.rowWidgets.Count()
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
             m.hasMore = true
+            UpdateHeroBanner()
+            BuildContentRows()
+            if m.rowIndex < prevCount then
+                m.rowIndex = prevCount
+                m.cardIndex = 0
+            end if
+            ApplyHomeFocus()
         else
             m.hasMore = false
         end if
     else
         m.hasMore = false
     end if
-    RenderBootData()
 end sub
