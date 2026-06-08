@@ -156,6 +156,11 @@ end sub
 
 sub ApplyHeaderBranding()
     if m.header = invalid then return
+
+    ' Active profile avatar (parity with NetflixHeader): persisted by fetchProfiles.
+    avatarUri = RegistryRead(SK_Avatar(), "app")
+    if avatarUri <> invalid then m.header.avatarUri = avatarUri
+
     resolved = invalid
     if m.global <> invalid then resolved = m.global.businessResolved
     if resolved = invalid then return

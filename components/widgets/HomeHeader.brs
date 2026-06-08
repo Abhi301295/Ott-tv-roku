@@ -3,7 +3,8 @@ sub init()
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
     m.menuRow = m.top.findNode("menuRow")
-    m.avatar = m.top.findNode("avatar")
+    m.avatarImg = m.top.findNode("avatarImg")
+    m.avatarBg = m.top.findNode("avatarBg")
 
     m.itemLabels = []
     m.itemUnderlines = []
@@ -24,9 +25,19 @@ sub OnMenuChanged()
 end sub
 
 sub OnThemeChanged()
-    if m.avatar <> invalid then m.avatar.blendColor = m.top.cNeutral50
     if m.logoLabel <> invalid then m.logoLabel.color = m.top.cNeutral50
     ApplyFocus()
+end sub
+
+sub OnAvatarChanged()
+    if m.avatarImg = invalid then return
+    uri = m.top.avatarUri
+    if uri <> invalid and uri <> "" then
+        m.avatarImg.uri = uri
+        m.avatarImg.visible = true
+    else
+        m.avatarImg.visible = false
+    end if
 end sub
 
 sub OnLogoChanged()
