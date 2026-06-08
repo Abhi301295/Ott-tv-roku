@@ -31,7 +31,7 @@
       <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" />
     </Label>
 
-    <LayoutGroup id="menuRow" layoutDirection="horiz" itemSpacings="[56]"
+    <LayoutGroup id="menuRow" layoutDirection="horiz" itemSpacings="[24]"
       translation="[560, 34]" />
 
     <!-- Active profile avatar (parity with NetflixHeader avatar). The simulator can't

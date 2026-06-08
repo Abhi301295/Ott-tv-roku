@@ -1,3 +1,13 @@
+' HomeHeader.brs — Netflix top bar (parity with ottHeader.tsx NetflixMenuItem).
+'
+' Each menu item mirrors the React <button>:
+'   px-4 py-2  →  PAD_X=16, PAD_Y=8
+'   fs-24 font-medium / font-bold when selected
+'   default:     text-neutral-200
+'   focused:     rounded-full scale-105 border-b-2 border-neutral-50, text-neutral-200
+'   selected:    text-neutral-50 font-bold border-b-2 border-primary-500 (straight)
+'   focused+selected: focus shape + scale, selected color + bold + primary border
+
 sub init()
     m.scrim = m.top.findNode("scrim")
     m.logoPoster = m.top.findNode("logoPoster")
@@ -6,12 +16,27 @@ sub init()
     m.avatarImg = m.top.findNode("avatarImg")
     m.avatarBg = m.top.findNode("avatarBg")
 
+    m.itemRoots = []
     m.itemLabels = []
-    m.itemUnderlines = []
+    m.itemSelBars = []
+    m.itemFocusL = []
+    m.itemFocusM = []
+    m.itemFocusR = []
 
-    m.menuFont = CreateObject("roSGNode", "Font")
-    m.menuFont.uri = "pkg:/fonts/DMSans-Medium.ttf"
-    m.menuFont.size = 24
+    ' React px-4 py-2 + fs-24 → ~40px tall pill (rounded-full radius = half height).
+    m.PAD_X = 16
+    m.PAD_Y = 8
+    m.ITEM_H = 40
+    m.BORDER_W = 2
+    m.CAP_R = 20
+
+    m.fontMedium = CreateObject("roSGNode", "Font")
+    m.fontMedium.uri = "pkg:/fonts/DMSans-Medium.ttf"
+    m.fontMedium.size = 24
+
+    m.fontBold = CreateObject("roSGNode", "Font")
+    m.fontBold.uri = "pkg:/fonts/DMSans-Bold.ttf"
+    m.fontBold.size = 24
 
     m.layoutTimer = CreateObject("roSGNode", "Timer")
     m.layoutTimer.duration = 0.1
@@ -26,6 +51,12 @@ end sub
 
 sub OnThemeChanged()
     if m.logoLabel <> invalid then m.logoLabel.color = m.top.cNeutral50
+    for i = 0 to m.itemSelBars.Count() - 1
+        if m.itemSelBars[i] <> invalid then m.itemSelBars[i].color = m.top.cPrimary500
+        if m.itemFocusL[i] <> invalid then m.itemFocusL[i].blendColor = m.top.cNeutral50
+        if m.itemFocusM[i] <> invalid then m.itemFocusM[i].color = m.top.cNeutral50
+        if m.itemFocusR[i] <> invalid then m.itemFocusR[i].blendColor = m.top.cNeutral50
+    end for
     ApplyFocus()
 end sub
 
@@ -58,8 +89,12 @@ sub OnFocusChanged()
 end sub
 
 sub BuildMenu()
+    m.itemRoots = []
     m.itemLabels = []
-    m.itemUnderlines = []
+    m.itemSelBars = []
+    m.itemFocusL = []
+    m.itemFocusM = []
+    m.itemFocusR = []
     if m.menuRow = invalid then return
 
     count = m.menuRow.getChildCount()
@@ -70,38 +105,92 @@ sub BuildMenu()
     texts = m.top.menuTexts
     if texts = invalid then return
 
+    capR = m.CAP_R
+    borderY = m.ITEM_H - m.BORDER_W
+
     for each t in texts
-        item = m.menuRow.createChild("Group")
-        lbl = item.createChild("Label")
+        root = m.menuRow.createChild("Group")
+
+        lbl = root.createChild("Label")
         lbl.text = t
-        lbl.font = m.menuFont
-        lbl.height = 36
+        lbl.font = m.fontMedium
+        lbl.translation = [m.PAD_X, m.PAD_Y]
+        lbl.height = 24
         lbl.color = m.top.cNeutral200
-        und = item.createChild("Rectangle")
-        und.height = 3
-        und.width = 0
-        und.translation = [0, 42]
-        und.color = m.top.cPrimary500
-        und.visible = false
+
+        ' Selected: straight blue bottom border (border-b-2 border-primary-500).
+        sel = root.createChild("Rectangle")
+        sel.height = m.BORDER_W
+        sel.width = 0
+        sel.translation = [0, borderY]
+        sel.color = m.top.cPrimary500
+        sel.visible = false
+
+        ' Focused: rounded-full bottom border (border-b-2 border-neutral-50).
+        fL = root.createChild("Poster")
+        fL.uri = "pkg:/images/ui/focus_cap_left.png"
+        fL.width = capR
+        fL.height = capR
+        fL.translation = [0, m.ITEM_H - capR]
+        fL.blendColor = m.top.cNeutral50
+        fL.visible = false
+
+        fM = root.createChild("Rectangle")
+        fM.height = m.BORDER_W
+        fM.width = 0
+        fM.translation = [capR, borderY]
+        fM.color = m.top.cNeutral50
+        fM.visible = false
+
+        fR = root.createChild("Poster")
+        fR.uri = "pkg:/images/ui/focus_cap_right.png"
+        fR.width = capR
+        fR.height = capR
+        fR.translation = [0, m.ITEM_H - capR]
+        fR.blendColor = m.top.cNeutral50
+        fR.visible = false
+
+        m.itemRoots.Push(root)
         m.itemLabels.Push(lbl)
-        m.itemUnderlines.Push(und)
+        m.itemSelBars.Push(sel)
+        m.itemFocusL.Push(fL)
+        m.itemFocusM.Push(fM)
+        m.itemFocusR.Push(fR)
     end for
 
     m.layoutTimer.control = "start"
     ApplyFocus()
 end sub
 
-' Underline widths and horizontal centering need measured label sizes, so finalize
-' once the row has been laid out.
+' Measure label widths after layout, then size borders to the full button (text + px-4).
 sub OnLayoutTimer()
+    capR = m.CAP_R
+    borderY = m.ITEM_H - m.BORDER_W
+
     for i = 0 to m.itemLabels.Count() - 1
         lbl = m.itemLabels[i]
-        und = m.itemUnderlines[i]
-        if lbl = invalid or und = invalid then continue for
+        if lbl = invalid then continue for
+
         r = lbl.boundingRect()
-        w = 0
-        if r <> invalid then w = r.width
-        und.width = w
+        textW = 0
+        if r <> invalid then textW = r.width
+
+        itemW = textW + (2 * m.PAD_X)
+
+        m.itemSelBars[i].width = itemW
+
+        fL = m.itemFocusL[i]
+        fM = m.itemFocusM[i]
+        fR = m.itemFocusR[i]
+        fL.translation = [0, m.ITEM_H - capR]
+        fR.translation = [itemW - capR, m.ITEM_H - capR]
+        midW = itemW - (2 * capR)
+        if midW < 0 then midW = 0
+        fM.translation = [capR, borderY]
+        fM.width = midW
+
+        ' scale-105 anchor = button center.
+        m.itemRoots[i].scaleRotateCenter = [itemW / 2, m.ITEM_H / 2]
     end for
 
     rr = m.menuRow.boundingRect()
@@ -120,23 +209,56 @@ sub ApplyFocus()
 
     for i = 0 to m.itemLabels.Count() - 1
         lbl = m.itemLabels[i]
-        und = m.itemUnderlines[i]
-        if lbl = invalid or und = invalid then continue for
+        root = m.itemRoots[i]
+        sel = m.itemSelBars[i]
+        fL = m.itemFocusL[i]
+        fM = m.itemFocusM[i]
+        fR = m.itemFocusR[i]
+        if lbl = invalid then continue for
 
         isFocused = (active and i = fIdx)
         isSelected = (i = sIdx)
 
-        if isFocused then
+        ' Border priority matches React class merge:
+        '   focused only        → rounded white underline
+        '   selected only       → straight blue underline
+        '   focused + selected  → rounded blue underline (primary wins over neutral-50)
+        showRounded = isFocused
+        showStraight = (isSelected and not isFocused)
+
+        fL.visible = showRounded
+        fM.visible = showRounded
+        fR.visible = showRounded
+        sel.visible = showStraight
+
+        if showRounded then
+            if isSelected then
+                fL.blendColor = m.top.cPrimary500
+                fM.color = m.top.cPrimary500
+                fR.blendColor = m.top.cPrimary500
+            else
+                fL.blendColor = m.top.cNeutral50
+                fM.color = m.top.cNeutral50
+                fR.blendColor = m.top.cNeutral50
+            end if
+        end if
+
+        ' Text + font (React class merge order).
+        if isSelected then
             lbl.color = m.top.cNeutral50
-            und.color = m.top.cNeutral50
-            und.visible = true
-        else if isSelected then
-            lbl.color = m.top.cNeutral50
-            und.color = m.top.cPrimary500
-            und.visible = true
+            lbl.font = m.fontBold
         else
             lbl.color = m.top.cNeutral200
-            und.visible = false
+            lbl.font = m.fontMedium
+        end if
+
+        ' scale-105 on the whole button when focused.
+        if root <> invalid then
+            if showRounded then
+                root.scale = [1.05, 1.05]
+            else
+                root.scale = [1.0, 1.0]
+            end if
         end if
     end for
 
