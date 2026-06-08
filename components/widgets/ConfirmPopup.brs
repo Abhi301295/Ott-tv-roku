@@ -16,13 +16,25 @@ sub init()
     UpdateButtons()
 end sub
 
+' Re-apply when the screen injects themed tokens after this component's init().
+sub OnThemeChanged()
+    if m.cancelFill = invalid then return   ' init() not finished yet
+    ApplyTheme()
+    UpdateButtons()
+end sub
+
 sub ApplyTheme()
     m.cardBorder = m.top.findNode("cardBorder")
     m.cardFill = m.top.findNode("cardFill")
+    m.prompt = m.top.findNode("prompt")
     m.cardBorder.blendColor = m.top.cCardBorder
     m.cardFill.blendColor = m.top.cCardBg
-    m.cancelShadow.blendColor = m.top.cPrimary500
-    m.logoutShadow.blendColor = m.top.cPrimary500
+    ' Prompt copy follows the themed neutral-300 (parity with text-neutral-300).
+    if m.prompt <> invalid then m.prompt.color = m.top.cNeutral300
+    ' Subtle dark drop shadow on the focused button (parity with shadow-lg),
+    ' not a colored glow. Kept black; size/opacity set in XML.
+    m.cancelShadow.blendColor = "0x000000ff"
+    m.logoutShadow.blendColor = "0x000000ff"
 end sub
 
 sub OnLoggingOutChanged()

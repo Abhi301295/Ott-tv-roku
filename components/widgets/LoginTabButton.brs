@@ -58,5 +58,7 @@ sub ApplyStyle()
     sc = m.top.shadowColor
     if sc = invalid or sc = "" then sc = "0x04478bff"
     m.shadow.blendColor = sc
-    m.shadow.visible = (m.top.showShadow = true and m.top.shadowUri <> "")
+    ' No external glow/background on focus; selection is communicated by the
+    ' button fill itself, matching the requested Roku TV behavior.
+    m.shadow.visible = false
 end sub

@@ -24,18 +24,17 @@
          animate its scale smoothly (pop-in / pop-out) from the left-center anchor. -->
     <Group id="scaler">
     <!-- Avatar (144) centered in the 166 ring footprint → ~5px gap to the ring. -->
-    <Poster id="circleBg" translation="[11, 11]" width="144" height="144"
-      uri="pkg:/images/ui/avatar_circle.png" blendColor="0x404040ff" />
-    <Poster id="avatarImg" translation="[11, 11]" width="144" height="144"
-      loadDisplayMode="scaleToFill" visible="false" />
-    <Label id="initials" translation="[11, 11]" width="144" height="144"
-      horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
-      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="44" />
-    </Label>
-    <!-- corner mask tinted to page bg → makes the square image read as circular -->
-    <Poster id="cornerMask" translation="[11, 11]" width="144" height="144"
-      uri="pkg:/images/ui/avatar_mask.png" blendColor="0x080a0cff" />
-
+    <MaskGroup id="avatarMask" maskUri="pkg:/images/ui/avatar_circle.png"
+      maskSize="[144, 144]" maskOffset="[11, 11]">
+      <Poster id="circleBg" translation="[11, 11]" width="144" height="144"
+        uri="pkg:/images/ui/avatar_circle.png" blendColor="0x404040ff" />
+      <Poster id="avatarImg" translation="[11, 11]" width="144" height="144"
+        loadDisplayMode="scaleToFill" visible="false" />
+      <Label id="initials" translation="[11, 11]" width="144" height="144"
+        horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
+        <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="44" />
+      </Label>
+    </MaskGroup>
     <Poster id="ring" translation="[0, 0]" width="166" height="166"
       uri="pkg:/images/ui/avatar_ring.png" blendColor="0xffffffff" visible="false" />
     <!-- Auto-select progress ring (parity with NetComponent): faint white track + a
@@ -53,10 +52,8 @@
     <Group id="editBadge" translation="[-48, 59]" visible="false">
       <Poster id="editBadgeBg" width="48" height="48"
         uri="pkg:/images/ui/avatar_circle.png" blendColor="0xf8f1f7ff" />
-      <Label id="editIcon" text="/" translation="[0, 0]" width="48" height="48"
-        horizAlign="center" vertAlign="center" color="0x0a0a0aff" rotation="-0.55">
-        <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" />
-      </Label>
+      <Poster id="editIcon" translation="[12, 12]" width="24" height="24"
+        uri="pkg:/images/ui/profile_edit_icon.png" />
       <Poster id="leftLockIcon" translation="[12, 12]" width="24" height="24"
         uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" visible="false" />
     </Group>
@@ -64,10 +61,11 @@
 
     <Animation id="focusAnim" duration="0.28" repeat="false" easeFunction="outCubic">
       <Vector2DFieldInterpolator id="focusInterp" key="[0.0, 1.0]"
-        keyValue="[[1.0, 1.0], [1.38, 1.38]]" fieldToInterp="scaler.scale" />
+        keyValue="[[1.0, 1.0], [1.25, 1.25]]" fieldToInterp="scaler.scale" />
       <Vector2DFieldInterpolator id="offsetInterp" key="[0.0, 1.0]"
         keyValue="[[0.0, 0.0], [34.0, 0.0]]" fieldToInterp="scaler.translation" />
     </Animation>
+    <Timer id="sizeAnimTimer" duration="0.016" repeat="true" />
 
     <Label id="nameLabel" translation="[292, 56]" width="420" height="40"
       vertAlign="center" color="0xf8f1f7ff" visible="false">

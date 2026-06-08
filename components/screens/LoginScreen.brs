@@ -52,6 +52,13 @@ sub init()
     m.FOCUS_LOGIN_BTN = 4
     m.focusIndex = m.FOCUS_PHONE_TAB
 
+    ' Avoid a visible Login -> Profile flash on startup when a session already exists.
+    if HasActiveSession() then
+        m.top.visible = false
+        RedirectIfAlreadyAuthenticated()
+        return
+    end if
+
     m.title.text = CopyLoginTitle()
     m.phoneTab.label = CopyUsePhone()
     m.remoteTab.label = CopyUseRemote()
@@ -74,13 +81,6 @@ sub init()
     ApplyThemeColors()
     UpdateTabColors()
     UpdateLoginButton()
-
-    ' If a session already exists, skip login and go straight to profile selection
-    ' (parity with web's authenticated-route guard).
-    if HasActiveSession() then
-        RedirectIfAlreadyAuthenticated()
-        return
-    end if
 
     LoginScreen_ApplyFocus()
     FetchOnboardDevice()

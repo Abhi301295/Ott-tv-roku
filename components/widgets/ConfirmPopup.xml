@@ -6,12 +6,14 @@
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
     <field id="isLoggingOut" type="boolean" value="false" onChange="OnLoggingOutChanged" />
     <field id="action" type="string" value="" alwaysNotify="true" />
-    <!-- theme colors injected by the screen -->
-    <field id="cPrimary500" type="string" value="0x0b75e0ff" />
-    <field id="cPrimary600" type="string" value="0x0760bbff" />
-    <field id="cNeutral500" type="string" value="0xe279ceff" />
-    <field id="cCardBg" type="string" value="0x171717ff" />
-    <field id="cCardBorder" type="string" value="0xa12189ff" />
+    <!-- theme colors injected by the screen (re-applied when the screen sets them,
+         since this component's init() runs before the screen injects tokens) -->
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
+    <field id="cNeutral300" type="string" value="0xc9c9c9ff" onChange="OnThemeChanged" />
+    <field id="cNeutral500" type="string" value="0xe279ceff" onChange="OnThemeChanged" />
+    <field id="cCardBg" type="string" value="0x171717ff" onChange="OnThemeChanged" />
+    <field id="cCardBorder" type="string" value="0xa12189ff" onChange="OnThemeChanged" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/components/widgets/ConfirmPopup.brs" />
@@ -33,24 +35,24 @@
       <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="20" />
     </Label>
 
-    <!-- Cancel button -->
-    <Poster id="cancelShadow" translation="[680, 560]" width="316" height="160"
-      uri="pkg:/images/ui/popup_btn_shadow.png" blendColor="0x0b75e0ff" opacity="0.7" visible="false" />
+    <!-- Cancel button (shadow = subtle dark drop shadow, parity with shadow-lg) -->
+    <Poster id="cancelShadow" translation="[726, 582]" width="224" height="68"
+      uri="pkg:/images/ui/popup_btn_shadow.png" blendColor="0x000000ff" opacity="0.35" visible="false" />
     <Poster id="cancelBorder" translation="[728, 568]" width="220" height="64"
       uri="pkg:/images/ui/popup_btn.png" blendColor="0xe279ceff" />
-    <Poster id="cancelFill" translation="[731, 571]" width="214" height="58"
+    <Poster id="cancelFill" translation="[730, 570]" width="216" height="60"
       uri="pkg:/images/ui/popup_btn.png" blendColor="0x171717ff" />
     <Label id="cancelLabel" text="Cancel" translation="[728, 568]" width="220" height="64"
       horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
       <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="20" />
     </Label>
 
-    <!-- Log Out button -->
-    <Poster id="logoutShadow" translation="[924, 560]" width="316" height="160"
-      uri="pkg:/images/ui/popup_btn_shadow.png" blendColor="0x0b75e0ff" opacity="0.7" visible="false" />
+    <!-- Log Out button (shadow = subtle dark drop shadow, parity with shadow-lg) -->
+    <Poster id="logoutShadow" translation="[970, 582]" width="224" height="68"
+      uri="pkg:/images/ui/popup_btn_shadow.png" blendColor="0x000000ff" opacity="0.35" visible="false" />
     <Poster id="logoutBorder" translation="[972, 568]" width="220" height="64"
       uri="pkg:/images/ui/popup_btn.png" blendColor="0xe279ceff" />
-    <Poster id="logoutFill" translation="[975, 571]" width="214" height="58"
+    <Poster id="logoutFill" translation="[974, 570]" width="216" height="60"
       uri="pkg:/images/ui/popup_btn.png" blendColor="0x171717ff" />
     <Label id="logoutLabel" text="Log Out" translation="[972, 568]" width="220" height="64"
       horizAlign="center" vertAlign="center" color="0xf8f1f7ff">

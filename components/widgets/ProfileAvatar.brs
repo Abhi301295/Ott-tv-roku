@@ -1,9 +1,9 @@
 sub init()
     m.scaler = m.top.findNode("scaler")
+    m.avatarMask = m.top.findNode("avatarMask")
     m.circleBg = m.top.findNode("circleBg")
     m.avatarImg = m.top.findNode("avatarImg")
     m.initials = m.top.findNode("initials")
-    m.cornerMask = m.top.findNode("cornerMask")
     m.ring = m.top.findNode("ring")
     m.progressTrack = m.top.findNode("progressTrack")
     m.progressArc = m.top.findNode("progressArc")
@@ -17,22 +17,24 @@ sub init()
     m.focusAnim = m.top.findNode("focusAnim")
     m.focusInterp = m.top.findNode("focusInterp")
     m.offsetInterp = m.top.findNode("offsetInterp")
+    m.sizeAnimTimer = m.top.findNode("sizeAnimTimer")
 
     m.ARC_FRAMES = 151
-    ' Focused profile must read clearly larger than the rail avatars on TV.
-    ' Roku's simulator/downscale makes 1.25 subtle, so use a stronger pop.
-    m.FOCUS_SCALE = 1.38
+    ' OTTPlay React parity: focused profile wrapper uses origin-left scale-125.
+    m.FOCUS_SCALE = 1.25
     m.REST_SCALE = 1.0
     ' Focused profile also pops out of the rail a little to the right; all
     ' unfocused profiles return to x=0 so the default column stays aligned.
     m.FOCUS_OFFSET_X = 34.0
     m.REST_OFFSET_X = 0.0
+    m.SIZE_ANIM_STEPS = 12
 
     m.top.focusable = true
     m.top.drawFocusFeedback = false
-    ' Keep the left edge fixed so the focused avatar grows rightward, matching
-    ' the OTTPlay React profile rail. Vertical growth stays centered per slot.
-    m.scaler.scaleRotateCenter = [0, 83]
+    ' Manual sizing uses a left-center anchor: grow rightward while vertical growth
+    ' stays centered in the profile row, matching React's origin-left transform.
+    m.scaler.scaleRotateCenter = [0, 0]
+    if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.observeField("fire", "OnSizeAnimTick")
 
     OnColorsChanged()
     OnDataChanged()
@@ -41,8 +43,7 @@ sub init()
 end sub
 
 sub OnColorsChanged()
-    if m.cornerMask = invalid then return
-    m.cornerMask.blendColor = m.top.bgColor
+    if m.ring = invalid then return
     m.ring.blendColor = m.top.ringColor
     m.nameLabel.color = m.top.nameColor
 end sub
@@ -78,6 +79,12 @@ sub OnFocusChanged()
     ' Otherwise (just focused, or locked) → static white ring + dot.
     showArc = (focused and not locked and progress > 0)
 
+    if focused then
+        m.circleBg.visible = true
+    else
+        m.circleBg.visible = false
+    end if
+
     m.progressTrack.visible = showArc
     m.progressArc.visible = showArc
     if showArc then m.progressArc.uri = ArcFrameUri(progress)
@@ -90,8 +97,10 @@ sub OnFocusChanged()
     m.editIcon.visible = (showBadge and not locked)
     m.leftLockIcon.visible = (showBadge and locked)
     m.lockBadge.visible = false
-    m.nameLabel.visible = focused
-    m.hintLabel.visible = (focused and m.top.hintText <> "")
+    ' Match current OTTPlay React/LG visual pass: profile rail shows only avatars
+    ' and focus affordances, not side labels.
+    m.nameLabel.visible = false
+    m.hintLabel.visible = false
 
     AnimateScale(focused)
 end sub
@@ -107,8 +116,9 @@ sub AnimateScale(focused as boolean)
     end if
 
     if m.lastScale = invalid then
-        m.scaler.scale = [target, target]
-        m.scaler.translation = [targetX, 0.0]
+        ApplyAvatarSize(target)
+        m.scaler.scale = [1.0, 1.0]
+        m.scaler.translation = [targetX, SizeOffsetY(target)]
         m.lastScale = target
         m.lastOffsetX = targetX
         return
@@ -116,12 +126,87 @@ sub AnimateScale(focused as boolean)
 
     if m.lastScale = target and m.lastOffsetX = targetX then return
 
-    m.focusAnim.control = "stop"
-    m.focusInterp.keyValue = [[m.lastScale, m.lastScale], [target, target]]
-    m.offsetInterp.keyValue = [[m.lastOffsetX, 0.0], [targetX, 0.0]]
-    m.focusAnim.control = "start"
+    StartSizeAnimation(m.lastScale, target, m.lastOffsetX, targetX)
     m.lastScale = target
     m.lastOffsetX = targetX
+end sub
+
+sub StartSizeAnimation(fromScale as float, toScale as float, fromX as float, toX as float)
+    m.animFromScale = fromScale
+    m.animToScale = toScale
+    m.animFromX = fromX
+    m.animToX = toX
+    m.animStep = 0
+    if m.sizeAnimTimer <> invalid then
+        m.sizeAnimTimer.control = "stop"
+        m.sizeAnimTimer.control = "start"
+    else
+        ApplyAvatarSize(toScale)
+        m.scaler.translation = [toX, SizeOffsetY(toScale)]
+    end if
+end sub
+
+sub OnSizeAnimTick()
+    m.animStep = m.animStep + 1
+    t = m.animStep / m.SIZE_ANIM_STEPS
+    if t > 1.0 then t = 1.0
+
+    ' Ease out cubic for the same "pop" feel as the React transition.
+    inv = 1.0 - t
+    eased = 1.0 - (inv * inv * inv)
+    scale = m.animFromScale + ((m.animToScale - m.animFromScale) * eased)
+    x = m.animFromX + ((m.animToX - m.animFromX) * eased)
+
+    ApplyAvatarSize(scale)
+    m.scaler.scale = [1.0, 1.0]
+    m.scaler.translation = [x, SizeOffsetY(scale)]
+
+    if t >= 1.0 and m.sizeAnimTimer <> invalid then
+        m.sizeAnimTimer.control = "stop"
+    end if
+end sub
+
+function SizeOffsetY(scale as float) as float
+    return -((166 * scale) - 166) / 2
+end function
+
+sub ApplyAvatarSize(scale as float)
+    ringSize = 166 * scale
+    avatarSize = 144 * scale
+    inset = 11 * scale
+
+    if m.avatarMask <> invalid then
+        m.avatarMask.maskSize = [avatarSize, avatarSize]
+        m.avatarMask.maskOffset = [inset, inset]
+    end if
+
+    for each node in [m.circleBg, m.avatarImg, m.initials]
+        if node <> invalid then
+            node.translation = [inset, inset]
+            node.width = avatarSize
+            node.height = avatarSize
+        end if
+    end for
+
+    for each node in [m.ring, m.progressTrack, m.progressArc]
+        if node <> invalid then
+            node.translation = [0, 0]
+            node.width = ringSize
+            node.height = ringSize
+        end if
+    end for
+
+    if m.dot <> invalid then
+        m.dot.translation = [74 * scale, 158 * scale]
+        m.dot.width = 18 * scale
+        m.dot.height = 18 * scale
+    end if
+
+    if m.lockBadge <> invalid then
+        m.lockBadge.translation = [69 * scale, 150 * scale]
+        m.lockBadge.width = 28 * scale
+        m.lockBadge.height = 28 * scale
+    end if
 end sub
 
 ' Map progress (0..1) to one of the pre-rendered arc frames (parity with the

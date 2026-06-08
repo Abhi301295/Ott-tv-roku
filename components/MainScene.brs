@@ -92,13 +92,17 @@ end sub
 
 sub OnThemeReady()
     if not m.themeManager.ready then return
+    ' themeManager.ready can notify more than once; the initial route mounts exactly once
+    ' so a single screen instance owns the stack.
+    if m.routed = true then return
+    m.routed = true
 
-    m.bootBg.visible = false
     m.viewManager.visible = true
 
     initialRoute = GetInitialRoute()
     m.viewManager.callFunc("NavigateReplace", initialRoute, {})
     m.viewManager.setFocus(true)
+    m.bootBg.visible = false
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean

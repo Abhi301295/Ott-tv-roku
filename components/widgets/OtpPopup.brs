@@ -1,12 +1,25 @@
 sub init()
     m.keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "delete"]
     m.pin = ["", "", "", "", "", ""]
-    m.focusIdx = 0       ' keypad index 0..11, or -1 for the Continue button
+    m.focusIdx = 0       ' keypad index 0..11, -1 Continue, -2 Close
     m.continue = m.top.findNode("continueBtn")
     m.continueLabel = m.top.findNode("continueLabel")
+    m.closeBg = m.top.findNode("closeBg")
+    m.closeLabel = m.top.findNode("closeLabel")
+    m.card = m.top.findNode("card")
 
     m.top.observeField("keyEvent", "OnKey")
+    OnCardBgChanged()
     UpdateAll()
+end sub
+
+' Card surface follows the BE theme (neutral-900), matching React's bg-neutral-900.
+' Also re-themes the keypad/buttons: the screen injects tokens after init() runs,
+' and cCardBg is the last field it sets, so all themed colors are ready here.
+sub OnCardBgChanged()
+    if m.card = invalid then m.card = m.top.findNode("card")
+    if m.card <> invalid then m.card.blendColor = m.top.cCardBg
+    if m.continue <> invalid then UpdateAll()
 end sub
 
 sub OnResetPin()
@@ -58,6 +71,7 @@ sub UpdateAll()
     UpdatePinBoxes()
     UpdateKeys()
     UpdateContinue()
+    UpdateClose()
 end sub
 
 sub UpdatePinBoxes()
@@ -95,6 +109,17 @@ sub UpdateKeys()
     end for
 end sub
 
+sub UpdateClose()
+    if m.closeBg = invalid then return
+    if m.focusIdx = -2 then
+        m.closeBg.blendColor = m.top.cPrimary500
+        m.closeLabel.color = "0xf8f1f7ff"
+    else
+        m.closeBg.blendColor = m.top.cNeutral700
+        m.closeLabel.color = "0xf8f1f7ff"
+    end if
+end sub
+
 sub UpdateContinue()
     complete = IsComplete()
     focused = (m.focusIdx = -1)
@@ -117,6 +142,11 @@ sub OnKey()
     if m.top.verifying then return
 
     key = ev.key
+    if m.focusIdx = -2 then
+        HandleCloseKey(key)
+        return
+    end if
+
     if m.focusIdx = -1 then
         HandleContinueKey(key)
         return
@@ -130,7 +160,11 @@ sub OnKey()
     else if key = "right" then
         if col < 2 and m.keys[m.focusIdx + 1] <> "" then m.focusIdx = m.focusIdx + 1
     else if key = "up" then
-        if row > 0 then m.focusIdx = m.focusIdx - 3
+        if row > 0 then
+            m.focusIdx = m.focusIdx - 3
+        else
+            m.focusIdx = -2
+        end if
     else if key = "down" then
         if row < 3 then
             newIdx = m.focusIdx + 3
@@ -152,6 +186,15 @@ sub OnKey()
     end if
 
     UpdateAll()
+end sub
+
+sub HandleCloseKey(key as string)
+    if key = "down" then
+        m.focusIdx = 0
+        UpdateAll()
+    else if key = "OK" or key = "ok" then
+        m.top.action = "close"
+    end if
 end sub
 
 sub HandleContinueKey(key as string)

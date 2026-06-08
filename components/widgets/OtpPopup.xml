@@ -6,12 +6,14 @@
   <interface>
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
     <field id="submitted" type="string" value="" alwaysNotify="true" />
+    <field id="action" type="string" value="" alwaysNotify="true" />
     <field id="resetPin" type="boolean" value="false" alwaysNotify="true" onChange="OnResetPin" />
     <field id="verifying" type="boolean" value="false" onChange="OnVerifyingChanged" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" />
     <field id="cPrimary600" type="string" value="0x0760bbff" />
     <field id="cNeutral600" type="string" value="0xa12189ff" />
     <field id="cNeutral700" type="string" value="0x404040ff" />
+    <field id="cCardBg" type="string" value="0x0a0a0aff" onChange="OnCardBgChanged" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/components/widgets/OtpPopup.brs" />
@@ -20,6 +22,12 @@
     <Rectangle id="scrim" width="1920" height="1080" color="0x00000080" />
     <Poster id="card" translation="[682, 180]" width="556" height="720"
       uri="pkg:/images/ui/otp_card.png" blendColor="0x0a0a0aff" />
+    <Poster id="closeBg" translation="[1142, 210]" width="44" height="44"
+      uri="pkg:/images/ui/avatar_circle.png" blendColor="0x404040ff" />
+    <Label id="closeLabel" text="X" translation="[1142, 210]" width="44" height="44"
+      horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
+      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="22" />
+    </Label>
 
     <Poster id="lockIcon" translation="[730, 222]" width="40" height="40"
       uri="pkg:/images/ui/lock.png" blendColor="0xf8f1f7ff" />

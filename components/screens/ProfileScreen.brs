@@ -16,6 +16,7 @@ sub init()
 
     m.profiles = []
     m.avatars = []
+    m.profilesLoaded = false   ' the auto-select loop must not run until profiles load
     m.focusArea = "profiles"   ' "profiles" | "logout"
     m.profileIndex = 0
     m.selectedProfile = invalid
@@ -23,15 +24,19 @@ sub init()
     m.popup = ""               ' "" | "confirm" | "otp"
     m.selecting = false
     m.loggingOut = false
-    m.AUTO_TOTAL_MS = 15000
-    m.AUTO_SELECT_MS = 15500
-    m.AUTO_TICK_MS = 100
-    ' Per-tick counter (parity with reference ProfileScene): reset to 0 on every
-    ' focus change so each profile always gets a fresh, full 15s.
-    m.autoElapsedMs = 0
-    m.autoProfileIndex = -1
-    m.autoProfileId = ""
-    m.autoSelectArmed = false
+    m.AUTO_TOTAL_MS = 15000      ' progress ring reaches 100% at 15s (parity with React)
+    m.AUTO_SELECT_MS = 15500     ' auto-select fires after 15s + a 500ms buffer
+    '
+    ' Auto-select model (single source of truth):
+    '   • m.autoArmedIndex — the profile index the countdown is running for, or -1 when
+    '     idle. Every navigation re-arms it from scratch; nothing else can select.
+    '   • m.autoStartMs    — the monotonic clock time the window began. Elapsed is always
+    '     derived as (clock now - start), so timing tracks true wall-time and never drifts
+    '     with the Timer's irregular firing rate on the simulator. We read TotalMilliseconds
+    '     directly and never call Mark() (unreliable on the simulator).
+    m.autoClock = CreateObject("roTimespan")
+    m.autoStartMs = 0
+    m.autoArmedIndex = -1
 
     m.title.text = CopyChooseProfile()
     m.logoutBtn.label = CopyLogout()
@@ -42,10 +47,19 @@ sub init()
 
     m.vm = FindViewManager(m.top)
 
+    ' Theme/branding can resolve AFTER this screen mounts (the business-config fetch
+    ' lands a moment after the fast boot/fallback theme). Re-apply colors and branding
+    ' whenever the resolved config updates so the logo + background always appear,
+    ' regardless of load ordering.
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.observeField("businessResolved", "OnBusinessResolved")
+    end if
+
     m.top.observeField("keyEvent", "OnKey")
     m.autoSelectTimer.observeField("fire", "OnAutoTick")
     m.confirmPopup.observeField("action", "OnConfirmAction")
     m.otpPopup.observeField("submitted", "OnOtpSubmitted")
+    m.otpPopup.observeField("action", "OnOtpAction")
     if m.vm <> invalid then m.vm.observeField("overlayDismiss", "OnOverlayDismiss")
 
     ShowLoading(true)
@@ -63,10 +77,14 @@ sub LoadProfileTokens()
     m.cPrimary600 = TC("primary-600", "#0760bb")
     m.cPrimary700 = TC("primary-700", "#04478b")
     m.cNeutral50 = TC("neutral-50", "#f8f1f7")
+    m.cNeutral300 = TC("neutral-300", "#d6d6d6")
     m.cNeutral400 = TC("neutral-400", "#9ea4b0")
     m.cNeutral500 = TC("neutral-500", "#e279ce")
     m.cNeutral600 = TC("neutral-600", "#a12189")
     m.cNeutral700 = "0x404040ff"
+    ' neutral-900 (tertiary/background) drives the themed dialog surfaces, matching
+    ' React's bg-neutral-900 on the confirm/OTP popups.
+    m.cNeutral900 = TC("neutral-900", "#0a0a0a")
     m.cBg = "0x141414ff"        ' dark backdrop (clean circular masking)
     m.cCardBg = "0x171717ff"
     ' Color behind the avatar corners; switches to a near-black scrim color when a
@@ -97,17 +115,29 @@ sub ApplyProfileColors()
     m.logoutBtn.textColor = m.cNeutral50
     m.logoutBtn.shadowColor = m.cPrimary500
 
-    ' Inject colors into the overlays.
+    ' Inject colors into the overlays. Dialog surfaces follow the BE theme:
+    ' card/button fills = neutral-900 (bg-neutral-900), borders = neutral-600/500.
     m.confirmPopup.cPrimary500 = m.cPrimary500
     m.confirmPopup.cPrimary600 = m.cPrimary600
+    m.confirmPopup.cNeutral300 = m.cNeutral300
     m.confirmPopup.cNeutral500 = m.cNeutral500
-    m.confirmPopup.cCardBg = m.cCardBg
+    m.confirmPopup.cCardBg = m.cNeutral900
     m.confirmPopup.cCardBorder = m.cNeutral600
 
     m.otpPopup.cPrimary500 = m.cPrimary500
     m.otpPopup.cPrimary600 = m.cPrimary600
     m.otpPopup.cNeutral600 = m.cNeutral600
     m.otpPopup.cNeutral700 = m.cNeutral700
+    m.otpPopup.cCardBg = m.cNeutral900
+end sub
+
+' The resolved business config (theme tokens + branding) arrived/updated — re-apply
+' so the dialog colors, logo and login background reflect the live theme.
+sub OnBusinessResolved()
+    LoadProfileTokens()
+    ApplyProfileColors()
+    ApplyProfileBranding()
+    ApplyProfileFocus()
 end sub
 
 sub ApplyProfileBranding()
@@ -129,7 +159,7 @@ sub ApplyProfileBranding()
     if url <> invalid and url <> "" then
         m.bgImage.uri = url
         m.bgImage.opacity = 1.0
-        m.bgOverlay.opacity = 1.0
+        m.bgOverlay.opacity = 0.55
         ' Avatar corners now sit over the near-black scrim, not the solid page bg.
         m.cAvatarBg = "0x080a0cff"
     end if
@@ -183,6 +213,7 @@ sub OnProfilesResponse()
     end if
 
     m.profiles = ExtractProfiles(api.result)
+    m.profilesLoaded = true
     SaveProfilesMeta(m.profiles)
     BuildAvatars()
 
@@ -219,7 +250,7 @@ sub BuildAvatars()
         av.ringColor = m.cNeutral50
         av.nameColor = m.cNeutral50
         ' Keep enough pitch for the enlarged focused avatar while fitting 4 rows.
-        av.translation = [0, i * 220]
+        av.translation = [0, i * 210]
         nm = ""
         if p.name <> invalid then nm = p.name
         av.profileName = nm
@@ -243,9 +274,7 @@ sub ApplyProfileFocus()
         end if
         ' Progress reflects the focused profile's auto-select elapsed; others reset.
         if focused then
-            frac = m.autoElapsedMs / m.AUTO_TOTAL_MS
-            if frac > 1.0 then frac = 1.0
-            av.progress = frac
+            av.progress = AutoProgressFor(i)
         else
             av.progress = 0.0
         end if
@@ -330,71 +359,92 @@ sub HandleLogoutKey(key as string)
     end if
 end sub
 
-' Restart the 15s auto-select countdown from zero for the currently focused
-' profile. The countdown is owned by profile index + profile id; if focus moves,
-' OnAutoTick refuses to select from the old countdown.
+' ── Auto-select (15s on focus, non-locked) ───────────────────────────────────
+
+' Re-arm the countdown for the currently focused profile, starting a fresh 15.5s
+' window. Called on every navigation, so any focus change restarts timing from zero.
 sub ResetAutoSelect()
-    m.autoElapsedMs = 0
-    m.autoProfileIndex = -1
-    m.autoProfileId = ""
-    m.autoSelectArmed = false
+    StopAutoSelect()
 
-    if m.autoSelectTimer <> invalid then
-        m.autoSelectTimer.control = "stop"
-    end if
-
+    if not m.profilesLoaded then return   ' do not start the loop before profiles load
     if m.focusArea <> "profiles" then return
     if m.profiles = invalid or m.profiles.Count() = 0 then return
     if m.profileIndex < 0 or m.profileIndex >= m.profiles.Count() then return
+    if ProfileNeedsPin(m.profiles[m.profileIndex]) then return   ' locked profiles never auto-select
 
-    p = m.profiles[m.profileIndex]
-    if ProfileNeedsPin(p) then return
-
-    profileId = ""
-    if p._id <> invalid then profileId = p._id
-
-    m.autoProfileIndex = m.profileIndex
-    m.autoProfileId = profileId
-    m.autoSelectArmed = true
-
-    if m.autoSelectTimer <> invalid then
-        m.autoSelectTimer.control = "start"
-    end if
+    m.autoArmedIndex = m.profileIndex
+    if m.autoClock <> invalid then m.autoStartMs = m.autoClock.TotalMilliseconds()
+    if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "start"
 end sub
 
-' ── Auto-select (15s on focus, non-locked) ───────────────────────────────────
+' Disarm and stop the countdown.
+sub StopAutoSelect()
+    m.autoArmedIndex = -1
+    if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
+end sub
+
+' Wall-time elapsed (ms) since the current window started; 0 when idle.
+function AutoElapsedMs() as integer
+    if m.autoArmedIndex < 0 or m.autoClock = invalid then return 0
+    elapsed = m.autoClock.TotalMilliseconds() - m.autoStartMs
+    if elapsed < 0 then elapsed = 0
+    return elapsed
+end function
+
+' Ring fill fraction (0.0–1.0) for the profile at index i; reaches 1.0 at AUTO_TOTAL_MS.
+function AutoProgressFor(i as integer) as float
+    if m.autoArmedIndex <> i then return 0.0
+    frac = AutoElapsedMs() / m.AUTO_TOTAL_MS
+    if frac > 1.0 then frac = 1.0
+    return frac
+end function
+
+' True if this ProfileScreen is not the top screen in the ViewManager stack (i.e. a
+' leftover instance that should no longer run its auto-select loop).
+function IsOrphaned() as boolean
+    if m.vm = invalid then return false
+    host = m.vm.findNode("screenHost")
+    if host = invalid then return false
+    count = host.getChildCount()
+    if count < 1 then return false
+    active = host.getChild(count - 1)
+    if active = invalid then return false
+    return not active.isSameNode(m.top)
+end function
 
 sub OnAutoTick()
+    if m.autoArmedIndex < 0 then return              ' not armed — nothing to do
+    if not m.profilesLoaded then return
+
+    ' Only the active (top-of-stack) screen runs the countdown; a backgrounded
+    ' instance stops so it cannot auto-navigate.
+    if IsOrphaned() then
+        StopAutoSelect()
+        return
+    end if
+
+    ' Pause (but keep timing) while an overlay/selection/logout is in progress.
     if m.popup <> "" or m.selecting or m.loggingOut then return
     if m.focusArea <> "profiles" then return
-    if m.profiles.Count() = 0 then return
-    if m.autoSelectArmed <> true then return
-    if m.profileIndex <> m.autoProfileIndex then
+    if m.profiles = invalid or m.profiles.Count() = 0 then return
+
+    ' Focus drifted from the armed profile without a reset — re-arm for the new one.
+    if m.profileIndex <> m.autoArmedIndex then
         ResetAutoSelect()
         ApplyProfileFocus()
         return
     end if
 
     p = m.profiles[m.profileIndex]
-    profileId = ""
-    if p._id <> invalid then profileId = p._id
-    if profileId <> m.autoProfileId then
-        ResetAutoSelect()
-        ApplyProfileFocus()
-        return
-    end if
     if ProfileNeedsPin(p) then return
 
-    m.autoElapsedMs = m.autoElapsedMs + m.AUTO_TICK_MS
-    frac = m.autoElapsedMs / m.AUTO_TOTAL_MS
-    if frac > 1.0 then frac = 1.0
+    ' Drive the ring from real elapsed wall-time, then select once the window completes.
     if m.avatars <> invalid and m.avatars.Count() > m.profileIndex then
-        m.avatars[m.profileIndex].progress = frac
+        m.avatars[m.profileIndex].progress = AutoProgressFor(m.profileIndex)
     end if
 
-    if m.autoElapsedMs >= m.AUTO_SELECT_MS then
-        if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
-        m.autoSelectArmed = false
+    if AutoElapsedMs() >= m.AUTO_SELECT_MS then
+        StopAutoSelect()
         SelectProfile(p)
     end if
 end sub
@@ -412,8 +462,7 @@ sub SelectProfile(profile as object)
 end sub
 
 sub DoSelectProfile(profileId as string)
-    m.autoSelectArmed = false
-    if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
+    StopAutoSelect()
     ShowSelectLoader(true)
     m.pendingProfileId = profileId
     path = SelectProfilePath()
@@ -514,6 +563,10 @@ sub CloseOtp()
     SetOverlayOpen(false)
     ResetAutoSelect()
     ApplyProfileFocus()
+end sub
+
+sub OnOtpAction()
+    if m.otpPopup.action = "close" and not m.otpPopup.verifying then CloseOtp()
 end sub
 
 sub OnOtpSubmitted()
