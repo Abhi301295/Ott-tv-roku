@@ -24,10 +24,14 @@ sub init()
     m.selecting = false
     m.loggingOut = false
     m.AUTO_TOTAL_MS = 15000
+    m.AUTO_SELECT_MS = 15500
     m.AUTO_TICK_MS = 100
     ' Per-tick counter (parity with reference ProfileScene): reset to 0 on every
     ' focus change so each profile always gets a fresh, full 15s.
     m.autoElapsedMs = 0
+    m.autoProfileIndex = -1
+    m.autoProfileId = ""
+    m.autoSelectArmed = false
 
     m.title.text = CopyChooseProfile()
     m.logoutBtn.label = CopyLogout()
@@ -186,9 +190,8 @@ sub OnProfilesResponse()
 
     m.focusArea = "profiles"
     m.profileIndex = InitialFocusIndex()
-    m.autoElapsedMs = 0
+    ResetAutoSelect()
     ApplyProfileFocus()
-    m.autoSelectTimer.control = "start"
 end sub
 
 ' Focus the stored profile if present, else the first (parity with focusSelf logic).
@@ -215,9 +218,8 @@ sub BuildAvatars()
         av.bgColor = m.cAvatarBg
         av.ringColor = m.cNeutral50
         av.nameColor = m.cNeutral50
-        ' Slot pitch must exceed the full-size avatar footprint (166) plus a gap so a
-        ' sized-up focused profile never rides its neighbours, even mid-animation.
-        av.translation = [0, i * 206]
+        ' Keep enough pitch for the enlarged focused avatar while fitting 4 rows.
+        av.translation = [0, i * 220]
         nm = ""
         if p.name <> invalid then nm = p.name
         av.profileName = nm
@@ -297,19 +299,20 @@ sub HandleProfilesKey(key as string)
     if key = "up" then
         if m.profileIndex > 0 then
             m.profileIndex = m.profileIndex - 1
-            ResetAutoSelect()
-            ApplyProfileFocus()
         end if
+        ResetAutoSelect()
+        ApplyProfileFocus()
     else if key = "down" then
         if m.profileIndex < m.profiles.Count() - 1 then
             m.profileIndex = m.profileIndex + 1
-            ResetAutoSelect()
-            ApplyProfileFocus()
         else if m.logoutBtn.visible then
             m.focusArea = "logout"
-            ResetAutoSelect()
-            ApplyProfileFocus()
         end if
+        ResetAutoSelect()
+        ApplyProfileFocus()
+    else if key = "left" or key = "right" then
+        ResetAutoSelect()
+        ApplyProfileFocus()
     else if key = "OK" or key = "ok" then
         if m.profiles.Count() > 0 then SelectProfile(m.profiles[m.profileIndex])
     end if
@@ -319,25 +322,43 @@ sub HandleLogoutKey(key as string)
     if key = "up" then
         if m.profiles.Count() > 0 then
             m.focusArea = "profiles"
-            ResetAutoSelect()
-            ApplyProfileFocus()
         end if
+        ResetAutoSelect()
+        ApplyProfileFocus()
     else if key = "OK" or key = "ok" then
         OpenConfirm()
     end if
 end sub
 
-' Restart the 15s auto-select countdown from zero. The timer node free-runs every
-' 100ms (guarded in OnAutoTick); the wall-clock Mark() is the single source of truth
-' for elapsed time, so a fresh Mark() on each switch guarantees a full 15s — matching
-' react's clearInterval + fresh setInterval on focus change.
+' Restart the 15s auto-select countdown from zero for the currently focused
+' profile. The countdown is owned by profile index + profile id; if focus moves,
+' OnAutoTick refuses to select from the old countdown.
 sub ResetAutoSelect()
     m.autoElapsedMs = 0
-    ' Re-phase the timer so the next 15s starts cleanly from this switch
-    ' (matches reference StartAutoSelectForFocusedProfile).
+    m.autoProfileIndex = -1
+    m.autoProfileId = ""
+    m.autoSelectArmed = false
+
     if m.autoSelectTimer <> invalid then
         m.autoSelectTimer.control = "stop"
-        if m.focusArea = "profiles" then m.autoSelectTimer.control = "start"
+    end if
+
+    if m.focusArea <> "profiles" then return
+    if m.profiles = invalid or m.profiles.Count() = 0 then return
+    if m.profileIndex < 0 or m.profileIndex >= m.profiles.Count() then return
+
+    p = m.profiles[m.profileIndex]
+    if ProfileNeedsPin(p) then return
+
+    profileId = ""
+    if p._id <> invalid then profileId = p._id
+
+    m.autoProfileIndex = m.profileIndex
+    m.autoProfileId = profileId
+    m.autoSelectArmed = true
+
+    if m.autoSelectTimer <> invalid then
+        m.autoSelectTimer.control = "start"
     end if
 end sub
 
@@ -347,8 +368,21 @@ sub OnAutoTick()
     if m.popup <> "" or m.selecting or m.loggingOut then return
     if m.focusArea <> "profiles" then return
     if m.profiles.Count() = 0 then return
+    if m.autoSelectArmed <> true then return
+    if m.profileIndex <> m.autoProfileIndex then
+        ResetAutoSelect()
+        ApplyProfileFocus()
+        return
+    end if
 
     p = m.profiles[m.profileIndex]
+    profileId = ""
+    if p._id <> invalid then profileId = p._id
+    if profileId <> m.autoProfileId then
+        ResetAutoSelect()
+        ApplyProfileFocus()
+        return
+    end if
     if ProfileNeedsPin(p) then return
 
     m.autoElapsedMs = m.autoElapsedMs + m.AUTO_TICK_MS
@@ -357,7 +391,12 @@ sub OnAutoTick()
     if m.avatars <> invalid and m.avatars.Count() > m.profileIndex then
         m.avatars[m.profileIndex].progress = frac
     end if
-    if m.autoElapsedMs >= m.AUTO_TOTAL_MS then SelectProfile(p)
+
+    if m.autoElapsedMs >= m.AUTO_SELECT_MS then
+        if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
+        m.autoSelectArmed = false
+        SelectProfile(p)
+    end if
 end sub
 
 ' ── Selection ────────────────────────────────────────────────────────────────
@@ -373,7 +412,8 @@ sub SelectProfile(profile as object)
 end sub
 
 sub DoSelectProfile(profileId as string)
-    m.autoSelectTimer.control = "stop"
+    m.autoSelectArmed = false
+    if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
     ShowSelectLoader(true)
     m.pendingProfileId = profileId
     path = SelectProfilePath()
@@ -399,8 +439,7 @@ sub OnSelectResponse()
 
     ' Failure: toast + let the user retry (web also surfaces this alert).
     ShowAlert(m.top, 2, MsgFailedSelectProfile())
-    m.autoElapsedMs = 0
-    m.autoSelectTimer.control = "start"
+    ResetAutoSelect()
     ApplyProfileFocus()
 end sub
 
@@ -418,8 +457,7 @@ sub CloseConfirm()
     m.confirmPopup.visible = false
     SetOverlayOpen(false)
     ' Give the focused profile a fresh 15s after dismissing the dialog.
-    m.autoElapsedMs = 0
-    m.autoSelectTimer.control = "start"
+    ResetAutoSelect()
     ApplyProfileFocus()
 end sub
 
@@ -474,8 +512,7 @@ sub CloseOtp()
     m.popup = ""
     m.otpPopup.visible = false
     SetOverlayOpen(false)
-    m.autoElapsedMs = 0
-    m.autoSelectTimer.control = "start"
+    ResetAutoSelect()
     ApplyProfileFocus()
 end sub
 

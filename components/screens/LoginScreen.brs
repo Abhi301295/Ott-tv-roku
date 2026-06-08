@@ -252,8 +252,8 @@ sub HideFormError()
     LayoutForm(false)
 end sub
 
-' Top-aligned form. Without an error the fields sit near the top (space at bottom);
-' with an error the error box takes the top slot and everything shifts down ~68px.
+' Top-aligned form. Without an error, keep extra breathing room above Email.
+' With an error, the error box owns the top slot and fields start below it.
 sub LayoutForm(hasError as boolean)
     if m.emailField = invalid then return
     if hasError then
@@ -261,9 +261,9 @@ sub LayoutForm(hasError as boolean)
         m.passwordField.translation = [64, 191]
         m.loginBtn.translation = [64, 295]
     else
-        m.emailField.translation = [64, 35]
-        m.passwordField.translation = [64, 123]
-        m.loginBtn.translation = [64, 227]
+        m.emailField.translation = [64, 55]
+        m.passwordField.translation = [64, 143]
+        m.loginBtn.translation = [64, 247]
     end if
     by = m.loginBtn.translation[1]
     m.loginSpinner.translation = [443, by + 12]

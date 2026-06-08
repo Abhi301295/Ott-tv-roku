@@ -33,6 +33,9 @@
          sits over a near-solid dark area (so the corner-mask circle trick still reads). -->
     <Poster id="bgOverlay" width="1920" height="1080" uri="pkg:/images/ui/profile_bg_overlay.png"
       opacity="0.0" />
+    <!-- Solid rail backing hides the simulator's square avatar-mask artifact while
+         keeping the content background visible outside the profile column. -->
+    <Rectangle id="avatarRailBg" width="430" height="1080" color="0x080a0cff" opacity="0.86" />
 
     <Poster id="logoPoster" translation="[120, 48]" width="280" height="68" loadDisplayMode="scaleToFit" visible="false" />
     <Label id="logoLabel" text="OTT Accelerator" translation="[120, 64]" width="400"
@@ -48,17 +51,17 @@
     </Label>
 
     <!-- Loading shimmer (3 rows): rounded avatar box + name strip (parity with SkeletonBox) -->
-    <Group id="skeletonGroup" translation="[156, 270]" visible="false">
+    <Group id="skeletonGroup" translation="[156, 210]" visible="false">
       <Skeleton id="sk0a" translation="[0, 0]" boxWidth="150" boxHeight="150" />
       <Skeleton id="sk0b" translation="[170, 66]" boxWidth="150" boxHeight="16" />
-      <Skeleton id="sk1a" translation="[0, 206]" boxWidth="150" boxHeight="150" />
-      <Skeleton id="sk1b" translation="[170, 272]" boxWidth="150" boxHeight="16" />
-      <Skeleton id="sk2a" translation="[0, 412]" boxWidth="150" boxHeight="150" />
-      <Skeleton id="sk2b" translation="[170, 478]" boxWidth="150" boxHeight="16" />
+      <Skeleton id="sk1a" translation="[0, 220]" boxWidth="150" boxHeight="150" />
+      <Skeleton id="sk1b" translation="[170, 286]" boxWidth="150" boxHeight="16" />
+      <Skeleton id="sk2a" translation="[0, 440]" boxWidth="150" boxHeight="150" />
+      <Skeleton id="sk2b" translation="[170, 506]" boxWidth="150" boxHeight="16" />
     </Group>
 
     <!-- Avatars added dynamically -->
-    <Group id="profilesContainer" translation="[150, 270]" />
+    <Group id="profilesContainer" translation="[150, 210]" />
 
     <LoginTabButton id="logoutBtn" label="Logout" translation="[1656, 970]"
       buttonWidth="200" buttonHeight="65"

@@ -48,18 +48,32 @@
       uri="pkg:/images/ui/avatar_dot.png" blendColor="0xffffffff" visible="false" />
     <Poster id="lockBadge" translation="[69, 150]" width="28" height="28"
       uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" visible="false" />
+    <!-- React NetComponent parity: focused profile shows a left floating badge.
+         Unlocked = edit mark; locked = lock icon. Hidden while progress is running. -->
+    <Group id="editBadge" translation="[-48, 59]" visible="false">
+      <Poster id="editBadgeBg" width="48" height="48"
+        uri="pkg:/images/ui/avatar_circle.png" blendColor="0xf8f1f7ff" />
+      <Label id="editIcon" text="/" translation="[0, 0]" width="48" height="48"
+        horizAlign="center" vertAlign="center" color="0x0a0a0aff" rotation="-0.55">
+        <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="34" />
+      </Label>
+      <Poster id="leftLockIcon" translation="[12, 12]" width="24" height="24"
+        uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" visible="false" />
+    </Group>
     </Group>
 
     <Animation id="focusAnim" duration="0.28" repeat="false" easeFunction="outCubic">
       <Vector2DFieldInterpolator id="focusInterp" key="[0.0, 1.0]"
-        keyValue="[[1.0, 1.0], [1.25, 1.25]]" fieldToInterp="scaler.scale" />
+        keyValue="[[1.0, 1.0], [1.38, 1.38]]" fieldToInterp="scaler.scale" />
+      <Vector2DFieldInterpolator id="offsetInterp" key="[0.0, 1.0]"
+        keyValue="[[0.0, 0.0], [34.0, 0.0]]" fieldToInterp="scaler.translation" />
     </Animation>
 
-    <Label id="nameLabel" translation="[188, 56]" width="420" height="40"
+    <Label id="nameLabel" translation="[292, 56]" width="420" height="40"
       vertAlign="center" color="0xf8f1f7ff" visible="false">
       <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="30" />
     </Label>
-    <Label id="hintLabel" translation="[188, 98]" width="420" height="28"
+    <Label id="hintLabel" translation="[292, 98]" width="420" height="28"
       vertAlign="center" color="0x9ea4b0ff" visible="false">
       <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="16" />
     </Label>

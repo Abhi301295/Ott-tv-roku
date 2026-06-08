@@ -9,21 +9,30 @@ sub init()
     m.progressArc = m.top.findNode("progressArc")
     m.dot = m.top.findNode("dot")
     m.lockBadge = m.top.findNode("lockBadge")
+    m.editBadge = m.top.findNode("editBadge")
+    m.editIcon = m.top.findNode("editIcon")
+    m.leftLockIcon = m.top.findNode("leftLockIcon")
     m.nameLabel = m.top.findNode("nameLabel")
     m.hintLabel = m.top.findNode("hintLabel")
     m.focusAnim = m.top.findNode("focusAnim")
     m.focusInterp = m.top.findNode("focusInterp")
+    m.offsetInterp = m.top.findNode("offsetInterp")
 
     m.ARC_FRAMES = 151
-    ' LG layout: focused profile is full-size, the rest sit small at fixed slots.
-    m.FOCUS_SCALE = 1.0
-    m.REST_SCALE = 0.66
+    ' Focused profile must read clearly larger than the rail avatars on TV.
+    ' Roku's simulator/downscale makes 1.25 subtle, so use a stronger pop.
+    m.FOCUS_SCALE = 1.38
+    m.REST_SCALE = 1.0
+    ' Focused profile also pops out of the rail a little to the right; all
+    ' unfocused profiles return to x=0 so the default column stays aligned.
+    m.FOCUS_OFFSET_X = 34.0
+    m.REST_OFFSET_X = 0.0
 
     m.top.focusable = true
     m.top.drawFocusFeedback = false
-    ' Scale about the avatar centre so growing/shrinking never shifts the slot
-    ' position (matches LG: fixed positions, only the size animates).
-    m.scaler.scaleRotateCenter = [83, 83]
+    ' Keep the left edge fixed so the focused avatar grows rightward, matching
+    ' the OTTPlay React profile rail. Vertical growth stays centered per slot.
+    m.scaler.scaleRotateCenter = [0, 83]
 
     OnColorsChanged()
     OnDataChanged()
@@ -75,31 +84,44 @@ sub OnFocusChanged()
 
     m.ring.visible = (focused and not showArc)
     m.dot.visible = (focused and not showArc)
-    m.lockBadge.visible = (focused and locked)
+    ' React shows a left badge on focus: edit icon for unlocked, lock icon for locked.
+    showBadge = (focused and (progress = 0 or locked))
+    m.editBadge.visible = showBadge
+    m.editIcon.visible = (showBadge and not locked)
+    m.leftLockIcon.visible = (showBadge and locked)
+    m.lockBadge.visible = false
     m.nameLabel.visible = focused
     m.hintLabel.visible = (focused and m.top.hintText <> "")
 
     AnimateScale(focused)
 end sub
 
-' Smoothly pop the avatar in (1.0 → 1.25) on focus and out (1.25 → 1.0) on blur.
+' Smoothly pop the avatar in (1.0 → 1.25 + right offset) on focus and out on blur.
 ' The first call (init) just snaps to the resting scale without animating.
 sub AnimateScale(focused as boolean)
     target = m.REST_SCALE
-    if focused then target = m.FOCUS_SCALE
+    targetX = m.REST_OFFSET_X
+    if focused then
+        target = m.FOCUS_SCALE
+        targetX = m.FOCUS_OFFSET_X
+    end if
 
     if m.lastScale = invalid then
         m.scaler.scale = [target, target]
+        m.scaler.translation = [targetX, 0.0]
         m.lastScale = target
+        m.lastOffsetX = targetX
         return
     end if
 
-    if m.lastScale = target then return
+    if m.lastScale = target and m.lastOffsetX = targetX then return
 
     m.focusAnim.control = "stop"
     m.focusInterp.keyValue = [[m.lastScale, m.lastScale], [target, target]]
+    m.offsetInterp.keyValue = [[m.lastOffsetX, 0.0], [targetX, 0.0]]
     m.focusAnim.control = "start"
     m.lastScale = target
+    m.lastOffsetX = targetX
 end sub
 
 ' Map progress (0..1) to one of the pre-rendered arc frames (parity with the
