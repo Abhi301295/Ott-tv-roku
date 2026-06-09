@@ -4,11 +4,15 @@ sub init()
     m.skeleton = m.top.findNode("skeleton")
     m.progressTrack = m.top.findNode("progressTrack")
     m.progressFill = m.top.findNode("progressFill")
+    m.dataApplied = false
+    m.reported = false
     m.thumb.observeField("loadStatus", "OnThumbLoad")
     ApplyAll()
 end sub
 
 sub OnDataChanged()
+    m.dataApplied = true
+    m.reported = false
     ApplyAll()
 end sub
 
@@ -21,7 +25,20 @@ sub OnThemeChanged()
 end sub
 
 sub OnThumbLoad()
+    status = ""
+    if m.thumb <> invalid then status = m.thumb.loadStatus
     CardOnPosterLoad(m.thumb, m.skeleton)
+    if status = "ready" or status = "failed" then ReportLoaded()
+end sub
+
+' Notify the parent row exactly once that this card's media is ready.
+' Guarded so the alwaysNotify "loaded" field never fires more than once
+' (which previously corrupted the row's pending-load counter).
+sub ReportLoaded()
+    if not m.dataApplied then return
+    if m.reported then return
+    m.reported = true
+    m.top.loaded = true
 end sub
 
 sub ApplyAll()
@@ -31,10 +48,13 @@ sub ApplyAll()
         m.thumb.visible = true
         m.skeleton.visible = true
         m.skeleton.running = true
+        status = m.thumb.loadStatus
+        if status = "ready" or status = "failed" then ReportLoaded()
     else
         m.thumb.visible = false
         m.skeleton.visible = true
         m.skeleton.running = true
+        if m.dataApplied then ReportLoaded()
     end if
     CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
     m.progressTrack.color = m.top.cNeutral950

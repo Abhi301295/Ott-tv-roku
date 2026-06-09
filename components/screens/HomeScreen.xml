@@ -33,12 +33,12 @@
 
     <HeroBannerCinematic id="hero" translation="[0, 0]" visible="false" />
 
-    <!-- Content-section backdrop: the hero fades into a solid dark band where the rows
-         (Continue Watching etc.) live, so the banner image/video never shows through
-         behind the row shimmer or cards. The poster still bleeds full-width up top. -->
+    <!-- Row backdrop is intentionally transparent; HomeSkeleton/row shimmers cover loading
+         state while the hero remains visible behind the content rows, matching LG. -->
     <Poster id="rowsScrimGrad" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 600]"
-      width="1920" height="70" loadDisplayMode="scaleToFill" />
-    <Rectangle id="rowsScrim" translation="[0, 668]" width="1920" height="412" color="0x0a0a0aff" />
+      width="1920" height="70" loadDisplayMode="scaleToFill" opacity="0.0" />
+    <Rectangle id="rowsScrim" translation="[0, 668]" width="1920" height="412"
+      color="0x0a0a0aff" opacity="0.0" />
 
     <Group id="rowsHost" translation="[0, 702]" visible="false" />
 

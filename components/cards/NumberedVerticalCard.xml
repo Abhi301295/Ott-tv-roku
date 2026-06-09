@@ -22,7 +22,7 @@
     </Label>
     <Group id="body" translation="[51, 3]">
       <Skeleton id="skeleton" boxWidth="368" boxHeight="208" />
-      <Poster id="thumb" width="368" height="208" loadDisplayMode="scaleToFill" visible="false" />
+      <Poster id="thumb" width="368" height="208" loadWidth="368" loadHeight="208" loadDisplayMode="scaleToFill" visible="false" />
     </Group>
     <!-- Rounded, even 3px focus frame (primitive edges + corner sprites) on top of the body. -->
     <FocusFrame id="focusBorder" translation="[48, 0]" boxWidth="374" boxHeight="214"

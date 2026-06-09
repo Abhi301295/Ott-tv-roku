@@ -19,7 +19,9 @@ sub init()
     m.cardIndex = 0
     m.loadingMore = false
 
-    m.focusZone = "rows"
+    ' Start on the header so navigation is responsive while hero/CW rows are still loading.
+    ' The user can move to another section immediately instead of waiting for CW cards.
+    m.focusZone = "header"
     m.menuItems = []
     m.menuIndex = 0
 
@@ -79,6 +81,7 @@ sub init()
     m.skeletonTimeout.observeField("fire", "OnSkeletonTimeout")
 
     SetupHeader()
+    EnterHeader()
 
     if GetProfileId() = "" then
         RedirectToProfiles()
@@ -325,8 +328,11 @@ sub EnterHeroFromHeader()
     if m.header <> invalid then m.header.headerActive = false
     if HeroAvailable() then
         EnterHero("next")
-    else
+    else if m.rowWidgets.Count() > 0 then
         ExitHeaderToRows()
+    else
+        ' Keep header focus active while Home content is still loading.
+        EnterHeader()
     end if
 end sub
 
@@ -414,7 +420,11 @@ sub SelectHeaderItem()
     SetValueByKey(SK_SelectedItem(), item.text, "app")
 
     if item.route = RouteHome() then
-        ExitHeaderToRows()
+        if m.rowWidgets.Count() > 0 then
+            ExitHeaderToRows()
+        else
+            EnterHeader()
+        end if
         return
     end if
 
@@ -718,7 +728,13 @@ sub OnRowBuildTick()
     span = CreateObject("roTimespan")
     row = m.rowsHost.createChild("ContentRow")
     ApplyThemeToRow(row)
-    row.categoryData = cat
+    ' Rows 0–1 (CW + next) materialize immediately; deeper rows are shell-only until the
+    ' user scrolls near them or the first row finishes loading (background warm-up).
+    if m.rowBuildIndex <= 1 then
+        row.categoryData = cat
+    else
+        row.callFunc("PrepareShell", cat)
+    end if
     row.translation = [0, m.rowBuildY]
     m.rowWidgets.Push(row)
     rowMs = span.TotalMilliseconds()
@@ -726,31 +742,42 @@ sub OnRowBuildTick()
     m.rowBuildCostMs = m.rowBuildCostMs + rowMs
     print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
 
-    ' Keep the rows shimmer up until the FIRST row (Continue Watching) is fully populated,
-    ' then hand off to a row that appears all at once (no one-by-one card stacking).
-    if m.rowBuildIndex = 0 then row.observeField("built", "OnFirstRowBuilt")
+    ' Keep the rows shimmer up until the FIRST row (Continue Watching) has actually loaded
+    ' its thumbnails, then hand off to real cards (no static grey-card gap).
+    if m.rowBuildIndex = 0 then row.observeField("mediaReady", "OnFirstRowBuilt")
 
     m.rowBuildY = m.rowBuildY + HC_RowPitch()
     m.rowBuildIndex = m.rowBuildIndex + 1
+
+    ' Touch only the row we just built — the full ApplyHomeFocus (which also drives the
+    ' rows-host scroll animation) runs once the build completes, not on every tick.
+    ApplyRowFocusState(m.rowWidgets.Count() - 1)
 
     if m.rowBuildIndex >= m.contentRowCats.Count() then
         m.rowBuildTimer.control = "stop"
         wall = 0
         if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
         print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
+        ApplyHomeFocus()
     end if
-
-    ApplyHomeFocus()
 end sub
 
-' The Continue Watching row finished populating — drop the shimmer so the shimmer hands
-' straight off to a fully-built row (cards reveal together, never one at a time).
+' The Continue Watching row finished loading thumbnails — drop the shimmer so the shimmer
+' hands straight off to real cards (not static grey card placeholders).
 sub OnFirstRowBuilt()
-    print "[HOME] first row built -> hide rows shimmer + reveal hero behind cards"
+    row = invalid
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
+    if row <> invalid and row.hasField("mediaReady") and row.mediaReady <> true then return
+    print "[HOME] first row media ready -> hide rows shimmer + reveal hero behind cards"
     ShowRowsSkeleton(false)
     ' CW content has painted — drop the dark scrim so the hero bleeds behind the cards.
     m.rowsRevealed = true
     UpdateRowsScrim()
+    ' Warm the next row in the background while the user is still on CW.
+    if m.rowWidgets.Count() > 1 then
+        row1 = m.rowWidgets[1]
+        if row1 <> invalid then row1.callFunc("Materialize", invalid)
+    end if
 end sub
 
 sub ClearContentRows()
@@ -766,35 +793,53 @@ end sub
 sub ApplyHomeFocus()
     if m.rowsHost = invalid then return
 
+    if m.focusZone = "rows" then MaterializeNearbyRows()
+
     anchorY = HC_NetflixAnchorY() - (m.rowIndex * HC_RowPitch())
     AnimateRowsHost(anchorY)
 
     for i = 0 to m.rowWidgets.Count() - 1
-        row = m.rowWidgets[i]
-        if row = invalid then continue for
-        row.rowFocused = (i = m.rowIndex)
-        row.rowDimmed = (i > m.rowIndex)
-        if i = m.rowIndex then
-            ClampCardIndex()
-            row.cardFocusIndex = m.cardIndex
-        end if
+        ApplyRowFocusState(i)
     end for
 
     UpdateRowsScrim()
 end sub
 
-' The dark content backdrop only blocks the hero while the rows are loading or the user has
-' scrolled past the first row. Once Continue Watching has painted and we're back at the top
-' row, the scrim goes transparent so the hero poster/trailer bleeds behind the cards (parity
-' with the React layout). The cards' rounded corners are faked with page-bg corner masks; the
-' bottom corners sit below the hero (always blend) and the top corners sit over the hero's
-' dark bottom vignette, so the notches stay subtle while the hero shows through.
+' Set the focus/dim state for a single row. Pulled out of ApplyHomeFocus so the row-build
+' loop can touch only the row it just created instead of re-applying focus to every row on
+' every 30ms tick (which also needlessly re-triggers the rows-host scroll animation).
+' Materialize deferred row shells within a 1-row prefetch window around focus.
+sub MaterializeNearbyRows()
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    lo = m.rowIndex - 1
+    if lo < 0 then lo = 0
+    hi = m.rowIndex + 2
+    if hi >= m.rowWidgets.Count() then hi = m.rowWidgets.Count() - 1
+    for i = lo to hi
+        row = m.rowWidgets[i]
+        if row <> invalid then row.callFunc("Materialize", invalid)
+    end for
+end sub
+
+sub ApplyRowFocusState(i as integer)
+    if i < 0 or i >= m.rowWidgets.Count() then return
+    row = m.rowWidgets[i]
+    if row = invalid then return
+    row.rowFocused = (m.focusZone = "rows" and i = m.rowIndex)
+    row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
+    if m.focusZone = "rows" and i = m.rowIndex then
+        ClampCardIndex()
+        row.cardFocusIndex = m.cardIndex
+    else
+        row.cardFocusIndex = -1
+    end if
+end sub
+
+' Keep the row backdrop transparent in both loading and loaded states. The row shimmer owns
+' the loading affordance, and React/LG keeps the hero visible behind the content rows.
 sub UpdateRowsScrim()
-    transparent = m.rowsRevealed and (m.rowIndex <= 0)
-    op = 1.0
-    if transparent then op = 0.0
-    if m.rowsScrim <> invalid then m.rowsScrim.opacity = op
-    if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.opacity = op
+    if m.rowsScrim <> invalid then m.rowsScrim.opacity = 0.0
+    if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.opacity = 0.0
 end sub
 
 ' Smooth row pinning (parity with netflixContent.tsx 400ms translate).
@@ -848,7 +893,6 @@ sub OnKey()
     ev = m.top.keyEvent
     if ev = invalid or ev.key = invalid or ev.press = invalid then return
     if not ev.press then return
-    if AnyBootLoading() then return
 
     key = ev.key
     print "[KEYDBG] OnKey key='"; key; "' zone='"; m.focusZone; "' heroFocus='"; m.heroFocus; "'"
@@ -857,6 +901,8 @@ sub OnKey()
         HandleHeaderKey(key)
         return
     end if
+
+    if AnyBootLoading() then return
 
     if m.focusZone = "hero" then
         HandleHeroKey(key)
@@ -925,16 +971,23 @@ sub OnLoadMoreResponse()
     if api = invalid then return
     if HandleSessionExpiry(m.top, api) then return
 
-    prevCount = m.rowWidgets.Count()
+    prevCatCount = m.contentRowCats.Count()
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
+            m.contentRowCats = FilterContentRows(m.categories)
             m.hasMore = true
             UpdateHeroBanner()
-            BuildContentRows()
-            if m.rowIndex < prevCount then
-                m.rowIndex = prevCount
+            ' Append-only: keep existing row nodes and build only the new categories.
+            if m.contentRowCats.Count() > prevCatCount then
+                m.rowBuildIndex = prevCatCount
+                m.rowBuildY = prevCatCount * HC_RowPitch()
+                m.rowsHost.visible = true
+                m.rowBuildTimer.control = "start"
+            end if
+            if m.rowIndex < prevCatCount then
+                m.rowIndex = prevCatCount
                 m.cardIndex = 0
             end if
             ApplyHomeFocus()

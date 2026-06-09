@@ -35,9 +35,14 @@ sub TintGroup(grp as object, color as string)
     count = grp.getChildCount()
     for i = 0 to count - 1
         bar = grp.getChild(i)
-        ' Leave the large poster block on its darker base color; only tint the lines.
-        if bar <> invalid and bar.hasField("color") and bar.id <> "hPoster" then
-            bar.color = color
+        if bar <> invalid and bar.hasField("color") then
+            ' Keep all HomeSkeleton placeholders on one visual system:
+            ' base = neutral-800-ish, shine = neutral-700-ish.
+            if Right(bar.id, 5) = "Shine" or Left(bar.id, 8) = "rowShine" then
+                bar.color = "0x404040ff"
+            else
+                bar.color = color
+            end if
         end if
     end for
 end sub

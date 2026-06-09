@@ -18,7 +18,7 @@
     <Group id="body" translation="[3, 3]">
       <Rectangle id="fallback" width="1770" height="400" color="0x262626ff" visible="false" />
       <Skeleton id="skeleton" boxWidth="1770" boxHeight="400" />
-      <Poster id="thumb" width="1770" height="400" loadDisplayMode="scaleToFill" visible="false" />
+      <Poster id="thumb" width="1770" height="400" loadWidth="1770" loadHeight="400" loadDisplayMode="scaleToFill" visible="false" />
       <Label id="titleLabel" translation="[20, 340]" width="1200" height="40" text=""
         color="0xf8f1f7ff">
         <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="28" />

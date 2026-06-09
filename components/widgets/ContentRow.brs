@@ -12,11 +12,22 @@ sub init()
     m.buildPlan = []
     m.buildIdx = 0
     m.buildX = 0
+    m.pendingMediaLoads = 0
+    m.buildComplete = false
+    m.shellCat = invalid
     m.cardTimer = CreateObject("roSGNode", "Timer")
     m.cardTimer.duration = 0.01
     m.cardTimer.repeat = true
     m.top.appendChild(m.cardTimer)
     m.cardTimer.observeField("fire", "OnCardBuildTick")
+
+    ' Safety net: if a thumbnail never reports back, force the reveal so the
+    ' shimmer can't sit on screen forever.
+    m.revealTimer = CreateObject("roSGNode", "Timer")
+    m.revealTimer.duration = 4
+    m.revealTimer.repeat = false
+    m.top.appendChild(m.revealTimer)
+    m.revealTimer.observeField("fire", "OnRevealSafety")
 end sub
 
 sub OnCategoryChanged()
@@ -48,6 +59,39 @@ sub BuildRowCards()
     ClearCards()
     cat = m.top.categoryData
     if cat = invalid then return
+    m.shellCat = invalid
+    StartCardBuild(cat)
+end sub
+
+' Title + cardCount only — card nodes are deferred until Materialize() (off-screen rows).
+function PrepareShell(cat as object) as boolean
+    if cat = invalid then return false
+    ClearCards()
+    m.shellCat = cat
+    plan = PlanRowCards(cat)
+    if plan = invalid then return false
+    m.buildPlan = plan
+    m.top.cardCount = m.buildPlan.Count()
+    m.top.built = false
+    m.top.mediaReady = false
+    m.buildComplete = false
+    if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
+    return true
+end function
+
+' Build deferred card nodes for a shell row (focus prefetch or background warm-up).
+function Materialize() as boolean
+    if m.buildComplete then return false
+    if m.shellCat = invalid then return false
+    cat = m.shellCat
+    m.shellCat = invalid
+    StartCardBuild(cat)
+    return true
+end function
+
+' Cheap planning pass shared by immediate and deferred builds.
+function PlanRowCards(cat as object) as object
+    if cat = invalid then return invalid
 
     rowType = ""
     if cat.type <> invalid then rowType = cat.type
@@ -61,10 +105,10 @@ sub BuildRowCards()
     m.rowTitle.color = m.top.cNeutral50
 
     items = cat.result
-    if items = invalid or items.Count() = 0 then return
+    if items = invalid or items.Count() = 0 then return invalid
 
     compName = CardComponentForRow(rowType, cardType)
-    if compName = "BannerCard" and rowType <> HC_PromotionalCard() then return
+    if compName = "BannerCard" and rowType <> HC_PromotionalCard() then return invalid
 
     maxItems = items.Count()
     if rowType <> HC_PromotionalCard() then
@@ -74,32 +118,40 @@ sub BuildRowCards()
         maxItems = 1
     end if
 
-    ' Build the plan: one entry per card, plus an optional trailing See-All.
-    m.buildPlan = []
+    plan = []
     for i = 0 to maxItems - 1
         item = items[i]
         if item <> invalid then
-            m.buildPlan.Push({ kind: "card", item: item, comp: compName, cardType: cardType, rank: i })
+            plan.Push({ kind: "card", item: item, comp: compName, cardType: cardType, rank: i })
         end if
     end for
     if rowType <> HC_PromotionalCard() and items.Count() >= HC_SeeAllThreshold() + 1 then
-        m.buildPlan.Push({ kind: "seeAll" })
+        plan.Push({ kind: "seeAll" })
     end if
+    return plan
+end function
 
-    ' Expose the final count up-front so focus/navigation math is correct even while the
-    ' card nodes are still being created (focus starts at index 0, which builds first).
+sub StartCardBuild(cat as object)
+    plan = PlanRowCards(cat)
+    if plan = invalid then return
+
+    m.buildPlan = plan
     m.top.cardCount = m.buildPlan.Count()
+    m.top.mediaReady = false
     m.buildIdx = 0
     m.buildX = 0
+    m.pendingMediaLoads = 0
+    m.buildComplete = false
+    if m.revealTimer <> invalid then m.revealTimer.control = "stop"
 
-    ' Build into a hidden strip; it is revealed in one shot when the last card lands.
     if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
     m.top.built = false
 
     if m.buildPlan.Count() > 0 then
         m.cardTimer.control = "start"
     else
-        RevealCards()
+        m.buildComplete = true
+        RevealNow()
     end if
 end sub
 
@@ -125,6 +177,10 @@ sub OnCardBuildTick()
         m.buildX = m.buildX + w + gap
     else
         card = m.cardsHost.createChild(plan.comp)
+        if plan.comp = "ContinueWatchCard" and card.hasField("loaded") then
+            m.pendingMediaLoads = m.pendingMediaLoads + 1
+            card.observeField("loaded", "OnCardMediaLoaded")
+        end if
         ConfigureCard(card, plan.comp, plan.item, plan.cardType, plan.rank)
         card.translation = [m.buildX, 0]
         w = CardComponentWidth(plan.comp)
@@ -135,28 +191,49 @@ sub OnCardBuildTick()
 
     m.buildIdx = m.buildIdx + 1
 
-    ' Apply focus to the just-built set so the first card highlights immediately.
-    ApplyCardFocus()
+    ' Highlight only the card just built (if it's the focused one) instead of looping the
+    ' whole strip on every 10ms tick. The full focus pass runs once at completion below.
+    newCard = m.cards[m.cards.Count() - 1]
+    if newCard <> invalid and newCard.hasField("focusedState") then
+        newCard.focusedState = ((m.cards.Count() - 1) = m.top.cardFocusIndex)
+    end if
 
     if m.buildIdx >= m.buildPlan.Count() then
         m.cardTimer.control = "stop"
         OnCardFocusChanged()
-        RevealCards()
+        m.buildComplete = true
+        m.top.built = true
+        ' If we're still waiting on card thumbnails, arm the safety fallback.
+        if m.pendingMediaLoads > 0 and m.revealTimer <> invalid then
+            m.revealTimer.control = "start"
+        end if
+        MaybeReveal()
     end if
 end sub
 
-' Fade the fully-built card strip in together and signal the row is done.
-sub RevealCards()
-    if m.cardsHost <> invalid then
-        if m.cardsRevealAnim <> invalid then
-            m.cardsHost.opacity = 0.0
-            m.cardsRevealAnim.control = "stop"
-            m.cardsRevealAnim.control = "start"
-        else
-            m.cardsHost.opacity = 1.0
-        end if
-    end if
+' Reveal only when every card node exists AND its media is loaded, so the
+' shimmer stays up continuously and the real strip swaps in instantly.
+sub MaybeReveal()
+    if not m.buildComplete then return
+    if m.pendingMediaLoads > 0 then return
+    RevealNow()
+end sub
+
+sub RevealNow()
+    if m.revealTimer <> invalid then m.revealTimer.control = "stop"
+    if m.cardsHost <> invalid then m.cardsHost.opacity = 1.0
     m.top.built = true
+    if m.top.mediaReady <> true then m.top.mediaReady = true
+end sub
+
+sub OnRevealSafety()
+    m.pendingMediaLoads = 0
+    RevealNow()
+end sub
+
+sub OnCardMediaLoaded()
+    if m.pendingMediaLoads > 0 then m.pendingMediaLoads = m.pendingMediaLoads - 1
+    MaybeReveal()
 end sub
 
 sub ConfigureCard(card as object, compName as string, item as object, cardType as string, rank as integer)
@@ -197,7 +274,10 @@ sub ApplyCardFocus()
     end for
 end sub
 
-' Keep the focused card in view (parity with contentRow onAssetFocus scroll).
+' Keep the focused card in view without over-scrolling. The previous logic aligned every
+' focused card near the left edge, so navigating right made the whole strip slide left and
+' left empty space on the right at the end of the row. Clamp to the real strip width so the
+' last card lands flush-right, matching LG.
 sub ScrollToFocusedCard()
     if m.cardsHost = invalid then return
     idx = m.top.cardFocusIndex
@@ -210,19 +290,47 @@ sub ScrollToFocusedCard()
     for i = 0 to idx - 1
         x = x + m.cardWidths[i] + gap
     end for
-    scrollX = x - 10
+
+    cardW = m.cardWidths[idx]
+    cardLeft = x
+    cardRight = cardLeft + cardW
+
+    viewportW = 1920 - 64
+    currentScroll = 32 - m.cardsHost.translation[0]
+    if currentScroll < 0 then currentScroll = 0
+
+    scrollX = currentScroll
+    if cardLeft < scrollX then
+        scrollX = cardLeft
+    else if cardRight > scrollX + viewportW then
+        scrollX = cardRight - viewportW
+    end if
+
+    totalW = 0
+    for i = 0 to m.cardWidths.Count() - 1
+        totalW = totalW + m.cardWidths[i]
+        if i < m.cardWidths.Count() - 1 then totalW = totalW + gap
+    end for
+    maxScroll = totalW - viewportW
+    if maxScroll < 0 then maxScroll = 0
+
     if scrollX < 0 then scrollX = 0
+    if scrollX > maxScroll then scrollX = maxScroll
     m.cardsHost.translation = [32 - scrollX, 55]
 end sub
 
 sub ClearCards()
     if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+    if m.revealTimer <> invalid then m.revealTimer.control = "stop"
     if m.cardsRevealAnim <> invalid then m.cardsRevealAnim.control = "stop"
     if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
     m.top.built = false
     m.buildPlan = []
     m.buildIdx = 0
     m.buildX = 0
+    m.pendingMediaLoads = 0
+    m.buildComplete = false
+    m.shellCat = invalid
     m.cards = []
     m.cardWidths = []
     if m.cardsHost = invalid then return
@@ -231,4 +339,5 @@ sub ClearCards()
         m.cardsHost.removeChildIndex(i)
     end for
     m.top.cardCount = 0
+    m.top.mediaReady = false
 end sub

@@ -12,6 +12,7 @@
     <!-- Fires true once every card node for this row has been created, so the screen can
          drop the loading shimmer and reveal a fully-populated row in one shot. -->
     <field id="built" type="boolean" value="false" alwaysNotify="true" />
+    <field id="mediaReady" type="boolean" value="false" alwaysNotify="true" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
     <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
     <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
@@ -19,6 +20,9 @@
     <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
     <field id="cNeutral950" type="string" value="0x0a0a0aff" onChange="OnThemeChanged" />
     <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <!-- Shell-only row: title + cardCount are set, card nodes build on Materialize(). -->
+    <function name="PrepareShell" />
+    <function name="Materialize" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
