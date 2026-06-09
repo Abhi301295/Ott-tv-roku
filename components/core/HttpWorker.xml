@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Persistent HTTP worker. Owns a single keep-alive roUrlTransfer and serves one
+     job at a time. The pool (HttpClient) assigns work via `job` and watches
+     `completed` to dispatch the next queued request. -->
+<component name="HttpWorker" extends="Task">
+  <interface>
+    <!-- Set by the pool to assign a request (an HttpRequest node). -->
+    <field id="job" type="node" />
+    <!-- True when the worker is free to take a job. Starts false: a worker is only
+         available once its run loop has registered the job observer (avoids a startup
+         race where a job is assigned before the worker can receive it). -->
+    <field id="available" type="boolean" value="false" />
+    <!-- Incremented after each finished job so the pool can pump its queue. -->
+    <field id="completed" type="integer" value="0" alwaysNotify="true" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/AuthInterceptor.brs" />
+  <script type="text/brightscript" uri="pkg:/components/core/HttpWorker.brs" />
+</component>

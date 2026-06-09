@@ -14,6 +14,9 @@
   <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
 
   <children>
+    <!-- First child: the keep-alive HTTP pool must exist before any boot request
+         (ThemeManager fires one from its init), so it is created before everything. -->
+    <HttpClient id="httpClient" />
     <Rectangle id="bootBg" width="1920" height="1080" color="0x0b1120" />
     <ThemeManager id="themeManager" />
     <ViewManager id="viewManager" visible="false" />

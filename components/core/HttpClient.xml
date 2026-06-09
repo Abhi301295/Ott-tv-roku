@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- App-wide HTTP client: owns the keep-alive worker pool + dispatch queue.
+     Declared as the first child of MainScene so it exists before any boot request,
+     and also registers itself on m.global for lazy access from anywhere. -->
+<component name="HttpClient" extends="Node">
+  <interface>
+    <function name="Submit" />
+    <function name="WarmAll" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/core/HttpClient.brs" />
+</component>

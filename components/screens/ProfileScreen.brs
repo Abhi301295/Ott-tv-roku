@@ -64,6 +64,10 @@ sub init()
 
     ShowLoading(true)
     FetchProfiles()
+
+    ' Pre-open keep-alive connections on the rest of the pool while the user picks a
+    ' profile, so the home screen's burst of requests right after select are all warm.
+    WarmHttpConnections()
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────

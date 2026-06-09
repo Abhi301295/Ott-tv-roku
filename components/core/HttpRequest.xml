@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<component name="HttpTask" extends="Task">
+<!-- A single HTTP request handle. Created by ApiClient (ApiGet/ApiPost/…), handed to
+     the HttpClient pool, and populated by a worker. Field-identical to the old
+     HttpTask interface so call sites keep observing apiResult exactly as before. -->
+<component name="HttpRequest" extends="Node">
   <interface>
     <field id="method" type="string" value="GET" />
     <field id="path" type="string" />
@@ -10,10 +13,4 @@
     <field id="errorMessage" type="string" alwaysNotify="true" />
     <field id="shouldLogout" type="boolean" alwaysNotify="true" />
   </interface>
-
-  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/net/AuthInterceptor.brs" />
-  <script type="text/brightscript" uri="pkg:/components/core/HttpTask.brs" />
 </component>
