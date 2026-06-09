@@ -25,8 +25,8 @@ sub ApplyAll()
         h = 320
     end if
 
-    m.focusBorder.width = w + 6
-    m.focusBorder.height = h + 6
+    m.focusBorder.boxWidth = w + 6
+    m.focusBorder.boxHeight = h + 6
     m.fill.width = w
     m.fill.height = h
     m.fill.color = m.top.cNeutral800

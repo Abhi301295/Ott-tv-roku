@@ -24,8 +24,8 @@
         <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="28" />
       </Label>
     </Group>
-    <!-- Rounded, even 3px focus frame (9-patch, tinted via blendColor) on top of the body. -->
-    <Poster id="focusBorder" uri="pkg:/images/ui/card_focus.9.png" translation="[0, 0]"
-      width="1776" height="406" blendColor="0x04478bff" visible="false" />
+    <!-- Rounded, even 3px focus frame (primitive edges + corner sprites) on top of the body. -->
+    <FocusFrame id="focusBorder" translation="[0, 0]" boxWidth="1776" boxHeight="406"
+      color="0x04478bff" visible="false" />
   </children>
 </component>

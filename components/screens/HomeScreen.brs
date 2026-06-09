@@ -43,6 +43,20 @@ sub init()
     m.heroBuilt = false
     m.rowsBuilt = false
 
+    ' Continue-Watching (and the other rows) are expensive to build — creating their card
+    ' nodes + decoding thumbnails saturates the single render thread and starves the hero
+    ' trailer (the preview video would never paint until the rows finished). So we hold the
+    ' row build until the hero trailer is actually live, or a safety gate elapses, giving the
+    ' preview the thread first. The cheap shimmer keeps animating during the wait.
+    m.rowsDataReady = false
+    m.rowGateStarted = false
+    m.rowGateElapsed = false
+    m.rowBuildGate = CreateObject("roSGNode", "Timer")
+    m.rowBuildGate.duration = HC_RowBuildGateSec()
+    m.rowBuildGate.repeat = false
+    m.top.appendChild(m.rowBuildGate)
+    m.rowBuildGate.observeField("fire", "OnRowBuildGate")
+
     m.vm = FindViewManager(m.top)
 
     LoadThemeTokens()
@@ -215,6 +229,8 @@ end sub
 
 sub OnHeroTrailerPlayingChanged()
     UpdateHeaderScrimForHero()
+    ' Preview is live now — safe to spend the render thread on building the rows.
+    if m.hero <> invalid and m.hero.trailerPlaying = true then MaybeStartRowBuild()
 end sub
 
 sub UpdateHeaderScrimForHero()
@@ -568,6 +584,9 @@ sub MaybeBuildHero()
         ' Nothing to show in the hero — drop its shimmer immediately.
         ShowHeroSkeleton(false)
         UpdateHeroBanner()
+        ' No hero means no trailer to wait for: let the rows build right away.
+        m.rowGateElapsed = true
+        MaybeStartRowBuild()
         return
     end if
     m.skeletonTimeout.control = "start"
@@ -583,11 +602,46 @@ sub MaybeBuildRows()
         print "[HOME] MaybeBuildRows waiting (initialLoading="; m.initialLoading; " continueLoading="; m.continueLoading; ")"
         return
     end if
-    m.rowsBuilt = true
-    print "[HOME] MaybeBuildRows -> build rows (shimmer stays until first row paints)"
-    ' Rows build progressively; the rows shimmer is dropped in OnRowBuildTick once the
-    ' first real row exists, so the shimmer hands straight off to content (no black gap).
-    BuildContentRows()
+    ' Data is in. Don't build yet — hand the render thread to the hero preview first and
+    ' let the gate (trailer-live or timeout) kick off the build (see MaybeStartRowBuild).
+    m.rowsDataReady = true
+    print "[HOME] MaybeBuildRows -> data ready, waiting for hero trailer / gate"
+    MaybeStartRowBuild()
+end sub
+
+' Build the rows once data is ready AND either the hero trailer is live or the safety gate
+' elapsed. Holding the build off the render thread until the preview is up stops the rows
+' from starving the trailer (the preview video would otherwise never paint until CW built).
+sub MaybeStartRowBuild()
+    if m.rowsBuilt then return
+    if not m.rowsDataReady then return
+
+    heroLive = (m.hero <> invalid and m.hero.trailerPlaying = true)
+    if heroLive or m.rowGateElapsed then
+        m.rowsBuilt = true
+        if heroLive then
+            print "[HOME] row gate open (trailer live) -> build rows"
+        else
+            print "[HOME] row gate open (timeout) -> build rows"
+        end if
+        ' Rows build progressively; the rows shimmer is dropped in OnRowBuildTick once the
+        ' first real row exists, so the shimmer hands straight off to content (no black gap).
+        BuildContentRows()
+        return
+    end if
+
+    ' Arm the safety gate once so rows still appear even if this slide has no trailer.
+    if not m.rowGateStarted then
+        m.rowGateStarted = true
+        m.rowBuildGate.control = "start"
+        print "[HOME] row build held for hero preview (gate armed)"
+    end if
+end sub
+
+' Safety gate elapsed — build the rows even if no trailer ever went live.
+sub OnRowBuildGate()
+    m.rowGateElapsed = true
+    MaybeStartRowBuild()
 end sub
 
 ' Hero poster has painted — drop the hero shimmer (rows shimmer is untouched).
@@ -729,10 +783,12 @@ sub ApplyHomeFocus()
     UpdateRowsScrim()
 end sub
 
-' The dark content backdrop only blocks the hero while the rows are loading or the user
-' has scrolled past the first row. Once Continue Watching has painted and we're back at
-' the top row, it goes transparent so the hero poster/trailer bleeds behind the cards
-' (parity with the React layout where the hero shows through under the first row).
+' The dark content backdrop only blocks the hero while the rows are loading or the user has
+' scrolled past the first row. Once Continue Watching has painted and we're back at the top
+' row, the scrim goes transparent so the hero poster/trailer bleeds behind the cards (parity
+' with the React layout). The cards' rounded corners are faked with page-bg corner masks; the
+' bottom corners sit below the hero (always blend) and the top corners sit over the hero's
+' dark bottom vignette, so the notches stay subtle while the hero shows through.
 sub UpdateRowsScrim()
     transparent = m.rowsRevealed and (m.rowIndex <= 0)
     op = 1.0

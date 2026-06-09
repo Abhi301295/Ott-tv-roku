@@ -60,3 +60,11 @@ end function
 function HC_HomeSkeletonMaxSec() as float
     return 5.0
 end function
+
+' How long row building may wait for the hero trailer to go live before it builds
+' anyway. The hero schedules its trailer ~2.5s after the poster paints, so this gives
+' the preview the render thread first; if a slide has no trailer, rows still appear
+' promptly. The rows shimmer keeps animating during this window.
+function HC_RowBuildGateSec() as float
+    return 3.5
+end function

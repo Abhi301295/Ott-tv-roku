@@ -23,8 +23,8 @@
         <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
       </Label>
     </Group>
-    <!-- Rounded, even 3px focus frame (9-patch, tinted via blendColor); size set in code. -->
-    <Poster id="focusBorder" uri="pkg:/images/ui/card_focus.9.png" translation="[0, 0]"
-      width="246" height="311" blendColor="0x0b75e0ff" visible="false" />
+    <!-- Rounded, even 3px focus frame (primitive edges + corner sprites); size set in code. -->
+    <FocusFrame id="focusBorder" translation="[0, 0]" boxWidth="246" boxHeight="311"
+      color="0x0b75e0ff" visible="false" />
   </children>
 </component>

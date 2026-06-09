@@ -29,8 +29,8 @@ sub ApplyAll()
         w = 272
         h = 340
     end if
-    m.focusBorder.width = w + 6
-    m.focusBorder.height = h + 6
+    m.focusBorder.boxWidth = w + 6
+    m.focusBorder.boxHeight = h + 6
     m.skeleton.boxWidth = w
     m.skeleton.boxHeight = h
     m.thumb.width = w

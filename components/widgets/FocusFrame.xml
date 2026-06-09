@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Card focus frame built from primitives: 4 straight edge Rectangles + 4 rounded-corner
+     sprites. brs-engine renders these crisply at ANY size (it does NOT stretch 9-patches,
+     which only ever drew the corners), giving a continuous rounded border. Size it with
+     boxWidth/boxHeight; tint the whole frame with `color`. -->
+<component name="FocusFrame" extends="Group">
+  <interface>
+    <field id="boxWidth" type="float" value="0" onChange="OnFrameChanged" />
+    <field id="boxHeight" type="float" value="0" onChange="OnFrameChanged" />
+    <field id="color" type="string" value="0x0b75e0ff" onChange="OnColorChanged" />
+    <field id="thickness" type="float" value="3" onChange="OnFrameChanged" />
+    <field id="radius" type="float" value="14" onChange="OnFrameChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/FocusFrame.brs" />
+
+  <children>
+    <Rectangle id="edgeTop" color="0x0b75e0ff" />
+    <Rectangle id="edgeBottom" color="0x0b75e0ff" />
+    <Rectangle id="edgeLeft" color="0x0b75e0ff" />
+    <Rectangle id="edgeRight" color="0x0b75e0ff" />
+    <Poster id="cTL" uri="pkg:/images/ui/focus_corner_tl.png" />
+    <Poster id="cTR" uri="pkg:/images/ui/focus_corner_tr.png" />
+    <Poster id="cBL" uri="pkg:/images/ui/focus_corner_bl.png" />
+    <Poster id="cBR" uri="pkg:/images/ui/focus_corner_br.png" />
+  </children>
+</component>
