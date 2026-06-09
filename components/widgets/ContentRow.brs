@@ -1,9 +1,22 @@
 sub init()
     m.rowTitle = m.top.findNode("rowTitle")
     m.cardsHost = m.top.findNode("cardsHost")
+    m.cardsRevealAnim = m.top.findNode("cardsRevealAnim")
     m.cards = []
     m.cardWidths = []
     m.seeAllOrientation = HC_CardTypeVertical()
+
+    ' Cards are built progressively (a small chunk per tick) instead of all-at-once.
+    ' Creating a full row's cards synchronously blocks the render thread for hundreds of
+    ' ms to seconds (measured), which freezes the hero. Chunking lets the thread breathe.
+    m.buildPlan = []
+    m.buildIdx = 0
+    m.buildX = 0
+    m.cardTimer = CreateObject("roSGNode", "Timer")
+    m.cardTimer.duration = 0.01
+    m.cardTimer.repeat = true
+    m.top.appendChild(m.cardTimer)
+    m.cardTimer.observeField("fire", "OnCardBuildTick")
 end sub
 
 sub OnCategoryChanged()
@@ -30,6 +43,7 @@ sub OnRowVisualChanged()
     end if
 end sub
 
+' Plan the row synchronously (cheap), then build the card nodes progressively on a timer.
 sub BuildRowCards()
     ClearCards()
     cat = m.top.categoryData
@@ -60,32 +74,89 @@ sub BuildRowCards()
         maxItems = 1
     end if
 
-    x = 0
-    gap = HC_CardGap()
+    ' Build the plan: one entry per card, plus an optional trailing See-All.
+    m.buildPlan = []
     for i = 0 to maxItems - 1
         item = items[i]
-        if item = invalid then continue for
-        card = m.cardsHost.createChild(compName)
-        ConfigureCard(card, compName, item, cardType, i)
-        card.translation = [x, 0]
-        w = CardComponentWidth(compName)
-        m.cards.Push(card)
-        m.cardWidths.Push(w)
-        x = x + w + gap
+        if item <> invalid then
+            m.buildPlan.Push({ kind: "card", item: item, comp: compName, cardType: cardType, rank: i })
+        end if
     end for
-
     if rowType <> HC_PromotionalCard() and items.Count() >= HC_SeeAllThreshold() + 1 then
+        m.buildPlan.Push({ kind: "seeAll" })
+    end if
+
+    ' Expose the final count up-front so focus/navigation math is correct even while the
+    ' card nodes are still being created (focus starts at index 0, which builds first).
+    m.top.cardCount = m.buildPlan.Count()
+    m.buildIdx = 0
+    m.buildX = 0
+
+    ' Build into a hidden strip; it is revealed in one shot when the last card lands.
+    if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
+    m.top.built = false
+
+    if m.buildPlan.Count() > 0 then
+        m.cardTimer.control = "start"
+    else
+        RevealCards()
+    end if
+end sub
+
+sub OnCardBuildTick()
+    if m.buildIdx >= m.buildPlan.Count() then
+        m.cardTimer.control = "stop"
+        return
+    end if
+
+    ' One card per tick keeps each render-thread slice tiny so the hero animation and
+    ' input stay responsive while the row fills in.
+    plan = m.buildPlan[m.buildIdx]
+    gap = HC_CardGap()
+
+    if plan.kind = "seeAll" then
         seeAll = m.cardsHost.createChild("SeeAllCard")
         seeAll.orientation = m.seeAllOrientation
         CardInjectTheme(seeAll, m.top.cPrimary500, m.top.cPrimary600, m.top.cPrimary700, m.top.cNeutral50, m.top.cNeutral800, m.top.cNeutral700)
-        seeAll.translation = [x, 0]
+        seeAll.translation = [m.buildX, 0]
         w = CardComponentWidth("SeeAllCard", m.seeAllOrientation)
         m.cards.Push(seeAll)
         m.cardWidths.Push(w)
+        m.buildX = m.buildX + w + gap
+    else
+        card = m.cardsHost.createChild(plan.comp)
+        ConfigureCard(card, plan.comp, plan.item, plan.cardType, plan.rank)
+        card.translation = [m.buildX, 0]
+        w = CardComponentWidth(plan.comp)
+        m.cards.Push(card)
+        m.cardWidths.Push(w)
+        m.buildX = m.buildX + w + gap
     end if
 
-    m.top.cardCount = m.cards.Count()
-    OnCardFocusChanged()
+    m.buildIdx = m.buildIdx + 1
+
+    ' Apply focus to the just-built set so the first card highlights immediately.
+    ApplyCardFocus()
+
+    if m.buildIdx >= m.buildPlan.Count() then
+        m.cardTimer.control = "stop"
+        OnCardFocusChanged()
+        RevealCards()
+    end if
+end sub
+
+' Fade the fully-built card strip in together and signal the row is done.
+sub RevealCards()
+    if m.cardsHost <> invalid then
+        if m.cardsRevealAnim <> invalid then
+            m.cardsHost.opacity = 0.0
+            m.cardsRevealAnim.control = "stop"
+            m.cardsRevealAnim.control = "start"
+        else
+            m.cardsHost.opacity = 1.0
+        end if
+    end if
+    m.top.built = true
 end sub
 
 sub ConfigureCard(card as object, compName as string, item as object, cardType as string, rank as integer)
@@ -145,6 +216,13 @@ sub ScrollToFocusedCard()
 end sub
 
 sub ClearCards()
+    if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+    if m.cardsRevealAnim <> invalid then m.cardsRevealAnim.control = "stop"
+    if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
+    m.top.built = false
+    m.buildPlan = []
+    m.buildIdx = 0
+    m.buildX = 0
     m.cards = []
     m.cardWidths = []
     if m.cardsHost = invalid then return

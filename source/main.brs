@@ -15,6 +15,10 @@ sub Main(args as Dynamic)
         scene.launchArgs = args
     end if
 
+    ' Exit the channel cleanly when the scene requests it (Back on Home). The render
+    ' thread cannot close roSGScreen directly, so it flips exitChannel and we close here.
+    scene.observeField("exitChannel", m.port)
+
     screen.Show()
 
     while true
@@ -22,6 +26,11 @@ sub Main(args as Dynamic)
         msgType = type(msg)
         if msgType = "roSGScreenEvent" then
             if msg.IsScreenClosed() then return
+        else if msgType = "roSGNodeEvent" then
+            if msg.GetField() = "exitChannel" and msg.GetData() = true then
+                screen.Close()
+                return
+            end if
         end if
     end while
 end sub

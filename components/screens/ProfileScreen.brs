@@ -57,6 +57,11 @@ sub init()
 
     m.top.observeField("keyEvent", "OnKey")
     m.autoSelectTimer.observeField("fire", "OnAutoTick")
+    m.selectRetryTimer = m.top.findNode("selectRetryTimer")
+    if m.selectRetryTimer <> invalid then m.selectRetryTimer.observeField("fire", "OnSelectRetryFire")
+    ' How many times select-profile may be retried before surfacing the error toast.
+    m.selectRetriesLeft = 0
+    m.SELECT_MAX_RETRIES = 4
     m.confirmPopup.observeField("action", "OnConfirmAction")
     m.otpPopup.observeField("submitted", "OnOtpSubmitted")
     m.otpPopup.observeField("action", "OnOtpAction")
@@ -473,10 +478,24 @@ sub DoSelectProfile(profileId as string)
     StopAutoSelect()
     ShowSelectLoader(true)
     m.pendingProfileId = profileId
+    m.selectRetriesLeft = m.SELECT_MAX_RETRIES
+    FireSelectProfileRequest()
+end sub
+
+' Issues the select-profile POST for m.pendingProfileId. Split out so a retry can
+' re-fire the same request after the session-settle delay without re-running guards.
+sub FireSelectProfileRequest()
     path = SelectProfilePath()
-    m.selectTask = ApiPost(path, SelectProfilePayload(profileId))
+    m.selectTask = ApiPost(path, SelectProfilePayload(m.pendingProfileId))
     m.selectTask.observeField("apiResult", "OnSelectResponse")
     StartHttpTask(m.selectTask)
+end sub
+
+sub OnSelectRetryFire()
+    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    if not m.selecting then return
+    print "[SELECTDBG] retrying select-profile (retriesLeft="; m.selectRetriesLeft; ")"
+    FireSelectProfileRequest()
 end sub
 
 sub OnSelectResponse()
@@ -486,15 +505,42 @@ sub OnSelectResponse()
 
     if HandleSessionExpiry(m.top, api) then return
 
-    ShowSelectLoader(false)
-
     if api.ok and ApplySelectProfileTokens(api.result) then
+        ShowSelectLoader(false)
         SetProfileId(m.pendingProfileId)
+        ' Persist the CHOSEN profile's avatar so the home header shows it (SaveProfilesMeta
+        ' only ever stores the first profile's avatar; without this the header is stuck on
+        ' profile #1's image no matter who is selected).
+        if m.selectedProfile <> invalid and m.selectedProfile.avatar <> invalid then
+            SetValueByKey(SK_Avatar(), m.selectedProfile.avatar, "app")
+            print "[AVATARDBG] persisted selected avatar='"; m.selectedProfile.avatar; "' for profile id='"; m.pendingProfileId; "'"
+        else
+            print "[AVATARDBG] no avatar on selected profile (selectedProfile invalid="; (m.selectedProfile = invalid); ")"
+        end if
         NavigateHome()
         return
     end if
 
-    ' Failure: toast + let the user retry (web also surfaces this alert).
+    ' A freshly-issued login token is briefly not yet active on the backend, so the
+    ' first select-profile attempt(s) can come back 401/404. Retry a few times after a
+    ' short delay before surfacing the error (mirrors the user's "reload makes it work").
+    httpStatus = api.httpStatus
+    retriable = (httpStatus = 401 or httpStatus = 404 or httpStatus <= 0)
+    if retriable and m.selectRetriesLeft > 0 then
+        m.selectRetriesLeft = m.selectRetriesLeft - 1
+        print "[SELECTDBG] select-profile failed (httpStatus="; httpStatus; ") -> scheduling retry, retriesLeft="; m.selectRetriesLeft
+        if m.selectRetryTimer <> invalid then
+            m.selectRetryTimer.control = "stop"
+            m.selectRetryTimer.control = "start"
+        else
+            FireSelectProfileRequest()
+        end if
+        return
+    end if
+
+    ' Retries exhausted (or non-retriable failure): toast + let the user retry manually.
+    print "[SELECTDBG] select-profile giving up (httpStatus="; httpStatus; ")"
+    ShowSelectLoader(false)
     m.selecting = false
     ShowAlert(m.top, 2, MsgFailedSelectProfile())
     ResetAutoSelect()

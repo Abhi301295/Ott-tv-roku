@@ -309,10 +309,11 @@ sub ApplyFocus()
     end for
 
     if m.scrim <> invalid then
+        ' Gradient tint deepens a touch when the header is focused for menu legibility.
         if active then
-            m.scrim.opacity = 0.45
+            m.scrim.opacity = 0.75
         else
-            m.scrim.opacity = 0.2
+            m.scrim.opacity = 0.55
         end if
     end if
 end sub

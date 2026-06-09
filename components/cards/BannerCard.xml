@@ -15,7 +15,6 @@
   <script type="text/brightscript" uri="pkg:/components/cards/BannerCard.brs" />
 
   <children>
-    <Rectangle id="focusBorder" width="1776" height="406" color="0x04478bff" visible="false" />
     <Group id="body" translation="[3, 3]">
       <Rectangle id="fallback" width="1770" height="400" color="0x262626ff" visible="false" />
       <Skeleton id="skeleton" boxWidth="1770" boxHeight="400" />
@@ -25,5 +24,8 @@
         <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="28" />
       </Label>
     </Group>
+    <!-- Rounded, even 3px focus frame (9-patch, tinted via blendColor) on top of the body. -->
+    <Poster id="focusBorder" uri="pkg:/images/ui/card_focus.9.png" translation="[0, 0]"
+      width="1776" height="406" blendColor="0x04478bff" visible="false" />
   </children>
 </component>

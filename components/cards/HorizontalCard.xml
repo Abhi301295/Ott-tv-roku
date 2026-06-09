@@ -14,10 +14,12 @@
   <script type="text/brightscript" uri="pkg:/components/cards/HorizontalCard.brs" />
 
   <children>
-    <Rectangle id="focusBorder" width="556" height="328" color="0x0b75e0ff" visible="false" />
     <Group id="body" translation="[3, 3]">
       <Skeleton id="skeleton" boxWidth="540" boxHeight="312" />
       <Poster id="thumb" width="540" height="312" loadDisplayMode="scaleToFill" visible="false" />
     </Group>
+    <!-- Rounded, even 3px focus frame (9-patch, tinted via blendColor) on top of the body. -->
+    <Poster id="focusBorder" uri="pkg:/images/ui/card_focus.9.png" translation="[0, 0]"
+      width="546" height="318" blendColor="0x0b75e0ff" visible="false" />
   </children>
 </component>

@@ -22,7 +22,11 @@
   <script type="text/brightscript" uri="pkg:/components/widgets/HomeHeader.brs" />
 
   <children>
-    <Rectangle id="scrim" width="1920" height="120" color="0x0a0a0aff" opacity="0.2" />
+    <!-- Header tint: a top→bottom black gradient (opaque at the very top, fading to
+         transparent) instead of a flat band, so the bar reads as "transparent with a
+         subtle black tint" like the LG header rather than a solid black strip. -->
+    <Poster id="scrim" width="1920" height="170" uri="pkg:/images/ui/grad_top.png"
+      blendColor="0x000000ff" opacity="0.55" loadDisplayMode="scaleToFill" />
 
     <Poster id="logoPoster" translation="[48, 26]" width="220" height="64"
       loadDisplayMode="scaleToFit" visible="false" />

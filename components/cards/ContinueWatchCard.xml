@@ -17,12 +17,16 @@
   <script type="text/brightscript" uri="pkg:/components/cards/ContinueWatchCard.brs" />
 
   <children>
-    <Rectangle id="focusBorder" width="556" height="302" color="0x0b75e0ff" visible="false" />
     <Group id="body" translation="[3, 3]">
       <Skeleton id="skeleton" boxWidth="540" boxHeight="286" />
       <Poster id="thumb" width="540" height="286" loadDisplayMode="scaleToFill" visible="false" />
       <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0x0a0a0aff" />
       <Rectangle id="progressFill" translation="[0, 278]" width="0" height="8" color="0x0760bbff" />
     </Group>
+    <!-- Rounded, even 3px focus frame (9-patch, tinted via blendColor). Drawn ON TOP of the
+         body so its rounded corners clip the square thumbnail corners (parity radius-10 +
+         3px primary border on the selected card). Outer 546×292 = 540×286 + 3px each side. -->
+    <Poster id="focusBorder" uri="pkg:/images/ui/card_focus.9.png" translation="[0, 0]"
+      width="546" height="292" blendColor="0x0b75e0ff" visible="false" />
   </children>
 </component>

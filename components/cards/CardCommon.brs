@@ -3,7 +3,15 @@
 sub CardApplyFocusBorder(border as object, focused as boolean, color as string)
     if border = invalid then return
     border.visible = focused
-    if focused and color <> invalid and color <> "" then border.color = color
+    if focused and color <> invalid and color <> "" then
+        ' The focus frame is a tintable 9-patch Poster (rounded, even border) — tint it via
+        ' blendColor. Fall back to .color for any legacy Rectangle border.
+        if border.hasField("blendColor") then
+            border.blendColor = color
+        else if border.hasField("color") then
+            border.color = color
+        end if
+    end if
 end sub
 
 sub CardOnPosterLoad(poster as object, skeleton as object)
@@ -37,5 +45,7 @@ sub CardApplySkeleton(skeleton as object, neutral700 as string, neutral800 as st
     if highlight = invalid or highlight = "" then highlight = "0x262626ff"
     skeleton.baseColor = base
     skeleton.highlightColor = highlight
-    if skeleton.hasField("animate") then skeleton.animate = false
+    ' Shimmer the card placeholder while its thumbnail loads (it stops itself on load),
+    ' so a loading row reads as an intentional shimmer, not flat grey boxes.
+    if skeleton.hasField("animate") then skeleton.animate = true
 end sub

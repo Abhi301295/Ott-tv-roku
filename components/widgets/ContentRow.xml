@@ -9,6 +9,9 @@
     <field id="rowFocused" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <field id="rowDimmed" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <field id="cardCount" type="integer" value="0" />
+    <!-- Fires true once every card node for this row has been created, so the screen can
+         drop the loading shimmer and reveal a fully-populated row in one shot. -->
+    <field id="built" type="boolean" value="false" alwaysNotify="true" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
     <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
     <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
@@ -28,6 +31,13 @@
       color="0xf8f1f7ff">
       <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="34" />
     </Label>
-    <Group id="cardsHost" translation="[32, 55]" />
+    <!-- Cards build progressively into cardsHost while it is transparent, then the whole
+         strip fades in together (parity intent: the row appears populated, not stacking). -->
+    <Group id="cardsHost" translation="[32, 55]" opacity="0.0" />
+
+    <Animation id="cardsRevealAnim" duration="0.3" repeat="false" easeFunction="outQuad">
+      <FloatFieldInterpolator id="cardsRevealInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="cardsHost.opacity" />
+    </Animation>
   </children>
 </component>

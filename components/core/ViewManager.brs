@@ -19,6 +19,10 @@ sub ShowRoute(route as string, state as object, replace as boolean)
     if replace and m.stack.Count() > 0 then
         entry = m.stack[m.stack.Count() - 1]
         if entry.screen <> invalid then
+            ' Let the screen tear down its timers/video before it leaves the tree —
+            ' removeChild alone doesn't stop child Timers, which would keep an orphaned
+            ' HomeScreen's hero auto-rotating (stacked instances) after navigation.
+            if entry.screen.hasField("dispose") then entry.screen.dispose = true
             m.screenHost.removeChild(entry.screen)
         end if
         m.stack.Pop()

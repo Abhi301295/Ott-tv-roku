@@ -2,7 +2,16 @@ sub init()
     m.hero = m.top.findNode("hero")
     m.header = m.top.findNode("homeHeader")
     m.rowsHost = m.top.findNode("rowsHost")
+    m.rowsAnim = m.top.findNode("rowsAnim")
+    m.rowsInterp = m.top.findNode("rowsInterp")
     m.homeSkeleton = m.top.findNode("homeSkeleton")
+    m.rowsScrim = m.top.findNode("rowsScrim")
+    m.rowsScrimGrad = m.top.findNode("rowsScrimGrad")
+    ' Once the Continue Watching row has painted, the dark content scrim is removed at the
+    ' top row so the hero poster/video bleeds behind the cards (re-shown when scrolled down).
+    m.rowsRevealed = false
+    ' Which hero control is focused while focusZone = "hero": "prev" | "next" | "mute".
+    m.heroFocus = "next"
 
     m.categories = []
     m.rowWidgets = []
@@ -31,6 +40,8 @@ sub init()
     m.initialLoading = true
     m.continueLoading = true
     m.versionLoading = true
+    m.heroBuilt = false
+    m.rowsBuilt = false
 
     m.vm = FindViewManager(m.top)
 
@@ -41,6 +52,15 @@ sub init()
 
     m.top.observeField("keyEvent", "OnKey")
 
+    ' Hero shimmer hides once the hero poster actually paints, with a safety timeout so
+    ' a slow/blocked image can never strand it.
+    if m.hero <> invalid then m.hero.observeField("posterReady", "OnHeroPosterReady")
+    m.skeletonTimeout = CreateObject("roSGNode", "Timer")
+    m.skeletonTimeout.duration = HC_HomeSkeletonMaxSec()
+    m.skeletonTimeout.repeat = false
+    m.top.appendChild(m.skeletonTimeout)
+    m.skeletonTimeout.observeField("fire", "OnSkeletonTimeout")
+
     SetupHeader()
 
     if GetProfileId() = "" then
@@ -48,8 +68,25 @@ sub init()
         return
     end if
 
-    ShowSkeleton(true)
+    ' Both regions shimmer immediately on mount; they reveal independently as their data
+    ' lands (hero on poster paint, rows when CW + categories are ready).
+    ShowHeroSkeleton(true)
+    ShowRowsSkeleton(true)
+    ' Wall-clock from mount → hero poster painted = perceived first-content latency.
+    m.bootSpan = CreateObject("roTimespan")
     StartBootSequence()
+end sub
+
+' Stop everything that ticks before this screen is torn down, so a removed HomeScreen
+' can't leave its hero carousel/trailer/build timers running in the background.
+sub OnDispose()
+    if not m.top.dispose then return
+    print "[HOME] dispose -> stopping hero + timers"
+    ' Setting the hero invisible runs its OnVisibleChanged cleanup (swipe timer, trailer,
+    ' video, pending detail fetch all stop).
+    if m.hero <> invalid then m.hero.visible = false
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+    if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────
@@ -116,6 +153,7 @@ end sub
 sub UpdateHeroBanner()
     if m.hero = invalid then return
     items = ExtractBannerItems(m.categories)
+    print "[HOME] UpdateHeroBanner bannerItems="; items.Count()
     ApplyThemeToHero()
     m.hero.bannerItems = items
     m.hero.visible = (items.Count() > 0)
@@ -161,6 +199,7 @@ sub ApplyHeaderBranding()
 
     ' Active profile avatar (parity with NetflixHeader): persisted by fetchProfiles.
     avatarUri = RegistryRead(SK_Avatar(), "app")
+    print "[AVATARDBG] HomeHeader reading avatar='"; avatarUri; "'"
     if avatarUri <> invalid then m.header.avatarUri = avatarUri
 
     resolved = invalid
@@ -198,9 +237,135 @@ sub HandleHeaderKey(key as string)
             m.header.focusedIndex = m.menuIndex
         end if
     else if key = "down" then
-        ExitHeaderToRows()
+        EnterHeroFromHeader()
     else if key = "OK" or key = "ok" then
         SelectHeaderItem()
+    end if
+end sub
+
+' ── Hero banner focus zone (parity with the portal arrows / mute button) ─────
+' Vertical flow:  HEADER ↕ HERO (prev/next/mute) ↕ CONTINUE WATCHING.
+
+function HeroAvailable() as boolean
+    if m.hero = invalid or m.hero.visible <> true then return false
+    items = m.hero.bannerItems
+    if items = invalid or items.Count() = 0 then return false
+    ' Focusable only when there is something to act on: multiple slides (arrows) or a
+    ' playing trailer (mute) — mirrors React showing arrows only when items.length > 1.
+    return (items.Count() > 1) or (m.hero.trailerPlaying = true)
+end function
+
+function HeroMultiSlide() as boolean
+    if m.hero = invalid then return false
+    items = m.hero.bannerItems
+    return (items <> invalid and items.Count() > 1)
+end function
+
+' Pick a valid landing control given what is currently available.
+function NormalizeHeroTarget(target as string) as string
+    playing = (m.hero <> invalid and m.hero.trailerPlaying = true)
+    if target = "mute" and not playing then target = "next"
+    if (target = "prev" or target = "next") and not HeroMultiSlide() then
+        if playing then return "mute"
+        return "next"
+    end if
+    if target = "" then target = "next"
+    return target
+end function
+
+sub EnterHeroOrHeader()
+    if not HeroAvailable() then
+        EnterHeader()
+        return
+    end if
+    target = "next"
+    if m.hero.trailerPlaying = true then target = "mute"
+    EnterHero(target)
+end sub
+
+sub EnterHeroFromHeader()
+    if m.header <> invalid then m.header.headerActive = false
+    if HeroAvailable() then
+        EnterHero("next")
+    else
+        ExitHeaderToRows()
+    end if
+end sub
+
+sub EnterHero(target as string)
+    if not HeroAvailable() then return
+    m.focusZone = "hero"
+    if m.header <> invalid then m.header.headerActive = false
+    ' Drop any card highlight while the hero is focused.
+    for each row in m.rowWidgets
+        if row <> invalid then row.cardFocusIndex = -1
+    end for
+    m.heroFocus = NormalizeHeroTarget(target)
+    ApplyHeroFocus()
+    UpdateRowsScrim()
+end sub
+
+sub ApplyHeroFocus()
+    if m.hero <> invalid then m.hero.focusTarget = m.heroFocus
+end sub
+
+sub ClearHeroFocus()
+    if m.hero <> invalid then m.hero.focusTarget = ""
+end sub
+
+sub EnterRowsFromHero()
+    ClearHeroFocus()
+    m.focusZone = "rows"
+    m.rowIndex = 0
+    m.cardIndex = 0
+    ApplyHomeFocus()
+    UpdateRowsScrim()
+end sub
+
+sub HandleHeroKey(key as string)
+    multi = HeroMultiSlide()
+    playing = (m.hero <> invalid and m.hero.trailerPlaying = true)
+
+    if key = "up" then
+        if m.heroFocus = "mute" then
+            m.heroFocus = "next"
+            ApplyHeroFocus()
+        else
+            ClearHeroFocus()
+            EnterHeader()
+        end if
+    else if key = "down" then
+        if m.heroFocus = "next" and playing then
+            m.heroFocus = "mute"
+            ApplyHeroFocus()
+        else
+            EnterRowsFromHero()
+        end if
+    else if key = "left" then
+        if m.heroFocus = "next" and multi then
+            m.heroFocus = "prev"
+            ApplyHeroFocus()
+        else if m.heroFocus = "mute" then
+            EnterRowsFromHero()
+        end if
+    else if key = "right" then
+        if m.heroFocus = "prev" and multi then
+            m.heroFocus = "next"
+            ApplyHeroFocus()
+        end if
+    else if key = "OK" or key = "ok" then
+        print "[KEYDBG] HandleHeroKey OK branch heroFocus='"; m.heroFocus; "' heroInvalid="; (m.hero = invalid)
+        if m.hero = invalid then return
+        if m.heroFocus = "prev" then
+            print "[KEYDBG] calling HeroGoPrev"
+            m.hero.callFunc("HeroGoPrev", invalid)
+        else if m.heroFocus = "next" then
+            print "[KEYDBG] calling HeroGoNext"
+            m.hero.callFunc("HeroGoNext", invalid)
+        else if m.heroFocus = "mute" then
+            print "[KEYDBG] calling HeroToggleMute"
+            m.hero.callFunc("HeroToggleMute", invalid)
+        end if
     end if
 end sub
 
@@ -290,16 +455,20 @@ sub OnContinueWatchingResponse()
 
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
+        print "[HOME] continue-watching response ok, rows="; listing.Count()
         if listing.Count() > 0 then
             tagged = TagContinueWatchingRows(listing)
             m.categories = PrependCategories(m.categories, tagged)
         end if
-    else if api.message <> invalid and api.message <> "" then
-        ShowAlert(m.top, 2, api.message)
+    else
+        print "[HOME] continue-watching response failed/empty"
+        if api.message <> invalid and api.message <> "" then
+            ShowAlert(m.top, 2, api.message)
+        end if
     end if
 
     m.continueLoading = false
-    TryFinishBoot()
+    MaybeBuildRows()
 end sub
 
 sub FetchHomeCategories(pageNum as integer)
@@ -317,6 +486,7 @@ sub OnHomeCategoriesResponse()
 
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
+        print "[HOME] home categories response ok, categories="; listing.Count()
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
             m.hasMore = true
@@ -324,6 +494,7 @@ sub OnHomeCategoriesResponse()
             m.hasMore = false
         end if
     else
+        print "[HOME] home categories response failed/empty"
         m.hasMore = false
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
@@ -331,7 +502,10 @@ sub OnHomeCategoriesResponse()
     end if
 
     m.initialLoading = false
-    TryFinishBoot()
+    ' Categories (and thus the hero banner) are ready — render the hero NOW, independent
+    ' of Continue Watching. Rows still wait for CW so its shimmer can keep showing.
+    MaybeBuildHero()
+    MaybeBuildRows()
 end sub
 
 sub FetchLatestVersion()
@@ -350,7 +524,8 @@ sub OnLatestVersionResponse()
     verdict = EvaluateVersionUpdate(api)
     m.showUpdate = verdict.showUpdate
     m.versionLoading = false
-    TryFinishBoot()
+    ' Version check is non-blocking and gates nothing (parity: checkVersion runs in
+    ' parallel and never blocks isInitialLoading).
 end sub
 
 ' The update check runs in parallel and never gates first paint (parity with
@@ -359,17 +534,69 @@ function AnyBootLoading() as boolean
     return m.initialLoading or m.continueLoading
 end function
 
-sub TryFinishBoot()
-    if AnyBootLoading() then return
+' ── Hero (independent of Continue Watching) ──────────────────────────────────
+' Built as soon as categories land. Hero shimmer stays until the poster actually
+' paints (OnHeroPosterReady) or the safety timeout fires.
+sub MaybeBuildHero()
+    if m.heroBuilt then return
+    m.heroBuilt = true
+    items = ExtractBannerItems(m.categories)
+    print "[HOME] MaybeBuildHero bannerItems="; items.Count()
+    if items.Count() = 0 then
+        ' Nothing to show in the hero — drop its shimmer immediately.
+        ShowHeroSkeleton(false)
+        UpdateHeroBanner()
+        return
+    end if
+    m.skeletonTimeout.control = "start"
     UpdateHeroBanner()
+end sub
+
+' ── Rows / Continue Watching (waits for BOTH categories and CW) ───────────────
+' The rows shimmer (which reads as the Continue-Watching shimmer) stays up until CW
+' has resolved AND categories are in, so the hero can be live above a still-loading row.
+sub MaybeBuildRows()
+    if m.rowsBuilt then return
+    if AnyBootLoading() then
+        print "[HOME] MaybeBuildRows waiting (initialLoading="; m.initialLoading; " continueLoading="; m.continueLoading; ")"
+        return
+    end if
+    m.rowsBuilt = true
+    print "[HOME] MaybeBuildRows -> build rows (shimmer stays until first row paints)"
+    ' Rows build progressively; the rows shimmer is dropped in OnRowBuildTick once the
+    ' first real row exists, so the shimmer hands straight off to content (no black gap).
     BuildContentRows()
 end sub
 
-sub ShowSkeleton(show as boolean)
+' Hero poster has painted — drop the hero shimmer (rows shimmer is untouched).
+sub OnHeroPosterReady()
+    if m.hero = invalid or m.hero.posterReady <> true then return
+    bootMs = 0
+    if m.bootSpan <> invalid then bootMs = m.bootSpan.TotalMilliseconds()
+    print "[PERF] hero poster painted: "; bootMs; "ms from mount (perceived first-content latency)"
+    print "[HOME] hero poster ready -> hide hero shimmer"
+    if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
+    ShowHeroSkeleton(false)
+end sub
+
+' Safety net: never let the hero shimmer outlive the poster wait.
+sub OnSkeletonTimeout()
+    print "[HOME] hero skeleton timeout -> hide hero shimmer"
+    ShowHeroSkeleton(false)
+end sub
+
+sub ShowHeroSkeleton(show as boolean)
     if m.homeSkeleton = invalid then return
+    print "[HOME] ShowHeroSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
-    m.homeSkeleton.visible = show
-    m.homeSkeleton.running = show
+    m.homeSkeleton.heroRunning = show
+end sub
+
+sub ShowRowsSkeleton(show as boolean)
+    if m.homeSkeleton = invalid then return
+    print "[HOME] ShowRowsSkeleton("; show; ")"
+    m.homeSkeleton.boxColor = m.cNeutral800
+    m.homeSkeleton.rowsRunning = show
 end sub
 
 ' ── Content rows (parity with netflixContent.tsx row list) ───────────────────
@@ -387,11 +614,16 @@ sub BuildContentRows()
     m.rowIndex = 0
     m.cardIndex = 0
     m.rowsHost.visible = (m.contentRowCats.Count() > 0)
+    ' Render-build instrumentation: measure render-thread cost so optimization (e.g. lazy
+    ' row building) is driven by data, not guesswork. [PERF] tags are greppable.
+    m.rowBuildSpan = CreateObject("roTimespan")
+    m.rowBuildCostMs = 0
+    print "[HOME] BuildContentRows rows="; m.contentRowCats.Count()
 
+    ' Skeleton visibility is owned by OnHeroPosterReady / OnSkeletonTimeout, so we don't
+    ' toggle it here — rows build underneath and the shimmer drops once the hero paints.
     if m.contentRowCats.Count() > 0 then
         m.rowBuildTimer.control = "start"
-    else
-        ShowSkeleton(false)
     end if
 end sub
 
@@ -402,23 +634,47 @@ sub OnRowBuildTick()
     end if
 
     cat = m.contentRowCats[m.rowBuildIndex]
+    catName = ""
+    if cat <> invalid and cat.name <> invalid then catName = cat.name
+
+    ' Measure the render-thread cost of building this one row (node creation + card
+    ' population is the real Roku bottleneck — this is the number that matters).
+    span = CreateObject("roTimespan")
     row = m.rowsHost.createChild("ContentRow")
     ApplyThemeToRow(row)
     row.categoryData = cat
     row.translation = [0, m.rowBuildY]
     m.rowWidgets.Push(row)
+    rowMs = span.TotalMilliseconds()
+    if m.rowBuildCostMs = invalid then m.rowBuildCostMs = 0
+    m.rowBuildCostMs = m.rowBuildCostMs + rowMs
+    print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
+
+    ' Keep the rows shimmer up until the FIRST row (Continue Watching) is fully populated,
+    ' then hand off to a row that appears all at once (no one-by-one card stacking).
+    if m.rowBuildIndex = 0 then row.observeField("built", "OnFirstRowBuilt")
 
     m.rowBuildY = m.rowBuildY + HC_RowPitch()
     m.rowBuildIndex = m.rowBuildIndex + 1
 
-    ' First real row is on screen — drop the loading scaffold.
-    if m.rowBuildIndex = 1 then ShowSkeleton(false)
-
     if m.rowBuildIndex >= m.contentRowCats.Count() then
         m.rowBuildTimer.control = "stop"
+        wall = 0
+        if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
+        print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
     end if
 
     ApplyHomeFocus()
+end sub
+
+' The Continue Watching row finished populating — drop the shimmer so the shimmer hands
+' straight off to a fully-built row (cards reveal together, never one at a time).
+sub OnFirstRowBuilt()
+    print "[HOME] first row built -> hide rows shimmer + reveal hero behind cards"
+    ShowRowsSkeleton(false)
+    ' CW content has painted — drop the dark scrim so the hero bleeds behind the cards.
+    m.rowsRevealed = true
+    UpdateRowsScrim()
 end sub
 
 sub ClearContentRows()
@@ -435,7 +691,7 @@ sub ApplyHomeFocus()
     if m.rowsHost = invalid then return
 
     anchorY = HC_NetflixAnchorY() - (m.rowIndex * HC_RowPitch())
-    m.rowsHost.translation = [0, anchorY]
+    AnimateRowsHost(anchorY)
 
     for i = 0 to m.rowWidgets.Count() - 1
         row = m.rowWidgets[i]
@@ -447,6 +703,32 @@ sub ApplyHomeFocus()
             row.cardFocusIndex = m.cardIndex
         end if
     end for
+
+    UpdateRowsScrim()
+end sub
+
+' The dark content backdrop only blocks the hero while the rows are loading or the user
+' has scrolled past the first row. Once Continue Watching has painted and we're back at
+' the top row, it goes transparent so the hero poster/trailer bleeds behind the cards
+' (parity with the React layout where the hero shows through under the first row).
+sub UpdateRowsScrim()
+    transparent = m.rowsRevealed and (m.rowIndex <= 0)
+    op = 1.0
+    if transparent then op = 0.0
+    if m.rowsScrim <> invalid then m.rowsScrim.opacity = op
+    if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.opacity = op
+end sub
+
+' Smooth row pinning (parity with netflixContent.tsx 400ms translate).
+sub AnimateRowsHost(targetY as integer)
+    if m.rowsHost = invalid then return
+    fromY = m.rowsHost.translation[1]
+    if m.rowsAnim = invalid or m.rowsInterp = invalid or fromY = targetY then
+        m.rowsHost.translation = [0, targetY]
+        return
+    end if
+    m.rowsInterp.keyValue = [[0, fromY], [0, targetY]]
+    m.rowsAnim.control = "start"
 end sub
 
 sub ClampCardIndex()
@@ -491,14 +773,20 @@ sub OnKey()
     if AnyBootLoading() then return
 
     key = ev.key
+    print "[KEYDBG] OnKey key='"; key; "' zone='"; m.focusZone; "' heroFocus='"; m.heroFocus; "'"
 
     if m.focusZone = "header" then
         HandleHeaderKey(key)
         return
     end if
 
+    if m.focusZone = "hero" then
+        HandleHeroKey(key)
+        return
+    end if
+
     if m.rowWidgets.Count() = 0 then
-        if key = "up" then EnterHeader()
+        if key = "up" then EnterHeroOrHeader()
         return
     end if
 
@@ -519,7 +807,7 @@ sub OnKey()
             ClampCardIndex()
             ApplyHomeFocus()
         else
-            EnterHeader()
+            EnterHeroOrHeader()
         end if
     else if key = "down" then
         if m.rowIndex < LastRowIndex() then
@@ -530,8 +818,16 @@ sub OnKey()
             LoadMoreCategories()
         end if
     else if key = "OK" or key = "ok" then
-        ' Card navigation lands in feature/home-nav.
+        HandleCardSelection()
     end if
+end sub
+
+sub HandleCardSelection()
+    if m.rowIndex < 0 or m.rowIndex >= m.contentRowCats.Count() then return
+    row = CurrentRow()
+    if row = invalid then return
+    cat = m.contentRowCats[m.rowIndex]
+    NavigateHomeCardSelection(m.vm, cat, m.cardIndex, row.cardCount)
 end sub
 
 sub LoadMoreCategories()

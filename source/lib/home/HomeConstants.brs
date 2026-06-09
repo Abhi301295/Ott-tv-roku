@@ -49,3 +49,14 @@ end function
 function HC_HeroZoomSec() as float
     return 8.0
 end function
+
+' Delay before fetching/loading a slide's trailer (parity TRAILER_LOAD_DELAY 2500ms).
+function HC_HeroTrailerDelaySec() as float
+    return 2.5
+end function
+
+' Max time the loading skeleton waits for the hero poster to paint before it drops
+' anyway, so a slow/blocked image can never strand the shimmer on screen.
+function HC_HomeSkeletonMaxSec() as float
+    return 5.0
+end function

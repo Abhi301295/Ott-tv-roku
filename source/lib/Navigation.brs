@@ -42,9 +42,10 @@ function IsAuthenticatedForNav() as boolean
 end function
 
 function ExitApp(fromNode as object) as void
+    ' Scene has no close(); signal main.brs (which owns roSGScreen) to close instead.
     scene = fromNode.getScene()
-    if scene <> invalid then
-        scene.close()
+    if scene <> invalid and scene.hasField("exitChannel") then
+        scene.exitChannel = true
     end if
 end function
 

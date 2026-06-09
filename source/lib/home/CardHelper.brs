@@ -153,6 +153,42 @@ function TruncateHeroText(text as string, maxLen as integer) as string
     return Left(text, maxLen) + "..."
 end function
 
+' Mirror heroBannerCinematic formatRating(): always one decimal; .5 preserved,
+' otherwise rounded to the nearest whole number.
+function FormatHeroRating(rating as dynamic) as string
+    if rating = invalid then return ""
+    s = ""
+    if type(rating) = "roString" or type(rating) = "String" then
+        s = rating
+    else
+        s = Str(rating).Trim()
+    end if
+    if s = "" then return ""
+    v = Val(s)
+    frac = v - Int(v)
+    if Abs(frac - 0.5) < 0.001 then
+        whole = Int(v)
+        return whole.ToStr() + ".5"
+    end if
+    rounded = Int(v + 0.5)
+    return rounded.ToStr() + ".0"
+end function
+
+' Normalized 0–5 rating for star rendering (imdb is often 0–10).
+function HeroStarRating(rating as dynamic) as float
+    if rating = invalid then return 0.0
+    s = ""
+    if type(rating) = "roString" or type(rating) = "String" then
+        s = rating
+    else
+        s = Str(rating).Trim()
+    end if
+    if s = "" then return 0.0
+    v = Val(s)
+    if v > 5 then return v / 2.0
+    return v
+end function
+
 function FormatHeroGenres(item as object) as string
     if item = invalid or item.genres = invalid then return ""
     out = ""
