@@ -21,6 +21,7 @@ sub init()
     m.dividerTop = m.top.findNode("dividerTop")
     m.dividerBottom = m.top.findNode("dividerBottom")
     m.qrPad = m.top.findNode("qrPad")
+    m.qrGlow = m.top.findNode("qrGlow")
     m.qrSkeleton = m.top.findNode("qrSkeleton")
     m.qrErrorLabel = m.top.findNode("qrErrorLabel")
     m.qrImage = m.top.findNode("qrImage")
@@ -158,6 +159,7 @@ sub ApplyThemeColors()
 
     m.userCodeLabel.color = TC("neutral-50", "#f8f1f7")
     m.qrPad.blendColor = TC("neutral-50", "#f8f1f7")
+    if m.qrGlow <> invalid then m.qrGlow.blendColor = TC("primary-500", "#0092ff")
     m.qrErrorLabel.color = TC("primary-500", "#0b75e0")
     ' Error box — web: bg-primary-800/20, border-primary-500, text-primary-500
     m.formError.color = TC("primary-500", "#0b75e0")
@@ -364,11 +366,25 @@ sub SetLoginMode(mode as string)
 end sub
 
 sub ShowQrSkeleton(show as boolean)
-    m.qrSkeleton.visible = show
-    m.qrSkeleton.running = show
+    if m.qrSkeleton = invalid then return
     if show then
+        ' Parity with React's SkeletonBox (baseColor #ffffff, highlightColor #f3f3f3): a white
+        ' box that blends into the white QR pad, with a faint grey shimmer band. React sweeps a
+        ' moving gradient so the tiny delta still reads; our Skeleton pulses opacity (the sweep
+        ' was dropped to keep card shimmers cheap), so the grey highlight is nudged a touch
+        ' stronger (neutral-200) than React's #f3f3f3 to stay perceptible as a pulse.
+        m.qrSkeleton.baseColor = TC("neutral-50", "#f8f1f7")
+        m.qrSkeleton.highlightColor = TC("neutral-200", "#e5e5e5")
+        if m.qrSkeleton.hasField("animate") then m.qrSkeleton.animate = true
         m.qrImage.visible = false
         m.qrErrorLabel.visible = false
+        if m.qrGlow <> invalid then m.qrGlow.visible = true
+        m.qrSkeleton.visible = true
+        m.qrSkeleton.running = true
+    else
+        m.qrSkeleton.running = false
+        m.qrSkeleton.visible = false
+        if m.qrGlow <> invalid then m.qrGlow.visible = false
     end if
 end sub
 
