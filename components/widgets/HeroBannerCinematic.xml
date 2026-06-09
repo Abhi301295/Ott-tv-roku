@@ -48,11 +48,11 @@
       </Group>
     </Group>
 
-    <!-- Trailer video — top-level sibling (NOT inside a clipping group). A Roku Video
-         node composites on its own plane that ignores a parent clippingRect and renders
-         above sibling UI, which hides the arrow/mute focus rings. Kept here, below the
-         controls, sized to cover the full hero so it bleeds behind the header scrim. -->
-    <Video id="trailerVideo" width="1920" height="918" translation="[0, 0]"
+    <!-- Trailer video stays top-level: putting a Roku Video inside the clipped poster
+         group makes it render above the hero controls/focus rings. Shift it upward so
+         the moving frame starts behind the HomeHeader area instead of below it; the
+         rows scrim hides the lower overflow. -->
+    <Video id="trailerVideo" width="1920" height="1080" translation="[0, -160]"
       visible="false" opacity="0.0" mute="true" enableUI="false" />
 
     <!-- Smooth gradient vignettes (parity with the CSS linear-gradients). The TOP tint

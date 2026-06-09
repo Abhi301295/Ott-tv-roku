@@ -19,6 +19,7 @@ sub runWorker()
 
     m.curJob = invalid
     m.timer = invalid
+    m.lastAuthScheme = invalid
 
     ' Job observer + transfer are live; announce readiness so the pool can dispatch.
     ' Bumping `completed` is the pool's pump trigger (see HttpClient.OnWorkerCompleted).
@@ -82,9 +83,13 @@ sub BeginJob(job as object)
 
     headers = BuildDefaultHeaders()
     headers = ApplyAuthHeader(url, headers)
-    if headers["authorization"] = invalid or headers["authorization"] = "" then
-        headers.Delete("authorization")
-    end if
+    authHdr = ""
+    if headers["authorization"] <> invalid then authHdr = headers["authorization"]
+    if authHdr = "" then headers.Delete("authorization")
+    ' Login uses Basic auth; post-login APIs use Bearer. Reusing the same roUrlTransfer
+    ' across that boundary leaves a keep-alive connection the server bound to the wrong
+    ' credentials — recycle the transfer when the auth scheme changes.
+    EnsureTransferForAuth(authHdr)
 
     m.xfer.SetUrl(url)
     ' SetHeaders replaces the full header set, so a reused transfer never carries
@@ -168,3 +173,24 @@ function HttpWorkerBody(value as dynamic) as string
     if value = invalid then return ""
     return value
 end function
+
+function AuthScheme(authHdr as string) as string
+    if authHdr = invalid or authHdr = "" then return "none"
+    if Left(LCase(authHdr), 7) = "bearer " then return "bearer"
+    return "basic"
+end function
+
+' Drop and recreate roUrlTransfer when Authorization scheme changes (Basic login
+' warm-up vs Bearer select-profile). Without this, keep-alive reuses a connection the
+' API gateway already associated with the previous credentials.
+sub EnsureTransferForAuth(authHdr as string)
+    scheme = AuthScheme(authHdr)
+    if m.lastAuthScheme <> invalid and m.lastAuthScheme <> scheme then
+        print "[HTTP] " + m.top.id + " auth scheme " + m.lastAuthScheme + " -> " + scheme + " (recycling transfer)"
+        m.xfer = CreateObject("roUrlTransfer")
+        m.xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+        m.xfer.InitClientCertificates()
+        m.xfer.SetPort(m.port)
+    end if
+    m.lastAuthScheme = scheme
+end sub

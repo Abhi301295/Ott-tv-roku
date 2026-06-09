@@ -216,12 +216,11 @@ sub ApplySlides()
             m.activePoster.scale = [1.0, 1.0]
             m.activePoster.translation = [0, 0]
             m.activePoster.visible = true
-            ' Same URI may already be decoded from the next layer — finish immediately
-            ' without waiting for a loadStatus event that may never fire.
-            if m.activePoster.loadStatus = "ready" then
-                FinishCrossfadeLanding()
-                return
-            end if
+            ' Do NOT read loadStatus synchronously here: right after assigning a new .uri
+            ' it still reports the PREVIOUS image's "ready", so finishing now would reveal
+            ' the OLD poster for a frame before the new one decodes (the auto-advance
+            ' flash). Wait for OnActivePosterLoad to fire "ready" for the NEW uri — until
+            ' then the next layer keeps showing the correct (new) image.
         end if
         ' Hold the upcoming-slide preload until the swap (the next layer must keep showing
         ' the current image, not the one after it).
@@ -563,14 +562,13 @@ sub GoToSlide(targetIndex as integer)
     if targetIndex < 0 or targetIndex >= ItemCount() then return
     if targetIndex = m.activeIndex then return
     m.fadeTargetIndex = targetIndex
-    ' Counter, bars, and meta update immediately on navigation (parity: React's
-    ' activeIndex drives the "01 / 04" label as soon as the user clicks, not after the
-    ' 1.2s crossfade settles).
+    ' Counter + progress bars update immediately on navigation (parity: the "01 / 04"
+    ' label and active bar track the click, not the 1.2s crossfade). The META text is
+    ' intentionally NOT animated here — it animates exactly once after the crossfade
+    ' settles (OnFadeAnimState), so the title/desc never play their entrance twice.
     m.activeIndex = targetIndex
     UpdateCounter()
     BuildBars()
-    ApplyMeta()
-    PlayMetaEntrance()
     ' The preloaded next layer holds the auto-advance image; for an explicit jump (e.g.
     ' previous) repoint it at the chosen slide before revealing it in the crossfade.
     if m.nextPoster <> invalid then
@@ -602,24 +600,22 @@ sub OnFadeAnimState()
     if not m.isFading then return
 
     count = ItemCount()
-    if count > 0 then
-        target = m.fadeTargetIndex
-        if target < 0 or target >= count then target = (m.activeIndex + 1) mod count
-        ' activeIndex was already advanced in GoToSlide (counter/meta/bars too); only
-        ' reconcile here if the fade was started without GoToSlide (shouldn't happen).
-        if m.activeIndex <> target then
-            m.activeIndex = target
-            UpdateCounter()
-            BuildBars()
-            ApplyMeta()
-            PlayMetaEntrance()
-        end if
+    target = m.fadeTargetIndex
+    if count > 0 and (target < 0 or target >= count) then target = (m.activeIndex + 1) mod count
+    ' activeIndex/counter/bars were already advanced in GoToSlide; reconcile only if the
+    ' fade somehow started without it (defensive — shouldn't happen).
+    if count > 0 and m.activeIndex <> target then
+        m.activeIndex = target
+        UpdateCounter()
+        BuildBars()
     end if
     m.fadeTargetIndex = -1
     m.isFading = false
     m.crossfadeLanding = true
     ApplySlides()
-    ' Meta was reset to opacity 0 in BeginCrossfade — replay entrance after the swap.
+    ' The meta was hidden (opacity 0) for the whole crossfade; set the new slide's text
+    ' and play its entrance ONCE here — the only place the title/desc animate per slide.
+    ApplyMeta()
     PlayMetaEntrance()
     if m.top.visible then ScheduleTrailer()
 end sub
@@ -784,6 +780,7 @@ sub OnTrailerState()
         if not m.isVideoPlaying then
             m.isVideoPlaying = true
             m.top.trailerPlaying = true
+            print "[HEROVID] trailer playing with upward placement [0,-160,1920,1080]"
             ' Show the video node only once frames are ready — keeps poster visible while
             ' buffering and prevents the black Video rectangle from occluding it.
             if m.trailerVideo <> invalid then m.trailerVideo.visible = true

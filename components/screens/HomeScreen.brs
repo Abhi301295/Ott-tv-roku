@@ -54,7 +54,10 @@ sub init()
 
     ' Hero shimmer hides once the hero poster actually paints, with a safety timeout so
     ' a slow/blocked image can never strand it.
-    if m.hero <> invalid then m.hero.observeField("posterReady", "OnHeroPosterReady")
+    if m.hero <> invalid then
+        m.hero.observeField("posterReady", "OnHeroPosterReady")
+        m.hero.observeField("trailerPlaying", "OnHeroTrailerPlayingChanged")
+    end if
     m.skeletonTimeout = CreateObject("roSGNode", "Timer")
     m.skeletonTimeout.duration = HC_HomeSkeletonMaxSec()
     m.skeletonTimeout.repeat = false
@@ -183,6 +186,7 @@ sub SetupHeader()
 
     ApplyHeaderTheme()
     ApplyHeaderBranding()
+    UpdateHeaderScrimForHero()
 end sub
 
 sub ApplyHeaderTheme()
@@ -207,6 +211,24 @@ sub ApplyHeaderBranding()
     if resolved = invalid then return
     if resolved.brandingLogo <> invalid then m.header.logoUri = resolved.brandingLogo
     if resolved.appName <> invalid then m.header.appName = resolved.appName
+end sub
+
+sub OnHeroTrailerPlayingChanged()
+    UpdateHeaderScrimForHero()
+end sub
+
+sub UpdateHeaderScrimForHero()
+    if m.header = invalid then return
+    playing = (m.hero <> invalid and m.hero.trailerPlaying = true)
+    ' Home hero media must sit visually behind the header/nav like LG. Do not restore a
+    ' black header band for the static poster either, otherwise the media appears to start
+    ' below the header (the red-line issue).
+    m.header.scrimOpacity = 0.0
+    if playing then
+        print "[HEROVID] trailer playing -> transparent header scrim"
+    else
+        print "[HEROVID] trailer idle -> transparent header scrim"
+    end if
 end sub
 
 sub EnterHeader()

@@ -72,7 +72,9 @@ sub init()
 
     ' Pre-open keep-alive connections on the rest of the pool while the user picks a
     ' profile, so the home screen's burst of requests right after select are all warm.
-    WarmHttpConnections()
+    ' MUST use a Bearer path (same auth as select-profile). CHECK_UPDATE uses Basic auth
+    ' and poisons the pooled connection — select-profile then 404s until app reload.
+    WarmHttpConnections(Endpoints().PROFILE.GET_LOGIN_PROFILES)
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────

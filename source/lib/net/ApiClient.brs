@@ -28,10 +28,15 @@ function GetHttpClient() as object
 end function
 
 ' Pre-open keep-alive connections on every pooled worker so the next screen's
-' requests skip the TLS handshake. Safe to call from idle moments (e.g. profile screen).
-function WarmHttpConnections() as void
+' requests skip the TLS handshake. Pass a Bearer-auth path on post-login screens
+' (e.g. GET_LOGIN_PROFILES). Default CHECK_UPDATE uses Basic auth and must NOT be
+' warmed after login — it poisons the pool and select-profile 404s until reload.
+function WarmHttpConnections(path = "" as string) as void
     client = GetHttpClient()
-    if client <> invalid then client.callFunc("WarmAll", Endpoints().LOGIN.CHECK_UPDATE)
+    if client = invalid then return
+    warmPath = path
+    if warmPath = "" then warmPath = Endpoints().LOGIN.CHECK_UPDATE
+    client.callFunc("WarmAll", warmPath)
 end function
 
 function ApiGet(path as string) as object

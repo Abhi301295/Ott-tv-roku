@@ -64,6 +64,12 @@ sub OnThemeChanged()
     ApplyFocus()
 end sub
 
+sub OnScrimOpacityChanged()
+    if m.scrim = invalid then return
+    m.scrim.opacity = m.top.scrimOpacity
+    print "[HEROVID] header scrim opacity="; m.top.scrimOpacity
+end sub
+
 sub OnAvatarChanged()
     if m.avatarImg = invalid then return
     uri = m.top.avatarUri
