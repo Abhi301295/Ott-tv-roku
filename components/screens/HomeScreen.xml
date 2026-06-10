@@ -20,6 +20,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />

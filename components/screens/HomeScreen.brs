@@ -61,6 +61,30 @@ sub init()
 
     m.vm = FindViewManager(m.top)
 
+    ' Select-profile runs on Home (behind the shimmer) so the profile screen can navigate
+    ' here instantly — no full-screen loader. The chosen profile id + avatar arrive via
+    ' navState, which ViewManager assigns AFTER init() returns, so the boot sequence is
+    ' deferred to OnNavStateReady (see TryStartHomeBoot).
+    m.pendingSelectId = ""
+    m.pendingSelectAvatar = ""
+    m.bootStarted = false
+    m.selectInFlight = false
+    m.selectRetriesLeft = 0
+    m.SELECT_MAX_RETRIES = 8
+    m.selectRetryTimer = CreateObject("roSGNode", "Timer")
+    m.selectRetryTimer.duration = 0.5
+    m.selectRetryTimer.repeat = false
+    m.top.appendChild(m.selectRetryTimer)
+    m.selectRetryTimer.observeField("fire", "OnHomeSelectRetry")
+    ' Hard ceiling so a hung select (one that never posts a response) can't strand the
+    ' user on an endless shimmer — on fire we surface an error and return to profiles.
+    m.selectWatchdog = CreateObject("roSGNode", "Timer")
+    m.selectWatchdog.duration = HC_SelectWatchdogSec()
+    m.selectWatchdog.repeat = false
+    m.top.appendChild(m.selectWatchdog)
+    m.selectWatchdog.observeField("fire", "OnSelectWatchdog")
+    m.top.observeField("navState", "OnNavStateReady")
+
     LoadThemeTokens()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
@@ -82,10 +106,37 @@ sub init()
 
     SetupHeader()
     EnterHeader()
+    ' Boot (redirect check, shimmer, API calls) waits for navState — see OnNavStateReady.
+end sub
 
-    if GetProfileId() = "" then
+' ViewManager assigns navState after init(); consume it once and start the boot sequence.
+sub OnNavStateReady()
+    TryStartHomeBoot()
+end sub
+
+sub ConsumeHomeNavState()
+    ns = m.top.navState
+    if ns = invalid then return
+    if ns.selectProfileId <> invalid then m.pendingSelectId = ns.selectProfileId
+    if ns.selectAvatar <> invalid then m.pendingSelectAvatar = ns.selectAvatar
+end sub
+
+sub TryStartHomeBoot()
+    if m.bootStarted then return
+    ConsumeHomeNavState()
+    m.bootStarted = true
+
+    ' A pending select (from the profile screen) sets the profile id itself once it
+    ' succeeds, so don't bounce back to the picker just because it isn't persisted yet.
+    if GetProfileId() = "" and m.pendingSelectId = "" then
         RedirectToProfiles()
         return
+    end if
+
+    ' Paint the chosen avatar immediately so switching profiles never flashes the previous
+    ' profile's image in the header while select-profile is still in flight.
+    if m.pendingSelectId <> "" and m.pendingSelectAvatar <> "" and m.header <> invalid then
+        m.header.avatarUri = m.pendingSelectAvatar
     end if
 
     ' Both regions shimmer immediately on mount; they reveal independently as their data
@@ -107,6 +158,12 @@ sub OnDispose()
     if m.hero <> invalid then m.hero.visible = false
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
+    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
+    ' Drop the in-flight select task so a late apiResult can't fire a handler on this
+    ' (now removed) screen — the handlers also guard on m.top.dispose defensively.
+    m.selectInFlight = false
+    m.selectTask = invalid
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────
@@ -436,6 +493,17 @@ end sub
 ' ── Boot sequence (parity with features/home/index.tsx) ──────────────────────
 
 sub StartBootSequence()
+    ' If the profile screen handed us a pending profile, establish the session first
+    ' (select-profile, behind the shimmer). Content boot only fires once the token lands.
+    if m.pendingSelectId <> "" then
+        print "[HOME] pending select-profile -> running behind shimmer"
+        DoHomeSelect()
+        return
+    end if
+    BootHomeContent()
+end sub
+
+sub BootHomeContent()
     ' The profile was just selected on the previous screen, so the active profile
     ' identity is already persisted — only re-fetch profiles if it is somehow missing
     ' (parity intent: avoid a redundant GET_LOGIN_PROFILES on every home mount).
@@ -449,6 +517,92 @@ sub StartBootSequence()
     FetchContinueWatching()
     FetchHomeCategories(m.page)
     FetchLatestVersion()
+end sub
+
+' ── Select-profile (runs on Home so the profile screen can navigate here instantly) ──
+' POST select-profile, retrying a few times on transient 401/404 (a freshly-issued token
+' is briefly not yet active on the backend). On success: persist identity + boot content.
+' On give-up: surface a toast and return to the picker — never log the user out for a
+' transient failure (only a real 403 session-expiry, handled by HandleSessionExpiry, does).
+sub DoHomeSelect()
+    m.selectInFlight = true
+    m.selectRetriesLeft = m.SELECT_MAX_RETRIES
+    if m.selectWatchdog <> invalid then
+        m.selectWatchdog.control = "stop"
+        m.selectWatchdog.control = "start"
+    end if
+    ' Re-open a keep-alive connection to the (Bearer-auth) select endpoint: the profile
+    ' screen warmed the pool, but a long auto-select wait can let that socket idle out, so
+    ' the POST would otherwise pay a fresh TLS handshake. SelectProfilePath() is post-login
+    ' Bearer here, so this never poisons the pool with Basic-auth (see WarmHttpConnections).
+    WarmHttpConnections(SelectProfilePath())
+    FireHomeSelectRequest()
+end sub
+
+sub FireHomeSelectRequest()
+    path = SelectProfilePath()
+    m.selectTask = ApiPost(path, SelectProfilePayload(m.pendingSelectId))
+    m.selectTask.observeField("apiResult", "OnHomeSelectResponse")
+    StartHttpTask(m.selectTask)
+end sub
+
+sub OnHomeSelectRetry()
+    if m.top.dispose = true then return
+    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    print "[HOME] retrying select-profile (retriesLeft="; m.selectRetriesLeft; ")"
+    FireHomeSelectRequest()
+end sub
+
+sub OnHomeSelectResponse()
+    ' A late apiResult after the screen left the tree must not mutate auth/navigation.
+    if m.top.dispose = true then return
+    if m.selectTask = invalid then return
+    api = m.selectTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
+
+    if api.ok and ApplySelectProfileTokens(api.result) then
+        PersistSelectedProfile(m.pendingSelectId, m.pendingSelectAvatar)
+        m.pendingSelectId = ""
+        m.selectInFlight = false
+        if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
+        print "[HOME] select-profile ok -> boot home content"
+        BootHomeContent()
+        return
+    end if
+
+    if SelectProfileRetriable(api.httpStatus) and m.selectRetriesLeft > 0 then
+        m.selectRetriesLeft = m.selectRetriesLeft - 1
+        print "[HOME] select-profile failed (httpStatus="; api.httpStatus; ") -> retry, left="; m.selectRetriesLeft
+        if m.selectRetryTimer <> invalid then
+            m.selectRetryTimer.control = "stop"
+            m.selectRetryTimer.control = "start"
+        else
+            FireHomeSelectRequest()
+        end if
+        return
+    end if
+
+    print "[HOME] select-profile giving up (httpStatus="; api.httpStatus; ") -> back to profiles"
+    SelectFailedToProfiles()
+end sub
+
+' Transient/exhausted select failure: keep the user logged in, tell them, and send them
+' back to the profile picker so they can retry. (Auth is only cleared on a real 403.)
+sub SelectFailedToProfiles()
+    m.selectInFlight = false
+    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
+    ShowAlert(m.top, 2, MsgFailedSelectProfile())
+    RedirectToProfiles()
+end sub
+
+' Safety net for a select that never resolves (hung socket, no apiResult ever posted).
+sub OnSelectWatchdog()
+    if m.top.dispose = true then return
+    if not m.selectInFlight then return
+    print "[HOME] select-profile watchdog fired -> back to profiles"
+    SelectFailedToProfiles()
 end sub
 
 ' Subscription/badge flags the home tree reads are static placeholders (same values
@@ -467,6 +621,7 @@ sub FetchProfilesBootstrap()
 end sub
 
 sub OnProfilesBootstrapResponse()
+    if m.top.dispose = true then return
     if m.profilesTask = invalid then return
     api = m.profilesTask.apiResult
     if api = invalid then return
@@ -665,9 +820,9 @@ sub OnHeroPosterReady()
     ShowHeroSkeleton(false)
 end sub
 
-' Safety net: never let the hero shimmer outlive the poster wait.
+' Safety net: never let the hero shimmer outlive the wait.
 sub OnSkeletonTimeout()
-    print "[HOME] hero skeleton timeout -> hide hero shimmer"
+    print "[HOME] hero skeleton timeout -> hide shimmer"
     ShowHeroSkeleton(false)
 end sub
 
