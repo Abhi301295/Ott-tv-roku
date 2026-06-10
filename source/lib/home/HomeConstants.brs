@@ -61,6 +61,14 @@ function HC_HomeSkeletonMaxSec() as float
     return 5.0
 end function
 
+' Hard ceiling for the on-home select-profile step. The retry loop already bounds the
+' common 401/404 case, but a request that never posts a response (hung socket) would
+' otherwise strand the user on an endless shimmer — when this fires we surface an error
+' and return to the profile picker. Sized above the worst-case retry budget.
+function HC_SelectWatchdogSec() as float
+    return 12.0
+end function
+
 ' How long row building may wait for the hero trailer to go live before it builds
 ' anyway. The hero schedules its trailer ~2.5s after the poster paints, so this gives
 ' the preview the render thread first; if a slide has no trailer, rows still appear

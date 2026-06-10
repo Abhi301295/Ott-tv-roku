@@ -64,27 +64,9 @@
       shapeUri="pkg:/images/ui/btn_logout.png" shadowUri="pkg:/images/ui/btn_logout_shadow.png"
       fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="20" visible="false" />
 
-    <!-- Full-screen loader shown after selecting a profile while navigating home.
-         Parity with React <Spinner/>: a centered ring (white with a primary-600
-         bottom arc) spinning above a "Loading" label, over the dark app background. -->
-    <Group id="loaderOverlay" visible="false">
-      <Rectangle width="1920" height="1080" color="0x141414ff" />
-      <BusySpinner id="selectSpinner" translation="[936, 486]" spinInterval="1">
-        <Poster role="poster" uri="pkg:/images/ui/loader_spinner.png" width="48" height="48" />
-      </BusySpinner>
-      <Label id="loadingLabel" text="Loading" translation="[760, 548]" width="400" height="32"
-        horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
-        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
-      </Label>
-    </Group>
-
     <ConfirmPopup id="confirmPopup" visible="false" />
     <OtpPopup id="otpPopup" visible="false" />
 
     <Timer id="autoSelectTimer" duration="0.1" repeat="true" />
-    <!-- Retries select-profile after a short delay: a freshly-issued login token is
-         briefly not yet active on the backend, so the first select-profile can 401/404.
-         A short wait + retry lets the session settle (mirrors "reload makes it work"). -->
-    <Timer id="selectRetryTimer" duration="0.5" repeat="false" />
   </children>
 </component>
