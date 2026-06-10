@@ -4,8 +4,6 @@ sub init()
     m.skeletonGroup = m.top.findNode("skeletonGroup")
     m.profilesContainer = m.top.findNode("profilesContainer")
     m.logoutBtn = m.top.findNode("logoutBtn")
-    m.loaderOverlay = m.top.findNode("loaderOverlay")
-    m.selectSpinner = m.top.findNode("selectSpinner")
     m.confirmPopup = m.top.findNode("confirmPopup")
     m.otpPopup = m.top.findNode("otpPopup")
     m.autoSelectTimer = m.top.findNode("autoSelectTimer")
@@ -20,7 +18,6 @@ sub init()
     m.focusArea = "profiles"   ' "profiles" | "logout"
     m.profileIndex = 0
     m.selectedProfile = invalid
-    m.pendingProfileId = ""
     m.popup = ""               ' "" | "confirm" | "otp"
     m.selecting = false
     m.loggingOut = false
@@ -57,11 +54,6 @@ sub init()
 
     m.top.observeField("keyEvent", "OnKey")
     m.autoSelectTimer.observeField("fire", "OnAutoTick")
-    m.selectRetryTimer = m.top.findNode("selectRetryTimer")
-    if m.selectRetryTimer <> invalid then m.selectRetryTimer.observeField("fire", "OnSelectRetryFire")
-    ' How many times select-profile may be retried before surfacing the error toast.
-    m.selectRetriesLeft = 0
-    m.SELECT_MAX_RETRIES = 8
     m.confirmPopup.observeField("action", "OnConfirmAction")
     m.otpPopup.observeField("submitted", "OnOtpSubmitted")
     m.otpPopup.observeField("action", "OnOtpAction")
@@ -185,13 +177,6 @@ sub ShowLoading(show as boolean)
         if sk <> invalid then sk.running = show
     end for
     m.profilesContainer.visible = not show
-end sub
-
-' Rounded loader shown while a profile is being selected.
-sub ShowSelectLoader(show as boolean)
-    m.selecting = show
-    m.loaderOverlay.visible = show
-    m.selectSpinner.visible = show
 end sub
 
 sub ShowProfileError(msg as string)
@@ -474,80 +459,27 @@ sub SelectProfile(profile as object)
 end sub
 
 sub DoSelectProfile(profileId as string)
-    ' Guard against a second trigger (auto-select tick racing a manual press, or a
-    ' double press) starting another select + navigation, which mounts Home twice.
+    ' Guard against a second trigger (auto-select tick racing a manual press, or a double
+    ' press) starting another navigation, which would mount Home twice.
     if m.selecting then return
     m.selecting = true
     StopAutoSelect()
-    ShowSelectLoader(true)
-    m.pendingProfileId = profileId
-    m.selectRetriesLeft = m.SELECT_MAX_RETRIES
-    FireSelectProfileRequest()
-end sub
-
-' Issues the select-profile POST for m.pendingProfileId. Split out so a retry can
-' re-fire the same request after the session-settle delay without re-running guards.
-sub FireSelectProfileRequest()
-    path = SelectProfilePath()
-    m.selectTask = ApiPost(path, SelectProfilePayload(m.pendingProfileId))
-    m.selectTask.observeField("apiResult", "OnSelectResponse")
-    StartHttpTask(m.selectTask)
-end sub
-
-sub OnSelectRetryFire()
-    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
-    if not m.selecting then return
-    print "[SELECTDBG] retrying select-profile (retriesLeft="; m.selectRetriesLeft; ")"
-    FireSelectProfileRequest()
-end sub
-
-sub OnSelectResponse()
-    if m.selectTask = invalid then return
-    api = m.selectTask.apiResult
-    if api = invalid then return
-
-    if HandleSessionExpiry(m.top, api) then return
-
-    if api.ok and ApplySelectProfileTokens(api.result) then
-        ShowSelectLoader(false)
-        SetProfileId(m.pendingProfileId)
-        ' Persist the CHOSEN profile's avatar so the home header shows it (SaveProfilesMeta
-        ' only ever stores the first profile's avatar; without this the header is stuck on
-        ' profile #1's image no matter who is selected).
-        if m.selectedProfile <> invalid and m.selectedProfile.avatar <> invalid then
-            SetValueByKey(SK_Avatar(), m.selectedProfile.avatar, "app")
-            print "[AVATARDBG] persisted selected avatar='"; m.selectedProfile.avatar; "' for profile id='"; m.pendingProfileId; "'"
-        else
-            print "[AVATARDBG] no avatar on selected profile (selectedProfile invalid="; (m.selectedProfile = invalid); ")"
-        end if
-        NavigateHome()
-        return
+    ' Navigate to Home immediately and hand off the chosen profile + avatar; Home
+    ' establishes the session (select-profile) behind its shimmer, so there is no
+    ' full-screen loader on this screen.
+    avatar = ""
+    if m.selectedProfile <> invalid and m.selectedProfile.avatar <> invalid then avatar = m.selectedProfile.avatar
+    SetValueByKey(SK_SelectedItem(), "Home", "app")
+    if m.vm <> invalid then
+        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
+    else
+        ' Navigation unavailable — don't leave the screen permanently locked behind the
+        ' m.selecting guard; surface an error and let the user try again.
+        m.selecting = false
+        ShowAlert(m.top, 2, MsgFailedSelectProfile())
+        ResetAutoSelect()
+        ApplyProfileFocus()
     end if
-
-    ' A freshly-issued login token is briefly not yet active on the backend, so the
-    ' first select-profile attempt(s) can come back 401/404. Retry a few times after a
-    ' short delay before surfacing the error (mirrors the user's "reload makes it work").
-    httpStatus = api.httpStatus
-    retriable = (httpStatus = 401 or httpStatus = 404 or httpStatus <= 0)
-    if retriable and m.selectRetriesLeft > 0 then
-        m.selectRetriesLeft = m.selectRetriesLeft - 1
-        print "[SELECTDBG] select-profile failed (httpStatus="; httpStatus; ") -> scheduling retry, retriesLeft="; m.selectRetriesLeft
-        if m.selectRetryTimer <> invalid then
-            m.selectRetryTimer.control = "stop"
-            m.selectRetryTimer.control = "start"
-        else
-            FireSelectProfileRequest()
-        end if
-        return
-    end if
-
-    ' Retries exhausted (or non-retriable failure): toast + let the user retry manually.
-    print "[SELECTDBG] select-profile giving up (httpStatus="; httpStatus; ")"
-    ShowSelectLoader(false)
-    m.selecting = false
-    ShowAlert(m.top, 2, MsgFailedSelectProfile())
-    ResetAutoSelect()
-    ApplyProfileFocus()
 end sub
 
 ' ── Logout ───────────────────────────────────────────────────────────────────
@@ -674,9 +606,3 @@ sub OnOverlayDismiss()
     end if
 end sub
 
-' ── Navigation ───────────────────────────────────────────────────────────────
-
-sub NavigateHome()
-    SetValueByKey(SK_SelectedItem(), "Home", "app")
-    if m.vm <> invalid then m.vm.callFunc("NavigateReplace", RouteHome(), {})
-end sub
