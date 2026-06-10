@@ -23,6 +23,10 @@
     <!-- Shell-only row: title + cardCount are set, card nodes build on Materialize(). -->
     <function name="PrepareShell" />
     <function name="Materialize" />
+    <!-- Pause/resume progressive card building so user input never competes with node
+         creation on the single render thread (called by HomeScreen on key activity). -->
+    <function name="PauseBuild" />
+    <function name="ResumeBuild" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />

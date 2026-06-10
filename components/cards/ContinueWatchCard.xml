@@ -22,7 +22,11 @@
       <Skeleton id="skeleton" boxWidth="540" boxHeight="286" />
       <Poster id="thumb" width="540" height="286" loadWidth="540" loadHeight="286" loadDisplayMode="scaleToFill" visible="false" />
       <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0x0a0a0aff" />
-      <Rectangle id="progressFill" translation="[0, 278]" width="0" height="8" color="0x0760bbff" />
+      <!-- 3-segment fill approximates React's from-primary-500 via-600 to-700 gradient
+           while staying theme-token driven (widths/colors set in code). -->
+      <Rectangle id="progressFillA" translation="[0, 278]" width="0" height="8" color="0x0b75e0ff" />
+      <Rectangle id="progressFillB" translation="[0, 278]" width="0" height="8" color="0x0760bbff" />
+      <Rectangle id="progressFillC" translation="[0, 278]" width="0" height="8" color="0x04478bff" />
       <!-- Simulator-safe rounding: MaskGroup is not honored here, so these tuned corner
            covers hide the square thumbnail/progress corners while the row background remains
            transparent. Color matches the hero bottom vignette to avoid hard black notches. -->
@@ -35,10 +39,7 @@
       <Poster id="maskBR" uri="pkg:/images/ui/round_mask_br.png" translation="[528, 274]"
         width="12" height="12" />
     </Group>
-    <!-- Rounded, even 3px focus frame (primitive edges + corner sprites) on top of the body
-         (parity radius-10 + 3px primary border on the selected card). Outer 546×292 =
-         540×286 + 3px each side. -->
-    <FocusFrame id="focusBorder" translation="[0, 0]" boxWidth="546" boxHeight="292"
-      color="0x0b75e0ff" visible="false" />
+    <!-- Focus frame (546×292 = 540×286 + 3px each side) is created lazily on first focus
+         (see ApplyFocusVisual) so it isn't built for every card during the row build burst. -->
   </children>
 </component>

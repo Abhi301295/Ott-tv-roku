@@ -97,8 +97,8 @@ end function
 function CardComponentWidth(compName as string, orientation = "" as string) as integer
     if compName = "HorizontalCard" then return 556
     if compName = "ContinueWatchCard" then return 556
-    if compName = "NumberedVerticalCard" then return 422
-    if compName = "VerticalCard" then return 256
+    if compName = "NumberedVerticalCard" then return 392
+    if compName = "VerticalCard" then return 236
     if compName = "BannerCard" then return 1776
     if compName = "SeeAllCard" then
         if orientation = HC_CardTypeHorizontal() then return 546

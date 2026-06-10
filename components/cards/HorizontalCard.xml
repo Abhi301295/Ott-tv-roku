@@ -18,8 +18,6 @@
       <Skeleton id="skeleton" boxWidth="540" boxHeight="312" />
       <Poster id="thumb" width="540" height="312" loadWidth="540" loadHeight="312" loadDisplayMode="scaleToFill" visible="false" />
     </Group>
-    <!-- Rounded, even 3px focus frame (primitive edges + corner sprites) on top of the body. -->
-    <FocusFrame id="focusBorder" translation="[0, 0]" boxWidth="546" boxHeight="318"
-      color="0x0b75e0ff" visible="false" />
+    <!-- Focus frame (546×318) is created lazily on first focus — see ApplyFocusVisual. -->
   </children>
 </component>

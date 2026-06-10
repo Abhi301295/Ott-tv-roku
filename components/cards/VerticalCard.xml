@@ -16,11 +16,13 @@
 
   <children>
     <Group id="body" translation="[3, 3]">
-      <Skeleton id="skeleton" boxWidth="240" boxHeight="300" />
-      <Poster id="thumb" width="240" height="300" loadWidth="240" loadHeight="300" loadDisplayMode="scaleToFill" visible="false" />
+      <Skeleton id="skeleton" boxWidth="220" boxHeight="300" />
+      <Poster id="thumb" width="220" height="300" loadWidth="220" loadHeight="300" loadDisplayMode="scaleToFill" visible="false" />
+      <!-- Grey veil over the poster — parity with verticalCard.tsx linear-gradient(0deg,
+           rgba(40,40,40,.6) bottom -> rgba(120,120,120,.1) top). Sized in code. -->
+      <Poster id="veil" width="220" height="300" loadDisplayMode="scaleToFill"
+        uri="pkg:/images/ui/card_veil_vertical.png" />
     </Group>
-    <!-- Rounded, even 3px focus frame (primitive edges + corner sprites); size set in code. -->
-    <FocusFrame id="focusBorder" translation="[0, 0]" boxWidth="246" boxHeight="306"
-      color="0x0b75e0ff" visible="false" />
+    <!-- Focus frame (226×306) is created lazily on first focus — see ApplyFocusVisual. -->
   </children>
 </component>

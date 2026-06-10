@@ -1,5 +1,5 @@
 sub init()
-    m.focusBorder = m.top.findNode("focusBorder")
+    m.focusBorder = invalid
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
     m.thumb.observeField("loadStatus", "OnThumbLoad")
@@ -11,7 +11,7 @@ sub OnDataChanged()
 end sub
 
 sub OnFocusChanged()
-    CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
+    ApplyFocusVisual()
 end sub
 
 sub OnThemeChanged()
@@ -36,5 +36,10 @@ sub ApplyAll()
         m.skeleton.running = true
         CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
     end if
+    ApplyFocusVisual()
+end sub
+
+sub ApplyFocusVisual()
+    m.focusBorder = CardEnsureFocusFrame(m.top, m.focusBorder, 0, 0, 546, 318, m.top.cPrimary500)
     CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
 end sub

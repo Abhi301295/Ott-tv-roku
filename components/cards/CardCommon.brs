@@ -1,5 +1,21 @@
 ' Shared focus ring + poster load handling for home card widgets.
 
+' Lazily create a card's focus frame only when it is first needed (i.e. the card becomes
+' focused), instead of building all 9 frame nodes for every card up-front. During a row's
+' build burst no card is focused, so this removes the single biggest per-card node cost from
+' the hot path; the frame is created once on first focus and reused thereafter. Appearance is
+' identical to the previous XML-declared frame.
+function CardEnsureFocusFrame(card as object, existing as object, offX as float, offY as float, w as float, h as float, color as string) as object
+    if existing <> invalid then return existing
+    if card = invalid then return invalid
+    frame = card.createChild("FocusFrame")
+    frame.translation = [offX, offY]
+    frame.boxWidth = w
+    frame.boxHeight = h
+    if color <> invalid and color <> "" then frame.color = color
+    return frame
+end function
+
 sub CardApplyFocusBorder(border as object, focused as boolean, color as string)
     if border = invalid then return
     border.visible = focused

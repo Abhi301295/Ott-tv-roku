@@ -92,6 +92,16 @@ sub init()
 
     m.top.observeField("keyEvent", "OnKey")
 
+    ' Input-priority: any keypress pauses background row/card building so node creation never
+    ' competes with the user's interaction on the single render thread; building resumes a
+    ' short, repeatedly-reset idle window after the last key, so it never lags interaction.
+    m.interacting = false
+    m.interactIdle = CreateObject("roSGNode", "Timer")
+    m.interactIdle.duration = 0.25
+    m.interactIdle.repeat = false
+    m.top.appendChild(m.interactIdle)
+    m.interactIdle.observeField("fire", "OnInteractIdle")
+
     ' Hero shimmer hides once the hero poster actually paints, with a safety timeout so
     ' a slow/blocked image can never strand it.
     if m.hero <> invalid then
@@ -160,6 +170,7 @@ sub OnDispose()
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
     if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
+    if m.interactIdle <> invalid then m.interactIdle.control = "stop"
     ' Drop the in-flight select task so a late apiResult can't fire a handler on this
     ' (now removed) screen — the handlers also guard on m.top.dispose defensively.
     m.selectInFlight = false
@@ -675,8 +686,13 @@ sub OnContinueWatchingResponse()
 end sub
 
 sub FetchHomeCategories(pageNum as integer)
+    ' PARITY: the LG app calls getHomeCategory with a { page, limit } payload, but its
+    ' getDataApi forwards only `params` to axios (never `data`), so page/limit are dropped
+    ' and the real request is a bare GET /contents/home. The backend returns a different
+    ' curated home payload when page/limit ARE present, which made our rows/items diverge
+    ' from LG. Send the identical param-less request so the content mapping matches exactly.
     path = Endpoints().HOME.CATEGORY_LIST
-    m.categoryTask = ApiGetQuery(path, HomeCategoryQuery(pageNum))
+    m.categoryTask = ApiGet(path)
     m.categoryTask.observeField("apiResult", "OnHomeCategoriesResponse")
     StartHttpTask(m.categoryTask)
 end sub
@@ -690,25 +706,78 @@ sub OnHomeCategoriesResponse()
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
         print "[HOME] home categories response ok, categories="; listing.Count()
+        LogCategoryMapping(listing)
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
-            m.hasMore = true
-        else
-            m.hasMore = false
         end if
     else
         print "[HOME] home categories response failed/empty"
-        m.hasMore = false
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
         end if
     end if
+
+    ' PARITY: the active LG layout (NetflixContent) renders this single param-less response
+    ' and never paginates (loadMore is only wired into the non-Netflix Content layout). So
+    ' there is no "next page" — disable infinite scroll so we show exactly LG's row set.
+    m.hasMore = false
 
     m.initialLoading = false
     ' Categories (and thus the hero banner) are ready — render the hero NOW, independent
     ' of Continue Watching. Rows still wait for CW so its shimmer can keep showing.
     MaybeBuildHero()
     MaybeBuildRows()
+end sub
+
+' Verification logging for content/image parity with LG. Dumps the row order, each row's
+' type/cardType/item-count, and (for TOP_CONTENTS) every item's title + thumbnail variants
+' so we can confirm Roku and LG resolve the same content and the same image per card.
+sub LogCategoryMapping(listing as object)
+    if listing = invalid then
+        print "[HOME][MAP] listing invalid"
+        return
+    end if
+    print "[HOME][MAP] ===== category mapping (rows="; listing.Count(); ") ====="
+    for i = 0 to listing.Count() - 1
+        cat = listing[i]
+        if cat <> invalid then
+            nm = ""
+            if cat.name <> invalid then nm = cat.name
+            tp = ""
+            if cat.type <> invalid then tp = cat.type
+            ct = ""
+            if cat.cardType <> invalid then ct = cat.cardType
+            cid = ""
+            if cat._id <> invalid then cid = cat._id
+            cnt = 0
+            if cat.result <> invalid then cnt = cat.result.Count()
+            print "[HOME][MAP] row#"; i; " name='"; nm; "' type="; tp; " cardType="; ct; " id="; cid; " items="; cnt
+            if tp = "TOP_CONTENTS" and cat.result <> invalid then
+                for j = 0 to cat.result.Count() - 1
+                    it = cat.result[j]
+                    if it <> invalid then
+                        itTitle = ""
+                        if it.title <> invalid then itTitle = it.title
+                        itId = ""
+                        if it._id <> invalid then itId = it._id
+                        print "[HOME][MAP]   item#"; j; " id="; itId; " title='"; itTitle; "'"
+                        if it.thumbnails <> invalid then
+                            for each th in it.thumbnails
+                                if th <> invalid then
+                                    thType = ""
+                                    if th.type <> invalid then thType = th.type
+                                    thPath = ""
+                                    if th.path <> invalid then thPath = th.path
+                                    print "[HOME][MAP]       thumb type="; thType; " path="; thPath
+                                end if
+                            end for
+                        end if
+                    end if
+                end for
+            end if
+        end if
+    end for
+    print "[HOME][MAP] ===== end mapping ====="
 end sub
 
 sub FetchLatestVersion()
@@ -1050,6 +1119,8 @@ sub OnKey()
     if not ev.press then return
 
     key = ev.key
+    ' Give the render thread to this interaction: suspend any in-progress background build.
+    BeginInteraction()
     print "[KEYDBG] OnKey key='"; key; "' zone='"; m.focusZone; "' heroFocus='"; m.heroFocus; "'"
 
     if m.focusZone = "header" then
@@ -1099,6 +1170,43 @@ sub OnKey()
     else if key = "OK" or key = "ok" then
         HandleCardSelection()
     end if
+end sub
+
+' ── Input-priority build throttling ───────────────────────────────────────────
+' Pause progressive row/card building the instant the user presses a key, so creating
+' card nodes never steals render-thread time from a slide change or navigation. The idle
+' timer is reset on every key, so building only resumes once the user pauses (0.25s).
+sub BeginInteraction()
+    m.interacting = true
+    PauseRowBuilding()
+    if m.interactIdle <> invalid then
+        m.interactIdle.control = "stop"
+        m.interactIdle.control = "start"
+    end if
+end sub
+
+sub OnInteractIdle()
+    m.interacting = false
+    ResumeRowBuilding()
+end sub
+
+sub PauseRowBuilding()
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+    if m.rowWidgets = invalid then return
+    for each row in m.rowWidgets
+        if row <> invalid then row.callFunc("PauseBuild", invalid)
+    end for
+end sub
+
+sub ResumeRowBuilding()
+    ' Resume the row orchestration only if rows are still pending.
+    if m.rowsBuilt and m.rowBuildTimer <> invalid and m.rowBuildIndex < m.contentRowCats.Count() then
+        m.rowBuildTimer.control = "start"
+    end if
+    if m.rowWidgets = invalid then return
+    for each row in m.rowWidgets
+        if row <> invalid then row.callFunc("ResumeBuild", invalid)
+    end for
 end sub
 
 sub HandleCardSelection()

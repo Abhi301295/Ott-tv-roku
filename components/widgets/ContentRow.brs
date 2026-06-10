@@ -14,6 +14,9 @@ sub init()
     m.buildX = 0
     m.pendingMediaLoads = 0
     m.buildComplete = false
+    ' True only while a real card build is mid-flight (StartCardBuild ran but hasn't
+    ' finished). Shells have a plan but are NOT active, so resume must skip them.
+    m.buildActive = false
     m.shellCat = invalid
     m.cardTimer = CreateObject("roSGNode", "Timer")
     m.cardTimer.duration = 0.01
@@ -75,6 +78,7 @@ function PrepareShell(cat as object) as boolean
     m.top.built = false
     m.top.mediaReady = false
     m.buildComplete = false
+    m.buildActive = false
     if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
     return true
 end function
@@ -86,6 +90,25 @@ function Materialize() as boolean
     cat = m.shellCat
     m.shellCat = invalid
     StartCardBuild(cat)
+    return true
+end function
+
+' Suspend this row's progressive card build so the render thread is free for user input
+' (hero slide changes, navigation). Build state (buildIdx) is preserved for resume.
+function PauseBuild(dummy = invalid as dynamic) as boolean
+    if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+    return true
+end function
+
+' Resume a paused build only if there are still cards left to create.
+function ResumeBuild(dummy = invalid as dynamic) as boolean
+    ' Only revive a genuinely in-flight build — never auto-start a shell row (which would
+    ' break lazy off-screen loading).
+    if not m.buildActive then return false
+    if m.buildComplete then return false
+    if m.buildPlan = invalid then return false
+    if m.buildIdx >= m.buildPlan.Count() then return false
+    if m.cardTimer <> invalid then m.cardTimer.control = "start"
     return true
 end function
 
@@ -142,6 +165,7 @@ sub StartCardBuild(cat as object)
     m.buildX = 0
     m.pendingMediaLoads = 0
     m.buildComplete = false
+    m.buildActive = true
     if m.revealTimer <> invalid then m.revealTimer.control = "stop"
 
     if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
@@ -151,6 +175,7 @@ sub StartCardBuild(cat as object)
         m.cardTimer.control = "start"
     else
         m.buildComplete = true
+        m.buildActive = false
         RevealNow()
     end if
 end sub
@@ -176,6 +201,7 @@ sub OnCardBuildTick()
         m.cardWidths.Push(w)
         m.buildX = m.buildX + w + gap
     else
+        span = CreateObject("roTimespan")
         card = m.cardsHost.createChild(plan.comp)
         if plan.comp = "ContinueWatchCard" and card.hasField("loaded") then
             m.pendingMediaLoads = m.pendingMediaLoads + 1
@@ -187,6 +213,7 @@ sub OnCardBuildTick()
         m.cards.Push(card)
         m.cardWidths.Push(w)
         m.buildX = m.buildX + w + gap
+        print "[PERF]   card "; plan.comp; " rank="; plan.rank; " "; span.TotalMilliseconds(); "ms"
     end if
 
     m.buildIdx = m.buildIdx + 1
@@ -202,6 +229,7 @@ sub OnCardBuildTick()
         m.cardTimer.control = "stop"
         OnCardFocusChanged()
         m.buildComplete = true
+        m.buildActive = false
         m.top.built = true
         ' If we're still waiting on card thumbnails, arm the safety fallback.
         if m.pendingMediaLoads > 0 and m.revealTimer <> invalid then
@@ -245,8 +273,15 @@ sub ConfigureCard(card as object, compName as string, item as object, cardType a
         if card.hasField("cNeutral950") then card.cNeutral950 = m.top.cNeutral950
         if card.hasField("cNeutral700") then card.cNeutral700 = m.top.cNeutral700
     else if compName = "NumberedVerticalCard" then
-        card.thumbnailUri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
+        ' PARITY: contentRow.tsx selects the TOP_CONTENTS thumbnail with the category's own
+        ' cardType (getCardImgByType(cardType, thumbnails)) — NOT a hardcoded VERTICAL. Using
+        ' VERTICAL here picked a different thumbnail variant than LG for the same item.
+        chosen = GetCardImgByType(cardType, item.thumbnails)
+        card.thumbnailUri = chosen
         card.rank = rank
+        dbgTitle = ""
+        if item.title <> invalid then dbgTitle = item.title
+        print "[HOME][MAP] numbered rank="; rank; " title="; dbgTitle; " cardType="; cardType; " -> uri="; chosen
     else if compName = "BannerCard" then
         thumb = ResolveBannerImage(item, GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails))
         card.thumbnailUri = thumb
@@ -330,6 +365,7 @@ sub ClearCards()
     m.buildX = 0
     m.pendingMediaLoads = 0
     m.buildComplete = false
+    m.buildActive = false
     m.shellCat = invalid
     m.cards = []
     m.cardWidths = []

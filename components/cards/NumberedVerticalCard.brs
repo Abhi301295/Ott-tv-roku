@@ -1,6 +1,7 @@
 sub init()
-    m.focusBorder = m.top.findNode("focusBorder")
+    m.focusBorder = invalid
     m.rankLabel = m.top.findNode("rankLabel")
+    m.rankGlow = m.top.findNode("rankGlow")
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
     m.thumb.observeField("loadStatus", "OnThumbLoad")
@@ -12,7 +13,7 @@ sub OnDataChanged()
 end sub
 
 sub OnFocusChanged()
-    CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
+    ApplyFocusVisual()
 end sub
 
 sub OnThemeChanged()
@@ -24,8 +25,9 @@ sub OnThumbLoad()
 end sub
 
 sub ApplyAll()
-    m.rankLabel.text = Str(m.top.rank + 1)
+    m.rankLabel.text = (m.top.rank + 1).ToStr()
     m.rankLabel.color = m.top.cNeutral50
+    if m.rankGlow <> invalid then m.rankGlow.visible = true
 
     uri = m.top.thumbnailUri
     if uri <> invalid and uri <> "" then
@@ -39,5 +41,10 @@ sub ApplyAll()
         m.skeleton.running = true
     end if
     CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
+    ApplyFocusVisual()
+end sub
+
+sub ApplyFocusVisual()
+    m.focusBorder = CardEnsureFocusFrame(m.top, m.focusBorder, 21, 0, 374, 214, m.top.cPrimary500)
     CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
 end sub
