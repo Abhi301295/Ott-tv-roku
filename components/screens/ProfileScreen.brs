@@ -61,7 +61,7 @@ sub init()
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.observeField("fire", "OnSelectRetryFire")
     ' How many times select-profile may be retried before surfacing the error toast.
     m.selectRetriesLeft = 0
-    m.SELECT_MAX_RETRIES = 4
+    m.SELECT_MAX_RETRIES = 8
     m.confirmPopup.observeField("action", "OnConfirmAction")
     m.otpPopup.observeField("submitted", "OnOtpSubmitted")
     m.otpPopup.observeField("action", "OnOtpAction")
@@ -87,7 +87,7 @@ sub LoadProfileTokens()
     m.cPrimary500 = TC("primary-500", "#0b75e0")
     m.cPrimary600 = TC("primary-600", "#0760bb")
     m.cPrimary700 = TC("primary-700", "#04478b")
-    m.cNeutral50 = TC("neutral-50", "#f8f1f7")
+    m.cNeutral50 = TC("neutral-50", "#ffffff")
     m.cNeutral300 = TC("neutral-300", "#d6d6d6")
     m.cNeutral400 = TC("neutral-400", "#9ea4b0")
     m.cNeutral500 = TC("neutral-500", "#e279ce")
@@ -292,14 +292,15 @@ sub ApplyProfileFocus()
         av.focusedState = focused
     end for
 
-    ' Logout button focus (bg-primary-600 + glow when focused).
+    ' Logout button focus (bg-primary-600 when focused). Selection is shown by the
+    ' fill change only — no drop shadow (kept as-is per the current correct look;
+    ' the shared LoginTabButton's shadow is reserved for the login tabs).
     if m.focusArea = "logout" then
         m.logoutBtn.bgColor = m.cPrimary600
-        m.logoutBtn.showShadow = true
     else
         m.logoutBtn.bgColor = m.cPrimary500
-        m.logoutBtn.showShadow = false
     end if
+    m.logoutBtn.showShadow = false
 end sub
 
 ' Locked profiles show a PIN hint; unlocked ones show the filling progress ring (no text).

@@ -85,6 +85,6 @@
     <!-- Retries select-profile after a short delay: a freshly-issued login token is
          briefly not yet active on the backend, so the first select-profile can 401/404.
          A short wait + retry lets the session settle (mirrors "reload makes it work"). -->
-    <Timer id="selectRetryTimer" duration="2" repeat="false" />
+    <Timer id="selectRetryTimer" duration="0.5" repeat="false" />
   </children>
 </component>

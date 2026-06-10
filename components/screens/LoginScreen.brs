@@ -83,6 +83,13 @@ sub init()
     UpdateTabColors()
     UpdateLoginButton()
 
+    ' Login is the first screen, so business config may still be resolving. Re-apply the
+    ' themed colors when it lands (parity with HomeScreen) so the tabs/QR/fields don't get
+    ' stranded on dark fallbacks if the tokens arrive after mount.
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.observeField("businessResolved", "OnBusinessResolved")
+    end if
+
     LoginScreen_ApplyFocus()
     FetchOnboardDevice()
 end sub
@@ -95,15 +102,15 @@ sub LoadThemeTokens()
     ' Cache the colors used by interactive states (parity with Tailwind tokens).
     m.cActive = TC("primary-600", "#0760bb")        ' bg-primary-600 (active tab / focused btn)
     m.cShadow = TC("primary-700", "#04478b")         ' shadow-primary-700
-    m.cInactive = TC("background", "#ffffff")        ' bg-ui-background (inactive tab)
-    m.cTabText = TC("neutral-50", "#f8f1f7")         ' text-neutral-50
+    m.cInactive = TC("background", "#1f1f22")        ' bg-ui-background (inactive tab) — dark default from dark.theme.ts
+    m.cTabText = TC("neutral-50", "#ffffff")         ' text-neutral-50
     m.cBtnEnabledBg = TC("primary-500", "#0b75e0")   ' bg-primary-500 (enabled, unfocused)
     m.cBtnFocusBg = m.cActive                        ' bg-primary-600 (enabled, focused)
     m.cBtnDisabledBg = TC("neutral-600", "#a12189")  ' bg-neutral-600 (disabled)
     m.cBtnDisabledText = TC("neutral-400", "#ce4fb6")' text-neutral-400 (disabled)
     m.cFieldBg = TC("neutral-700", "#ffffff")        ' bg-neutral-700 (input bg, unfocused)
     m.cFieldBgFocus = TC("neutral-900", "#ffffff")   ' bg-neutral-900 (input bg, focused)
-    m.cFieldText = TC("neutral-50", "#f8f1f7")       ' text-neutral-50 (typed text + unfocused placeholder)
+    m.cFieldText = TC("neutral-50", "#ffffff")       ' text-neutral-50 (typed text + unfocused placeholder)
     m.cFieldBorder = TC("neutral-100", "#efdceb")    ' border-neutral-100 (focused input)
     ' Focused placeholder = browser-default muted gray (web drops the neutral-50
     ' override when focused). Not a theme token, so hardcode like the badge number.
@@ -113,6 +120,15 @@ end sub
 function TC(name as string, fallbackHex as string) as string
     return ThemeTokenColor(m.tokens, name, fallbackHex)
 end function
+
+' Business config resolved after mount — re-pull tokens and recolor everything.
+sub OnBusinessResolved()
+    LoadThemeTokens()
+    ApplyLoginBranding()
+    ApplyThemeColors()
+    UpdateTabColors()
+    UpdateLoginButton()
+end sub
 
 ' Emulate CSS tracking-widest (letter-spacing ~0.1em) by inserting a thin space
 ' between characters. Also lets the hyphenated code wrap like the web (2 lines).
@@ -129,10 +145,10 @@ end function
 
 ' One-time recolor of all static (non-interactive) elements from theme tokens.
 sub ApplyThemeColors()
-    m.title.color = TC("neutral-50", "#f8f1f7")
+    m.title.color = TC("neutral-50", "#ffffff")
     m.logoLabel.color = TC("primary-500", "#0b75e0")
 
-    cardBg = TC("background", "#ffffff")
+    cardBg = TC("background", "#1f1f22")
     cardBorder = TC("neutral-500", "#e279ce")
     m.phoneCard.blendColor = cardBg
     m.phoneCardBorder.blendColor = cardBorder
@@ -142,7 +158,7 @@ sub ApplyThemeColors()
     ' Badge bg uses neutral-50 (theme), but the number uses text-neutral-950 which
     ' is NOT mapped in the web Tailwind config — it falls back to Tailwind's default
     ' #0a0a0a (dark). So hardcode dark to match React/LG (not the white theme token).
-    badgeBg = TC("neutral-50", "#f8f1f7")
+    badgeBg = TC("neutral-50", "#ffffff")
     m.step1Badge.blendColor = badgeBg
     m.step2Badge.blendColor = badgeBg
     m.step1Num.color = "0x0a0a0aff"
@@ -157,8 +173,8 @@ sub ApplyThemeColors()
     m.dividerTop.color = dividerColor
     m.dividerBottom.color = dividerColor
 
-    m.userCodeLabel.color = TC("neutral-50", "#f8f1f7")
-    m.qrPad.blendColor = TC("neutral-50", "#f8f1f7")
+    m.userCodeLabel.color = TC("neutral-50", "#ffffff")
+    m.qrPad.blendColor = TC("neutral-50", "#ffffff")
     if m.qrGlow <> invalid then m.qrGlow.blendColor = TC("primary-500", "#0092ff")
     m.qrErrorLabel.color = TC("primary-500", "#0b75e0")
     ' Error box — web: bg-primary-800/20, border-primary-500, text-primary-500
@@ -368,13 +384,11 @@ end sub
 sub ShowQrSkeleton(show as boolean)
     if m.qrSkeleton = invalid then return
     if show then
-        ' Parity with React's SkeletonBox (baseColor #ffffff, highlightColor #f3f3f3): a white
-        ' box that blends into the white QR pad, with a faint grey shimmer band. React sweeps a
-        ' moving gradient so the tiny delta still reads; our Skeleton pulses opacity (the sweep
-        ' was dropped to keep card shimmers cheap), so the grey highlight is nudged a touch
-        ' stronger (neutral-200) than React's #f3f3f3 to stay perceptible as a pulse.
-        m.qrSkeleton.baseColor = TC("neutral-50", "#f8f1f7")
-        m.qrSkeleton.highlightColor = TC("neutral-200", "#e5e5e5")
+        ' Exact parity with React's SkeletonBox: baseColor #ffffff, highlightColor #f3f3f3
+        ' (literal hex in emailLogin/login index, NOT theme tokens) — a white box on the
+        ' near-white QR pad with a very faint grey shimmer band, plus the blue glow below.
+        m.qrSkeleton.baseColor = "0xffffffff"
+        m.qrSkeleton.highlightColor = "0xf3f3f3ff"
         if m.qrSkeleton.hasField("animate") then m.qrSkeleton.animate = true
         m.qrImage.visible = false
         m.qrErrorLabel.visible = false

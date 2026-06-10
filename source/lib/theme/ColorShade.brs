@@ -255,21 +255,20 @@ function BuildThemeTokens(resolved as object) as object
         end for
     end if
 
-    ' Mid/dark neutral shades (400–600) are generated from portalDesign.secondaryColor so
-    ' login/body text + dividers render in the secondary brand color (pink #e279ce here),
-    ' matching the LG/webOS reference. The LIGHT shades (50–300) are deliberately KEPT as
-    ' the static near-white DarkThemeTokens: the LG header/nav/title text is crisp white
-    ' (neutral-50 #ffffff, neutral-200 #e5e5e5), NOT pink-tinted. Pulling 50–300 from the
-    ' pink secondary tints the header off-white, so only the 400–600 range is themed.
+    ' Light neutral shades (50–600) are generated from portalDesign.secondaryColor,
+    ' exactly as the web does (useTheme: colors.secondary -> generateShades -> --neutral-50..600).
+    ' The LG/webOS reference renders login/body text with this secondary ramp (pink
+    ' #e279ce here), so Roku must do the same to match — otherwise neutrals fall back to
+    ' the static gray DarkThemeTokens and the text/dividers render gray instead of pink.
     secondary = NormalizeHex(resolved.portalSecondaryColor)
     if secondary <> "" then
         ss = GenerateShades(secondary)
         for each k in ss
             kn = Val(k)
-            if kn >= 400 and kn <= 600 then tokens["neutral-" + k] = ss[k]
+            if kn >= 50 and kn <= 600 then tokens["neutral-" + k] = ss[k]
         end for
     end if
-    print "[THEMEDBG] secondary='"; secondary; "' -> neutral-50(white)="; tokens["neutral-50"]; " neutral-200="; tokens["neutral-200"]; " neutral-500(pink)="; tokens["neutral-500"]; " neutral-600="; tokens["neutral-600"]
+    print "[THEMEDBG] secondary='"; secondary; "' -> neutral-500="; tokens["neutral-500"]; " neutral-50="; tokens["neutral-50"]; " neutral-600="; tokens["neutral-600"]
 
     tertiary = NormalizeHex(resolved.portalTertiaryColor)
     if tertiary <> "" then

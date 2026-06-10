@@ -54,11 +54,12 @@
       </Label>
 
       <Poster id="qrPad" translation="[160, 230]" width="182" height="182" uri="pkg:/images/ui/qr_pad.png" blendColor="0xf8f1f7ff" />
-      <!-- Parity with React SkeletonBox box-shadow: 0 4px 10px rgba(0,146,255,0.4) -->
+      <!-- Parity with React SkeletonBox box-shadow: 0 4px 10px rgba(0,146,255,0.4).
+           primary-500 blue (#0092ff) at 0.4 alpha, glow biased ~4px below the box. -->
       <Poster id="qrGlow" translation="[151, 225]" width="200" height="200" uri="pkg:/images/ui/qr_glow.png"
-        blendColor="0x0092ffff" opacity="0.85" visible="false" loadDisplayMode="scaleToFit" />
+        blendColor="0x0092ffff" opacity="0.4" visible="false" loadDisplayMode="scaleToFit" />
       <Skeleton id="qrSkeleton" translation="[176, 246]" boxWidth="150" boxHeight="150"
-        baseColor="0xf8f1f7ff" highlightColor="0xe5e5e5ff" visible="false" />
+        baseColor="0xffffffff" highlightColor="0xf3f3f3ff" visible="false" />
       <Poster id="qrImage" translation="[176, 246]" width="150" height="150" loadDisplayMode="scaleToFit" visible="false" />
       <Label id="qrErrorLabel" translation="[176, 246]" width="150" height="150" wrap="true" lineSpacing="4"
         horizAlign="center" vertAlign="center" color="0x0b75e0ff" visible="false">
