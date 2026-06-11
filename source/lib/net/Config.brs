@@ -36,6 +36,10 @@ end function
 
 ' Reads pkg:/config.json if present. Returns invalid when missing/unparseable.
 function ReadConfigJson() as object
+    ' Probe existence first; ReadAsciiFile prints a console error for a missing file.
+    fs = CreateObject("roFileSystem")
+    if fs = invalid or not fs.Exists("pkg:/config.json") then return invalid
+
     text = ReadAsciiFile("pkg:/config.json")
     if text = invalid or text = "" then return invalid
 

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Cinematic hero — parity with heroBannerCinematic.tsx (85vh media behind rows,
+     15s auto-swipe, crossfade, gradient overlays, title metadata). Trailers deferred. -->
+<component name="HeroBannerCinematic" extends="Group">
+  <interface>
+    <field id="bannerItems" type="array" onChange="OnBannerItemsChanged" />
+    <!-- Fires true once the FIRST slide's poster bitmap has actually painted, so the
+         home skeleton can stay up until the hero is real (no black gap). -->
+    <field id="posterReady" type="boolean" value="false" alwaysNotify="true" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <!-- Which hero control the parent screen has focused: "prev" | "next" | "mute" | "".
+         Drives the focus ring highlight (parity with the portal arrow/mute focus). -->
+    <field id="focusTarget" type="string" value="" onChange="OnFocusTargetChanged" />
+    <!-- True while a trailer is actually playing, so the screen knows the mute control is
+         available for D-pad focus (parity with isVideoPlaying gating the mute button). -->
+    <field id="trailerPlaying" type="boolean" value="false" />
+
+    <!-- D-pad actions invoked by HomeScreen via callFunc when a hero control is OK'd.
+         callFunc ONLY reaches functions declared here — without these the prev/next
+         arrows and mute toggle are silent no-ops. -->
+    <function name="HeroGoNext" />
+    <function name="HeroGoPrev" />
+    <function name="HeroToggleMute" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/HeroBannerCinematic.brs" />
+
+  <children>
+    <!-- React: hero container is height:85vh (=918 on 1080p) with backgroundColor #0f1014.
+         heroBg is that container fill — same height as the banner (NOT full screen). -->
+    <Rectangle id="heroBg" width="1920" height="918" color="0x0f1014ff" />
+
+    <Group id="nextLayer" translation="[0, 0]">
+      <!-- React: next layer top:0, bottom:0, left:-20%, right:-20% → spans full 85vh (918). -->
+      <Group id="nextClip" translation="[-384, 0]" clippingRect="[0, 0, 2688, 918]"
+        clippingRectClipsChildren="true">
+        <Poster id="nextPoster" width="2688" height="918" translation="[0, 0]"
+          loadWidth="2688" loadHeight="918" loadDisplayMode="scaleToFill" />
+      </Group>
+    </Group>
+
+    <Group id="activeLayer" translation="[0, 4]">
+      <!-- React: active layer top:4, bottom:0 → box is 914 tall (4..918). The poster bottom
+           lands exactly at 918 where the bottom gradient is fully solid, so no bright sliver
+           pokes out below the gradient (that was the seam). -->
+      <Group id="activeClip" clippingRect="[0, 0, 2458, 914]" clippingRectClipsChildren="true">
+        <Poster id="activePoster" width="2458" height="914" translation="[0, 0]"
+          loadWidth="2458" loadHeight="914" loadDisplayMode="scaleToFill" />
+      </Group>
+    </Group>
+
+    <!-- Trailer video stays top-level: putting a Roku Video inside the clipped poster
+         group makes it render above the hero controls/focus rings. Shift it upward so
+         the moving frame starts behind the HomeHeader area instead of below it; the
+         rows scrim hides the lower overflow. (Proven placement — do not move to y=0:
+         the simulator letterboxes the Video so a y=0 node puts a black bar in the
+         header zone, making the preview look like it starts below the nav.) -->
+    <Video id="trailerVideo" width="1920" height="1080" translation="[0, -160]"
+      visible="false" opacity="0.0" mute="true" enableUI="false" />
+
+    <!-- Smooth gradient vignettes (parity with the CSS linear-gradients), sized to the
+         85vh hero (918). The TOP tint is owned by the header gradient (HomeHeader scrim). -->
+    <Poster id="leftVignette" uri="pkg:/images/ui/grad_left.png" width="1248" height="918"
+      loadDisplayMode="scaleToFill" />
+    <!-- React bottom gradient: height 30% of 85vh = ~275px, bottom-aligned (643..918). -->
+    <Poster id="bottomVignette" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 643]"
+      width="1920" height="275" loadDisplayMode="scaleToFill" />
+
+    <Group id="metaHost" translation="[64, 300]">
+      <Label id="titleLabel" text="" width="760" height="90" wrap="false"
+        color="0xf8f1f7ff" horizAlign="left" vertAlign="top">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="67" />
+      </Label>
+
+      <!-- IMDB rating number + star row (parity with StarRating in hero). -->
+      <LayoutGroup id="ratingHost" translation="[0, 100]" layoutDirection="horiz"
+        itemSpacings="[8]" vertAlignment="center" visible="false">
+        <Label id="ratingLabel" text="" height="38" color="0xf8f1f7ff"
+          horizAlign="left" vertAlign="center">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="26" />
+        </Label>
+      </LayoutGroup>
+
+      <!-- Genres + quality badge inline (parity with genre row). -->
+      <LayoutGroup id="genreHost" translation="[0, 144]" layoutDirection="horiz"
+        itemSpacings="[15]" vertAlignment="center">
+        <Label id="genreLabel" text="" height="36"
+          color="0xf8f1f7ff" horizAlign="left" vertAlign="center">
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
+        </Label>
+        <Group id="qualityBadge" visible="false">
+          <Rectangle id="qualityBg" width="84" height="34" color="0xffffff33" />
+          <Label id="qualityLabel" text="" width="84" height="34"
+            color="0xf8f1f7ff" horizAlign="center" vertAlign="center">
+            <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="17" />
+          </Label>
+        </Group>
+      </LayoutGroup>
+
+      <Label id="descLabel" translation="[0, 190]" text="" width="633" height="96" wrap="true"
+        color="0xf8f1f7cc" horizAlign="left" vertAlign="top">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
+      </Label>
+
+      <Group id="barsHost" translation="[0, 290]" />
+      <!-- Persistent active-slide fill so the timer animation never loses its binding. -->
+      <Rectangle id="heroBarFill" translation="[0, 290]" width="0" height="4" color="0x0b75e0ff" />
+    </Group>
+
+    <!-- Prev/Next glass buttons at screen edges (parity with portal arrows:
+         48px circle, dark glass fill + white 0.3 ring border, centered chevron). -->
+    <Group id="prevArrow" translation="[10, 435]" opacity="0.85">
+      <!-- Focus ring: brighter, slightly larger primary ring shown when this arrow is focused. -->
+      <Poster id="prevFocusRing" uri="pkg:/images/ui/glass_ring.png" width="60" height="60"
+        translation="[-6, -6]" blendColor="0x0b75e0ff" opacity="0.0" />
+      <Poster uri="pkg:/images/ui/glass_circle.png" width="48" height="48"
+        blendColor="0x000000ff" opacity="0.45" />
+      <Poster uri="pkg:/images/ui/glass_ring.png" width="48" height="48"
+        blendColor="0xffffffff" opacity="0.4" />
+      <Poster uri="pkg:/images/ui/chevron_left.png" width="30" height="30" translation="[9, 9]"
+        blendColor="0xffffffff" />
+    </Group>
+    <Group id="nextArrow" translation="[1862, 435]" opacity="0.85">
+      <Poster id="nextFocusRing" uri="pkg:/images/ui/glass_ring.png" width="60" height="60"
+        translation="[-6, -6]" blendColor="0x0b75e0ff" opacity="0.0" />
+      <Poster uri="pkg:/images/ui/glass_circle.png" width="48" height="48"
+        blendColor="0x000000ff" opacity="0.45" />
+      <Poster uri="pkg:/images/ui/glass_ring.png" width="48" height="48"
+        blendColor="0xffffffff" opacity="0.4" />
+      <Poster uri="pkg:/images/ui/chevron_right.png" width="30" height="30" translation="[9, 9]"
+        blendColor="0xffffffff" />
+    </Group>
+
+    <!-- Mute indicator (shown while trailer plays, parity with mute button). -->
+    <Group id="muteBtn" translation="[1840, 520]" visible="false">
+      <Poster id="muteFocusRing" uri="pkg:/images/ui/glass_ring.png" width="60" height="60"
+        translation="[-6, -6]" blendColor="0x0b75e0ff" opacity="0.0" />
+      <Poster uri="pkg:/images/ui/glass_circle.png" width="48" height="48"
+        blendColor="0x000000ff" opacity="0.5" />
+      <Poster uri="pkg:/images/ui/glass_ring.png" width="48" height="48"
+        blendColor="0xffffffff" opacity="0.5" />
+      <Poster id="muteIcon" uri="pkg:/images/ui/vol_off.png" width="30" height="30"
+        translation="[9, 9]" blendColor="0xffffffff" />
+    </Group>
+
+    <!-- Slide counter bottom-right (parity with "01 / 05"). Kept above the content-section
+         scrim (y=703) so it stays visible over the hero, not behind the rows backdrop. -->
+    <LayoutGroup id="counterHost" translation="[1700, 600]" layoutDirection="horiz"
+      itemSpacings="[6]" vertAlignment="bottom" visible="false">
+      <Label id="counterCurrent" text="" color="0xf8f1f7ff" horizAlign="left" vertAlign="bottom">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="48" />
+      </Label>
+      <Label id="counterSep" text="/" color="0xf8f1f766" horizAlign="left" vertAlign="bottom">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
+      </Label>
+      <Label id="counterTotal" text="" color="0xf8f1f766" horizAlign="left" vertAlign="bottom">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
+      </Label>
+    </LayoutGroup>
+
+    <Timer id="swipeTimer" repeat="true" duration="15" />
+
+    <!-- Delay before fetching/loading the trailer (parity with TRAILER_LOAD_DELAY 2.5s). -->
+    <Timer id="trailerTimer" repeat="false" duration="2.5" />
+
+    <Animation id="fadeAnim" duration="1.2" repeat="false" easeFunction="inOutCubic">
+      <FloatFieldInterpolator id="fadeInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]"
+        fieldToInterp="activeLayer.opacity" />
+    </Animation>
+
+    <Animation id="zoomAnim" duration="8" repeat="false" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="zoomInterp" key="[0.0, 1.0]"
+        keyValue="[[1.0, 1.0], [1.05, 1.05]]" fieldToInterp="activePoster.scale" />
+    </Animation>
+
+    <!-- Active-slide progress fill (0 → 48px over the swipe interval). -->
+    <Animation id="barAnim" duration="15" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="barInterp" key="[0.0, 1.0]" keyValue="[0.0, 48.0]"
+        fieldToInterp="heroBarFill.width" />
+    </Animation>
+
+    <!-- Trailer fade-in (800ms, parity with React's opacity 800ms crossfade). The video
+         fades IN while the poster image fades OUT simultaneously, so once the trailer has
+         real frames the poster is gone — it can never show behind/around the video. The
+         fade only starts on the "playing" state (frames ready), so a buffering/black frame
+         never exposes a blank screen. RevealPoster/StopTrailer restore activePoster.opacity. -->
+    <Animation id="videoFadeAnim" duration="0.8" repeat="false" easeFunction="inOutCubic">
+      <FloatFieldInterpolator id="videoFadeInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="trailerVideo.opacity" />
+      <FloatFieldInterpolator id="posterHideInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]"
+        fieldToInterp="activePoster.opacity" />
+    </Animation>
+
+    <!-- Poster "glow": fade the poster in when its bitmap finishes loading, so it lands
+         softly instead of popping (parity with the image opacity transition). -->
+    <Animation id="posterGlowAnim" duration="0.5" repeat="false" easeFunction="outQuad">
+      <FloatFieldInterpolator id="posterGlowInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="activePoster.opacity" />
+    </Animation>
+
+    <!-- Text entrance: fade + slide-up on each slide (parity with textVisible). -->
+    <Animation id="metaAnim" duration="0.6" repeat="false" easeFunction="outCubic">
+      <FloatFieldInterpolator id="metaOpacityInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="metaHost.opacity" />
+      <Vector2DFieldInterpolator id="metaPosInterp" key="[0.0, 1.0]"
+        keyValue="[[64, 364], [64, 340]]" fieldToInterp="metaHost.translation" />
+    </Animation>
+  </children>
+</component>

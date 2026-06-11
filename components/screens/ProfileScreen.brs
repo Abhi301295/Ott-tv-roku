@@ -4,8 +4,6 @@ sub init()
     m.skeletonGroup = m.top.findNode("skeletonGroup")
     m.profilesContainer = m.top.findNode("profilesContainer")
     m.logoutBtn = m.top.findNode("logoutBtn")
-    m.loaderOverlay = m.top.findNode("loaderOverlay")
-    m.selectSpinner = m.top.findNode("selectSpinner")
     m.confirmPopup = m.top.findNode("confirmPopup")
     m.otpPopup = m.top.findNode("otpPopup")
     m.autoSelectTimer = m.top.findNode("autoSelectTimer")
@@ -20,7 +18,6 @@ sub init()
     m.focusArea = "profiles"   ' "profiles" | "logout"
     m.profileIndex = 0
     m.selectedProfile = invalid
-    m.pendingProfileId = ""
     m.popup = ""               ' "" | "confirm" | "otp"
     m.selecting = false
     m.loggingOut = false
@@ -67,7 +64,9 @@ sub init()
 
     ' Pre-open keep-alive connections on the rest of the pool while the user picks a
     ' profile, so the home screen's burst of requests right after select are all warm.
-    WarmHttpConnections()
+    ' MUST use a Bearer path (same auth as select-profile). CHECK_UPDATE uses Basic auth
+    ' and poisons the pooled connection — select-profile then 404s until app reload.
+    WarmHttpConnections(Endpoints().PROFILE.GET_LOGIN_PROFILES)
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────
@@ -80,7 +79,7 @@ sub LoadProfileTokens()
     m.cPrimary500 = TC("primary-500", "#0b75e0")
     m.cPrimary600 = TC("primary-600", "#0760bb")
     m.cPrimary700 = TC("primary-700", "#04478b")
-    m.cNeutral50 = TC("neutral-50", "#f8f1f7")
+    m.cNeutral50 = TC("neutral-50", "#ffffff")
     m.cNeutral300 = TC("neutral-300", "#d6d6d6")
     m.cNeutral400 = TC("neutral-400", "#9ea4b0")
     m.cNeutral500 = TC("neutral-500", "#e279ce")
@@ -178,13 +177,6 @@ sub ShowLoading(show as boolean)
         if sk <> invalid then sk.running = show
     end for
     m.profilesContainer.visible = not show
-end sub
-
-' Rounded loader shown while a profile is being selected.
-sub ShowSelectLoader(show as boolean)
-    m.selecting = show
-    m.loaderOverlay.visible = show
-    m.selectSpinner.visible = show
 end sub
 
 sub ShowProfileError(msg as string)
@@ -285,14 +277,15 @@ sub ApplyProfileFocus()
         av.focusedState = focused
     end for
 
-    ' Logout button focus (bg-primary-600 + glow when focused).
+    ' Logout button focus (bg-primary-600 when focused). Selection is shown by the
+    ' fill change only — no drop shadow (kept as-is per the current correct look;
+    ' the shared LoginTabButton's shadow is reserved for the login tabs).
     if m.focusArea = "logout" then
         m.logoutBtn.bgColor = m.cPrimary600
-        m.logoutBtn.showShadow = true
     else
         m.logoutBtn.bgColor = m.cPrimary500
-        m.logoutBtn.showShadow = false
     end if
+    m.logoutBtn.showShadow = false
 end sub
 
 ' Locked profiles show a PIN hint; unlocked ones show the filling progress ring (no text).
@@ -466,34 +459,27 @@ sub SelectProfile(profile as object)
 end sub
 
 sub DoSelectProfile(profileId as string)
+    ' Guard against a second trigger (auto-select tick racing a manual press, or a double
+    ' press) starting another navigation, which would mount Home twice.
+    if m.selecting then return
+    m.selecting = true
     StopAutoSelect()
-    ShowSelectLoader(true)
-    m.pendingProfileId = profileId
-    path = SelectProfilePath()
-    m.selectTask = ApiPost(path, SelectProfilePayload(profileId))
-    m.selectTask.observeField("apiResult", "OnSelectResponse")
-    StartHttpTask(m.selectTask)
-end sub
-
-sub OnSelectResponse()
-    if m.selectTask = invalid then return
-    api = m.selectTask.apiResult
-    if api = invalid then return
-
-    if HandleSessionExpiry(m.top, api) then return
-
-    ShowSelectLoader(false)
-
-    if api.ok and ApplySelectProfileTokens(api.result) then
-        SetProfileId(m.pendingProfileId)
-        NavigateHome()
-        return
+    ' Navigate to Home immediately and hand off the chosen profile + avatar; Home
+    ' establishes the session (select-profile) behind its shimmer, so there is no
+    ' full-screen loader on this screen.
+    avatar = ""
+    if m.selectedProfile <> invalid and m.selectedProfile.avatar <> invalid then avatar = m.selectedProfile.avatar
+    SetValueByKey(SK_SelectedItem(), "Home", "app")
+    if m.vm <> invalid then
+        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
+    else
+        ' Navigation unavailable — don't leave the screen permanently locked behind the
+        ' m.selecting guard; surface an error and let the user try again.
+        m.selecting = false
+        ShowAlert(m.top, 2, MsgFailedSelectProfile())
+        ResetAutoSelect()
+        ApplyProfileFocus()
     end if
-
-    ' Failure: toast + let the user retry (web also surfaces this alert).
-    ShowAlert(m.top, 2, MsgFailedSelectProfile())
-    ResetAutoSelect()
-    ApplyProfileFocus()
 end sub
 
 ' ── Logout ───────────────────────────────────────────────────────────────────
@@ -620,9 +606,3 @@ sub OnOverlayDismiss()
     end if
 end sub
 
-' ── Navigation ───────────────────────────────────────────────────────────────
-
-sub NavigateHome()
-    SetValueByKey(SK_SelectedItem(), "Home", "app")
-    if m.vm <> invalid then m.vm.callFunc("NavigateReplace", RouteHome(), {})
-end sub

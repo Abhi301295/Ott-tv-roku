@@ -36,14 +36,14 @@
     <Poster id="logoPoster" translation="[120, 48]" width="280" height="68" loadDisplayMode="scaleToFit" visible="false" />
     <Label id="logoLabel" text="OTT Accelerator" translation="[120, 64]" width="400"
       color="0x0b75e0ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="30" />
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="30" />
     </Label>
 
     <Label id="title" text="Who's Watching?" translation="[150, 150]" width="900" color="0xf8f1f7ff">
-      <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="34" />
+      <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="34" />
     </Label>
     <Label id="errorLabel" text="" translation="[150, 212]" width="900" color="0x0b75e0ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="20" />
+      <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
     </Label>
 
     <!-- Loading shimmer (3 rows): rounded avatar box + name strip (parity with SkeletonBox) -->
@@ -62,21 +62,7 @@
     <LoginTabButton id="logoutBtn" label="Logout" translation="[1656, 970]"
       buttonWidth="200" buttonHeight="65"
       shapeUri="pkg:/images/ui/btn_logout.png" shadowUri="pkg:/images/ui/btn_logout_shadow.png"
-      fontUri="pkg:/fonts/DMSans-Bold.ttf" fontSize="20" visible="false" />
-
-    <!-- Full-screen loader shown after selecting a profile while navigating home.
-         Parity with React <Spinner/>: a centered ring (white with a primary-600
-         bottom arc) spinning above a "Loading" label, over the dark app background. -->
-    <Group id="loaderOverlay" visible="false">
-      <Rectangle width="1920" height="1080" color="0x141414ff" />
-      <BusySpinner id="selectSpinner" translation="[936, 486]" spinInterval="1">
-        <Poster role="poster" uri="pkg:/images/ui/loader_spinner.png" width="48" height="48" />
-      </BusySpinner>
-      <Label id="loadingLabel" text="Loading" translation="[760, 548]" width="400" height="32"
-        horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="22" />
-      </Label>
-    </Group>
+      fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="20" visible="false" />
 
     <ConfirmPopup id="confirmPopup" visible="false" />
     <OtpPopup id="otpPopup" visible="false" />

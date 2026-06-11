@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Home loading scaffold — TWO independent shimmer regions so the hero and the content
+     rows (Continue Watching etc.) can load and reveal separately:
+       • heroPulse  — poster-section shimmer, hidden once the hero poster paints.
+       • rowsPulse  — card-row shimmer, hidden once the real rows are built.
+     Each region has its own running flag; a shared pulse animation drives both. -->
+<component name="HomeSkeleton" extends="Group">
+  <interface>
+    <field id="boxColor" type="string" value="0x262626ff" onChange="OnColorsChanged" />
+    <!-- Independent toggles for the two regions. -->
+    <field id="heroRunning" type="boolean" value="false" onChange="OnRunningChanged" />
+    <field id="rowsRunning" type="boolean" value="false" onChange="OnRunningChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/HomeSkeleton.brs" />
+
+  <children>
+    <!-- ── Hero (poster) shimmer ───────────────────────────────────────────── -->
+    <Group id="heroPulse" opacity="1.0" visible="false">
+      <!-- Do not cover the hero media area with a fake black block while it loads. The
+           real hero/poster should own the background; only metadata placeholder lines show. -->
+      <!-- Hero metadata placeholder lines (mirror title/genre/description position). -->
+      <Rectangle id="hTitle" translation="[64, 470]" width="520" height="54" color="0x262626ff" />
+      <Rectangle id="hGenre" translation="[64, 548]" width="360" height="22" color="0x262626ff" />
+      <Rectangle id="hDesc1" translation="[64, 590]" width="630" height="18" color="0x262626ff" />
+      <Rectangle id="hDesc2" translation="[64, 618]" width="580" height="18" color="0x262626ff" />
+      <Rectangle id="hTitleShine" translation="[64, 470]" width="520" height="54" color="0x404040ff" opacity="0.0" />
+      <Rectangle id="hGenreShine" translation="[64, 548]" width="360" height="22" color="0x404040ff" opacity="0.0" />
+      <Rectangle id="hDesc1Shine" translation="[64, 590]" width="630" height="18" color="0x404040ff" opacity="0.0" />
+      <Rectangle id="hDesc2Shine" translation="[64, 618]" width="580" height="18" color="0x404040ff" opacity="0.0" />
+    </Group>
+
+    <!-- ── Continue-Watching label (STATIC — never shimmers) ───────────────── -->
+    <Label id="rowsTitle" text="Continue Watching" translation="[32, 702]" width="600" height="40"
+      color="0xf8f1f7ff" visible="false">
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="34" />
+    </Label>
+
+    <!-- ── Rows / Continue-Watching shimmer ────────────────────────────────────
+         Placeholders match the real Continue Watching cards exactly (540×286 landscape
+         at x=32 + 10px gap, y=757) so the shimmer → content handoff has no jump. -->
+    <Group id="rowsPulse" opacity="1.0" visible="false">
+      <Rectangle id="rowBox1" translation="[32, 757]"   width="540" height="286" color="0x262626ff" />
+      <Rectangle id="rowBox2" translation="[582, 757]"  width="540" height="286" color="0x262626ff" />
+      <Rectangle id="rowBox3" translation="[1132, 757]" width="540" height="286" color="0x262626ff" />
+      <Rectangle id="rowBox4" translation="[1682, 757]" width="540" height="286" color="0x262626ff" />
+      <Rectangle id="rowShine1" translation="[32, 757]"   width="540" height="286" color="0x404040ff" opacity="0.0" />
+      <Rectangle id="rowShine2" translation="[582, 757]"  width="540" height="286" color="0x404040ff" opacity="0.0" />
+      <Rectangle id="rowShine3" translation="[1132, 757]" width="540" height="286" color="0x404040ff" opacity="0.0" />
+      <Rectangle id="rowShine4" translation="[1682, 757]" width="540" height="286" color="0x404040ff" opacity="0.0" />
+    </Group>
+
+    <Animation id="heroAnim" duration="1.0" repeat="true" easeFunction="inOutQuad">
+      <FloatFieldInterpolator id="heroInterp1" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hTitleShine.opacity" />
+      <FloatFieldInterpolator id="heroInterp2" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hGenreShine.opacity" />
+      <FloatFieldInterpolator id="heroInterp3" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hDesc1Shine.opacity" />
+      <FloatFieldInterpolator id="heroInterp4" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hDesc2Shine.opacity" />
+    </Animation>
+    <!-- Separate pulse for the rows so it can be frozen independently of the hero. -->
+    <Animation id="rowsAnim" duration="1.0" repeat="true" easeFunction="inOutQuad">
+      <FloatFieldInterpolator id="rowsInterp1" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine1.opacity" />
+      <FloatFieldInterpolator id="rowsInterp2" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine2.opacity" />
+      <FloatFieldInterpolator id="rowsInterp3" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine3.opacity" />
+      <FloatFieldInterpolator id="rowsInterp4" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine4.opacity" />
+    </Animation>
+
+    <!-- Dissolve the rows shimmer out (instead of a hard cut) so the heavy first-draw of
+         the real cards underneath can never show up as a stutter in the pulse. -->
+    <Animation id="rowsFade" duration="0.35" repeat="false" easeFunction="outQuad">
+      <FloatFieldInterpolator id="rowsFadeInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="rowsPulse.opacity" />
+    </Animation>
+  </children>
+</component>

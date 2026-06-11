@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Horizontal content row — parity with features/home/contentRow.tsx + row title
+     from netflixContent.tsx. Cards are built from category.result; focus scrolls
+     the row strip and highlights the active card. -->
+<component name="ContentRow" extends="Group">
+  <interface>
+    <field id="categoryData" type="assocarray" onChange="OnCategoryChanged" />
+    <field id="cardFocusIndex" type="integer" value="0" onChange="OnCardFocusChanged" />
+    <field id="rowFocused" type="boolean" value="false" onChange="OnRowVisualChanged" />
+    <field id="rowDimmed" type="boolean" value="false" onChange="OnRowVisualChanged" />
+    <field id="cardCount" type="integer" value="0" />
+    <!-- Fires true once every card node for this row has been created, so the screen can
+         drop the loading shimmer and reveal a fully-populated row in one shot. -->
+    <field id="built" type="boolean" value="false" alwaysNotify="true" />
+    <field id="mediaReady" type="boolean" value="false" alwaysNotify="true" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+    <field id="cNeutral950" type="string" value="0x0a0a0aff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <!-- Shell-only row: title + cardCount are set, card nodes build on Materialize(). -->
+    <function name="PrepareShell" />
+    <function name="Materialize" />
+    <!-- Pause/resume progressive card building so user input never competes with node
+         creation on the single render thread (called by HomeScreen on key activity). -->
+    <function name="PauseBuild" />
+    <function name="ResumeBuild" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/ContentRow.brs" />
+
+  <children>
+    <Label id="rowTitle" text="" translation="[32, 0]" width="1800" height="48"
+      color="0xf8f1f7ff">
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="41" />
+    </Label>
+    <!-- Cards build progressively into cardsHost while it is transparent, then the whole
+         strip fades in together (parity intent: the row appears populated, not stacking). -->
+    <Group id="cardsHost" translation="[32, 55]" opacity="0.0" />
+
+    <Animation id="cardsRevealAnim" duration="0.3" repeat="false" easeFunction="outQuad">
+      <FloatFieldInterpolator id="cardsRevealInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="cardsHost.opacity" />
+      <FloatFieldInterpolator id="titleRevealInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="rowTitle.opacity" />
+    </Animation>
+  </children>
+</component>

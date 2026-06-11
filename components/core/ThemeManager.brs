@@ -43,12 +43,16 @@ sub OnConfigResponse()
 end sub
 
 ' Dev defaults when API fails (channel still boots).
+' Leave colors empty so BuildThemeTokens falls back to the static dark theme
+' (DarkThemeTokens) — the same behavior as the React app when the backend
+' returns colors:null. This keeps neutrals white/#e5e5e5 (no pink secondary),
+' primary #0092ff, and background #1f1f22, matching LG.
 sub ApplyFallbackTheme()
     resolved = EmptyResolved()
     cfg = AppConfig()
-    resolved.portalPrimaryColor = "#0b75e0"
-    resolved.portalSecondaryColor = "#e279ce"
-    resolved.portalTertiaryColor = "#ffffff"
+    resolved.portalPrimaryColor = ""
+    resolved.portalSecondaryColor = ""
+    resolved.portalTertiaryColor = ""
     resolved.brandingLogo = ""
     resolved.appName = "OTT Accelerator"
     ApplyResolvedTheme(m.top, resolved)

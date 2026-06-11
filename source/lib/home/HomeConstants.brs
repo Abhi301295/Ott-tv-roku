@@ -1,0 +1,78 @@
+' HomeConstants.brs — card/row types and paging (parity with variable.constant.ts).
+
+function HC_TypeContinueWatching() as string
+    return "CONTINUE_WATCHING"
+end function
+
+function HC_TypeBanner() as string
+    return "BANNER"
+end function
+
+function HC_TypeContentList() as string
+    return "CONTENT_LIST"
+end function
+
+function HC_TypeTopContents() as string
+    return "TOP_CONTENTS"
+end function
+
+function HC_HomePageStart() as integer
+    return 1
+end function
+
+function HC_HomePageLimit() as integer
+    return 4
+end function
+
+' Static theme default (parity with theme.config.ts homeLayout).
+function HC_HomeLayoutNetflix() as string
+    return "NETFLIX"
+end function
+
+function HC_HomeLayoutOtt() as string
+    return "OTT"
+end function
+
+' Cinematic hero timing (parity with heroBannerCinematic.tsx).
+function HC_HeroHeight() as integer
+    return 918
+end function
+
+function HC_HeroSwipeMs() as integer
+    return 15000
+end function
+
+function HC_HeroCrossfadeSec() as float
+    return 1.2
+end function
+
+function HC_HeroZoomSec() as float
+    return 8.0
+end function
+
+' Delay before fetching/loading a slide's trailer (parity TRAILER_LOAD_DELAY 2500ms).
+function HC_HeroTrailerDelaySec() as float
+    return 2.5
+end function
+
+' Max time the loading skeleton waits for the hero poster to paint before it drops
+' anyway, so a slow/blocked image can never strand the shimmer on screen.
+function HC_HomeSkeletonMaxSec() as float
+    return 5.0
+end function
+
+' Hard ceiling for the on-home select-profile step. The retry loop already bounds the
+' common 401/404 case, but a request that never posts a response (hung socket) would
+' otherwise strand the user on an endless shimmer — when this fires we surface an error
+' and return to the profile picker. Sized above the worst-case retry budget.
+function HC_SelectWatchdogSec() as float
+    return 12.0
+end function
+
+' How long row building may wait for the hero trailer to go live before it builds
+' anyway. The hero schedules its trailer ~2.5s after the poster paints, so this gives
+' the preview the render thread first; if a slide has no trailer, rows still appear
+' promptly. The rows shimmer keeps animating during this window.
+function HC_RowBuildGateSec() as float
+    return 3.5
+end function

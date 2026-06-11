@@ -29,7 +29,7 @@
       font="font:LargeBoldSystemFont" color="0x0b75e0ff" visible="false" />
 
     <Label id="title" text="Choose how to Sign In" translation="[0, 228]" width="1920" horizAlign="center" color="0xf8f1f7ff">
-      <Font role="font" uri="pkg:/fonts/DMSans-Bold.ttf" size="36" />
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
     </Label>
 
     <!-- Tabs: DM Sans SemiBold 20, p-x-32 (pill = text+64), gap-16, radius-8, shadow-primary-700 when selected -->
@@ -47,33 +47,37 @@
     <Group id="phonePanel" translation="[499, 390]" visible="true">
       <Poster id="step1Badge" translation="[40, 44]" width="34" height="34" uri="pkg:/images/ui/badge.png" blendColor="0xf8f1f7ff" />
       <Label id="step1Num" text="1" translation="[40, 44]" width="34" height="34" horizAlign="center" vertAlign="center" color="0x0a0a0aff">
-        <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="16" />
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="16" />
       </Label>
       <Label id="step1Text" translation="[40, 94]" width="413" height="92" wrap="true" lineSpacing="6" color="0xe279ceff">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="19" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="19" />
       </Label>
 
       <Poster id="qrPad" translation="[160, 230]" width="182" height="182" uri="pkg:/images/ui/qr_pad.png" blendColor="0xf8f1f7ff" />
+      <!-- Parity with React SkeletonBox box-shadow: 0 4px 10px rgba(0,146,255,0.4).
+           primary-500 blue (#0092ff) at 0.4 alpha, glow biased ~4px below the box. -->
+      <Poster id="qrGlow" translation="[151, 225]" width="200" height="200" uri="pkg:/images/ui/qr_glow.png"
+        blendColor="0x0092ffff" opacity="0.4" visible="false" loadDisplayMode="scaleToFit" />
       <Skeleton id="qrSkeleton" translation="[176, 246]" boxWidth="150" boxHeight="150"
         baseColor="0xffffffff" highlightColor="0xf3f3f3ff" visible="false" />
       <Poster id="qrImage" translation="[176, 246]" width="150" height="150" loadDisplayMode="scaleToFit" visible="false" />
       <Label id="qrErrorLabel" translation="[176, 246]" width="150" height="150" wrap="true" lineSpacing="4"
         horizAlign="center" vertAlign="center" color="0x0b75e0ff" visible="false">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="13" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="13" />
       </Label>
 
       <Rectangle id="dividerTop" translation="[490, 61]" width="2" height="171" color="0xa12189ff" />
       <Label id="orLabel" text="or" translation="[468, 232]" width="46" height="36" horizAlign="center" vertAlign="center" color="0xe279ceff">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="18" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
       </Label>
       <Rectangle id="dividerBottom" translation="[490, 276]" width="2" height="174" color="0xa12189ff" />
 
       <Poster id="step2Badge" translation="[528, 44]" width="34" height="34" uri="pkg:/images/ui/badge.png" blendColor="0xf8f1f7ff" />
       <Label id="step2Num" text="2" translation="[528, 44]" width="34" height="34" horizAlign="center" vertAlign="center" color="0x0a0a0aff">
-        <Font role="font" uri="pkg:/fonts/DMSans-SemiBold.ttf" size="16" />
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="16" />
       </Label>
       <Label id="step2Text" translation="[528, 94]" width="354" height="80" wrap="true" horizAlign="center" color="0xe279ceff">
-        <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="22" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
       </Label>
       <!-- Code: font-serif fw-700 (tracking-widest) — Liberation Serif (Times-compatible) -->
       <Label id="userCodeLabel" translation="[528, 206]" width="354" height="110" wrap="true" lineSpacing="8"
@@ -94,14 +98,14 @@
         <Poster id="formErrorBg" translation="[0, 0]" width="794" height="52" uri="pkg:/images/ui/error_bg.png" blendColor="0x0b3a82ff" opacity="0.2" />
         <Poster id="formErrorBorder" translation="[0, 0]" width="794" height="52" uri="pkg:/images/ui/error_border.png" blendColor="0x0b75e0ff" />
         <Label id="formError" text="" translation="[16, 0]" width="762" height="52" wrap="true" horizAlign="center" vertAlign="center" color="0x0b75e0ff">
-          <Font role="font" uri="pkg:/fonts/DMSans-Regular.ttf" size="15" />
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="15" />
         </Label>
       </Group>
       <LoginFieldButton id="emailField" label="Email" translation="[64, 55]" fieldWidth="794" fieldHeight="60" />
       <LoginFieldButton id="passwordField" label="Password" translation="[64, 143]" fieldWidth="794" fieldHeight="60" secure="true" />
       <LoginTabButton id="loginBtn" label="Login" translation="[64, 247]" buttonWidth="794" buttonHeight="60"
         shapeUri="pkg:/images/ui/btn_login.png" shadowUri="pkg:/images/ui/btn_login_shadow.png"
-        fontUri="pkg:/fonts/DMSans-Bold.ttf" fontSize="22" />
+        fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="22" />
       <!-- In-button loader (parity with web's spinner inside the Login button) -->
       <BusySpinner id="loginSpinner" translation="[443, 259]" visible="false">
         <Poster role="poster" uri="pkg:/images/ui/spinner.png" width="36" height="36" />

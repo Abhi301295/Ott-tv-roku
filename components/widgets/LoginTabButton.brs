@@ -40,11 +40,14 @@ sub OnSizeChanged()
     m.bg.height = h
     m.text.width = w
     m.text.height = h
-    ' Keep focus glow tight. The source PNGs include generous padding; rendering
-    ' them at +96 made logout/home buttons look like a huge background panel.
-    m.shadow.width = w + 32
-    m.shadow.height = h + 32
-    m.shadow.translation = [-16, -12]
+    ' Each *_shadow.png is authored at exactly (button + 96px), i.e. 48px of soft
+    ' drop-shadow padding on every side (tab_phone 168x56 → shadow 264x152, etc).
+    ' Render at native size and center it with [-48,-48] so the pre-baked blur stays
+    ' soft. (An earlier +32 clamp squished it into a hard blob; the "huge panel" look
+    ' was the shadow showing when it shouldn't, now gated by showShadow below.)
+    m.shadow.width = w + 96
+    m.shadow.height = h + 96
+    m.shadow.translation = [-48, -48]
 end sub
 
 sub ApplyStyle()
@@ -58,7 +61,8 @@ sub ApplyStyle()
     sc = m.top.shadowColor
     if sc = invalid or sc = "" then sc = "0x04478bff"
     m.shadow.blendColor = sc
-    ' No external glow/background on focus; selection is communicated by the
-    ' button fill itself, matching the requested Roku TV behavior.
-    m.shadow.visible = false
+    ' Soft drop shadow (shadow-lg shadow-primary-700) on the selected/focused state,
+    ' driven by the owner via showShadow. Login tabs light this on the selected tab;
+    ' the logout button leaves it off so its look is unchanged.
+    m.shadow.visible = m.top.showShadow
 end sub

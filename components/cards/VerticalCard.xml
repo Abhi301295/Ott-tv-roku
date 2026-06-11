@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Vertical content card — parity with components/cards/verticalCard.tsx (240×300). -->
+<component name="VerticalCard" extends="Group">
+  <interface>
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="listType" type="boolean" value="false" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/VerticalCard.brs" />
+
+  <children>
+    <Group id="body" translation="[3, 3]">
+      <Skeleton id="skeleton" boxWidth="220" boxHeight="300" />
+      <Poster id="thumb" width="220" height="300" loadWidth="220" loadHeight="300" loadDisplayMode="scaleToFill" visible="false" />
+      <!-- Grey veil over the poster — parity with verticalCard.tsx linear-gradient(0deg,
+           rgba(40,40,40,.6) bottom -> rgba(120,120,120,.1) top). Sized in code. -->
+      <Poster id="veil" width="220" height="300" loadDisplayMode="scaleToFill"
+        uri="pkg:/images/ui/card_veil_vertical.png" />
+      <!-- Rounded corners (radius-10) — baked corner covers; MaskGroup doesn't clip in sim.
+           Must sit above the veil so the cut shows. Shared round_corner_*.png (#0a0a0a). -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]"   width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[210, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 290]" width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[210, 290]" width="10" height="10" />
+    </Group>
+    <!-- Focus frame (226×306) is created lazily on first focus — see ApplyFocusVisual. -->
+  </children>
+</component>

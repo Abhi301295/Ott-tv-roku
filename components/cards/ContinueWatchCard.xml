@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Continue-watching card — parity with continueWatchCard.tsx (540×286 + progress bar). -->
+<component name="ContinueWatchCard" extends="Group">
+  <interface>
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="progress" type="float" value="0.0" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="loaded" type="boolean" value="false" alwaysNotify="true" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+    <field id="cNeutral950" type="string" value="0x0a0a0aff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/ContinueWatchCard.brs" />
+
+  <children>
+    <Group id="body" translation="[3, 3]">
+      <!-- React: radius-10 container has bg-neutral-700 behind the image (shows while the
+           thumbnail loads / on transparent art). -->
+      <Rectangle id="cardBg" width="540" height="286" color="0x404040ff" />
+      <Skeleton id="skeleton" boxWidth="540" boxHeight="286" />
+      <Poster id="thumb" width="540" height="286" loadWidth="540" loadHeight="286" loadDisplayMode="scaleToFill" visible="false" />
+      <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0x0a0a0aff" />
+      <!-- Smooth fill gradient (parity with React from-primary-500 via-600 to-700): built in
+           code as N thin slices interpolating primary-500 -> primary-700, so the tone blends
+           continuously and stays fully theme-token driven (no baked colors). -->
+      <Group id="progressFill" translation="[0, 278]" />
+      <!-- Rounded corners (radius-10). MaskGroup doesn't clip in brs-engine, so corner nubs
+           paint the row backdrop (#0a0a0a) baked into the PNG — blendColor is unreliable here.
+           Shared round_corner_*.png set used by every card type. -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]"   width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[530, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 276]" width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[530, 276]" width="10" height="10" />
+    </Group>
+    <!-- Focus frame (546×292 = 540×286 + 3px each side) is created lazily on first focus
+         (see ApplyFocusVisual) so it isn't built for every card during the row build burst. -->
+  </children>
+</component>

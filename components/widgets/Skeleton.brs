@@ -31,11 +31,15 @@ sub ApplyColors()
     m.shine.blendColor = m.top.highlightColor
 end sub
 
+' Static placeholders (cards) keep the shimmer animation off: running ~20 of them
+' while building rows starves the render thread. The shine overlay is parked so the
+' base color reads as a plain neutral block. Screens that want the sweep set animate.
 sub OnRunningChanged()
     if m.anim = invalid then return
-    if m.top.running then
+    if m.top.running and m.top.animate then
         m.anim.control = "start"
     else
         m.anim.control = "stop"
+        if m.shine <> invalid then m.shine.opacity = 0.0
     end if
 end sub

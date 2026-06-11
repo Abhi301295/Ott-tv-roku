@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Top-contents numbered card — parity with numberedVerticalCard.tsx (368×208 + rank). -->
+<component name="NumberedVerticalCard" extends="Group">
+  <interface>
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="rank" type="integer" value="0" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/NumberedVerticalCard.brs" />
+
+  <children>
+    <!-- Small left gutter (parity with numberedVerticalCard.tsx p-l-12 inset) so the giant
+         numeral overlaps the poster's lower-left instead of sitting in empty space. -->
+    <Group id="body" translation="[24, 3]">
+      <Skeleton id="skeleton" boxWidth="368" boxHeight="208" />
+      <Poster id="thumb" width="368" height="208" loadWidth="368" loadHeight="208" loadDisplayMode="scaleToFill" visible="false" />
+      <!-- Rounded corners (radius-10): the simulator ignores MaskGroup, so baked corner covers
+           hide the square poster corners. Shared round_corner_*.png set (#0a0a0a backdrop). -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]" width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[358, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 198]" width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[358, 198]" width="10" height="10" />
+    </Group>
+    <!-- Giant rank numeral in front of the poster (parity with numberedVerticalCard.tsx
+         fs-150 fw-900, z-2 over the z-1 image, left:-5 vertically centered) with a soft
+         green glow behind it (drop-shadow #71C704). -->
+    <Poster id="rankGlow" translation="[-69, -43]" width="200" height="300"
+      uri="pkg:/images/ui/rank_glow.png" visible="false" />
+    <Label id="rankLabel" translation="[7, 32]" width="210" height="150" text="1"
+      horizAlign="left" vertAlign="center" color="0xf8f1f7ff">
+      <!-- fw-900 parity: Inter Black (900), the heaviest weight, matches LG's bold numerals. -->
+      <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="150" />
+    </Label>
+    <!-- Focus frame (374×214 @ [21,0]) is created lazily on first focus — see ApplyFocusVisual. -->
+  </children>
+</component>

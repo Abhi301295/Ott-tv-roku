@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- See-all tile — parity with components/cards/seeAll.tsx. -->
+<component name="SeeAllCard" extends="Group">
+  <interface>
+    <field id="orientation" type="string" value="VERTICAL" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/SeeAllCard.brs" />
+
+  <children>
+    <Group id="body" translation="[3, 3]">
+      <Rectangle id="fill" width="240" height="305" color="0x262626ff" />
+      <Label id="label" text="See All" translation="[0, 130]" width="240" height="40"
+        horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+      </Label>
+      <!-- Rounded corners (radius-10) — baked corner covers; repositioned in code per
+           orientation (vertical 240×305 / horizontal 540×320). Shared round_corner_*.png. -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]" width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[230, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 295]" width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[230, 295]" width="10" height="10" />
+    </Group>
+    <!-- Rounded, even 3px focus frame (primitive edges + corner sprites); size set in code. -->
+    <FocusFrame id="focusBorder" translation="[0, 0]" boxWidth="246" boxHeight="311"
+      color="0x0b75e0ff" visible="false" />
+  </children>
+</component>

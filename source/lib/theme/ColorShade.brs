@@ -255,14 +255,19 @@ function BuildThemeTokens(resolved as object) as object
         end for
     end if
 
+    ' Faithful 1:1 port of useTheme.ts: colors.secondary -> generateNeutralLightTokens
+    ' (neutral-50..600). No usability guard — match React exactly.
     secondary = NormalizeHex(resolved.portalSecondaryColor)
     if secondary <> "" then
-        ns = GenerateShades(secondary)
-        for each k in ns
-            if Val(k) <= 600 then tokens["neutral-" + k] = ns[k]
+        ss = GenerateShades(secondary)
+        for each k in ss
+            kn = Val(k)
+            if kn >= 50 and kn <= 600 then tokens["neutral-" + k] = ss[k]
         end for
     end if
 
+    ' Faithful 1:1 port of useTheme.ts: colors.tertiary -> generateBgTokens
+    ' (--background + neutral-700..1000). No darkness guard — match React exactly.
     tertiary = NormalizeHex(resolved.portalTertiaryColor)
     if tertiary <> "" then
         bg = GenerateBgTokens(tertiary)

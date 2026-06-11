@@ -65,6 +65,22 @@ function VerifyPinPayload(profileId as string, pin as string) as object
     }
 end function
 
+' Classify a select-profile HTTP status. A freshly-issued login token is briefly not yet
+' active on the backend, so 401/404 — and transport-level failures (status <= 0) — are
+' transient and worth retrying before surfacing an error. Single source of truth shared by
+' the profile screen (PIN path) and the home boot select.
+function SelectProfileRetriable(httpStatus as integer) as boolean
+    return (httpStatus = 401 or httpStatus = 404 or httpStatus <= 0)
+end function
+
+' Persist the active profile identity after a successful select-profile. SaveProfilesMeta
+' only ever stores profile #1's avatar, so the explicitly-chosen avatar is written here
+' too — otherwise the home header would be stuck on the first profile's image.
+sub PersistSelectedProfile(profileId as string, avatar as string)
+    SetProfileId(profileId)
+    if avatar <> "" then SetValueByKey(SK_Avatar(), avatar, "app")
+end sub
+
 ' Store tokens returned by select-profile. Returns true when a valid token pair
 ' arrived (parity with the statusCode 200 + authToken + refreshToken check).
 function ApplySelectProfileTokens(result as object) as boolean
