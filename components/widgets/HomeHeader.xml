@@ -40,18 +40,15 @@
          never reflows its neighbors, matching React where transform doesn't affect layout. -->
     <Group id="menuRow" translation="[560, 34]" />
 
-    <!-- Static header avatar (parity with ottHeader.tsx Images.AVATAR — NOT the selected
-         profile's remote image). Two-layer art from the React SVG: primary-tinted shapes
-         + fixed-color face/highlight detail, clipped to a 64px circle (w-16 h-16). -->
-    <MaskGroup id="avatarMask" translation="[1808, 26]"
-      maskUri="pkg:/images/ui/avatar_circle.png" maskSize="[64, 64]">
-      <Poster id="avatarBg" width="64" height="64"
-        uri="pkg:/images/ui/avatar_circle.png" blendColor="0x0b75e0ff" />
-      <Poster id="avatarPrimary" width="64" height="64"
-        uri="pkg:/images/ui/header_avatar_primary.png" blendColor="0x0b75e0ff"
-        loadDisplayMode="scaleToFill" />
+    <!-- Static header avatar (parity with ottHeader.tsx Images.AVATAR). PNGs are
+         pre-masked to a circle (rounded-full overflow-hidden). The tint layer is a
+         white-mask PNG tinted via blendColor using themeManager primary-500 (same
+         pattern as FocusFrame corners + LoginTabButton). -->
+    <Group id="avatarHost" translation="[1808, 26]">
+      <Poster id="avatarTint" width="64" height="64"
+        uri="pkg:/images/ui/header_avatar_tint.png" loadDisplayMode="scaleToFill" />
       <Poster id="avatarDetail" width="64" height="64"
         uri="pkg:/images/ui/header_avatar_detail.png" loadDisplayMode="scaleToFill" />
-    </MaskGroup>
+    </Group>
   </children>
 </component>

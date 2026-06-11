@@ -13,8 +13,10 @@ sub init()
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
     m.menuRow = m.top.findNode("menuRow")
-    m.avatarBg = m.top.findNode("avatarBg")
-    m.avatarPrimary = m.top.findNode("avatarPrimary")
+    m.avatarTint = m.top.findNode("avatarTint")
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.observeField("businessResolved", "OnBusinessResolved")
+    end if
     ApplyAvatarTheme()
 
     m.itemRoots = []
@@ -66,13 +68,33 @@ sub OnThemeChanged()
     ApplyFocus()
 end sub
 
-' React Images.AVATAR uses var(--primary-500) for the circle + clothing; tint those layers.
-sub ApplyAvatarTheme()
-    primary = m.top.cPrimary500
-    if primary = invalid or primary = "" then primary = "0x0b75e0ff"
-    if m.avatarBg <> invalid then m.avatarBg.blendColor = primary
-    if m.avatarPrimary <> invalid then m.avatarPrimary.blendColor = primary
+sub OnBusinessResolved()
+    ApplyAvatarTheme()
 end sub
+
+' React Images.AVATAR uses var(--primary-500) for the disc + clothing. Read the live
+' theme token from themeManager (not a baked default) and tint the white-mask PNG.
+sub ApplyAvatarTheme()
+    primary = "0x0b75e0ff"
+    tm = m.top.getScene().findNode("themeManager")
+    if tm <> invalid and tm.themeTokens <> invalid then
+        primary = HeaderTokenColor(tm.themeTokens, "primary-500", "#0b75e0")
+    else if m.top.cPrimary500 <> invalid and m.top.cPrimary500 <> "" then
+        primary = m.top.cPrimary500
+    end if
+    if m.avatarTint <> invalid then m.avatarTint.blendColor = primary
+end sub
+
+function HeaderTokenColor(tokens as object, name as string, fallbackHex as string) as string
+    hex = fallbackHex
+    if tokens <> invalid and tokens[name] <> invalid and tokens[name] <> "" then
+        hex = tokens[name]
+    end if
+    if Left(hex, 1) = "#" then hex = Mid(hex, 2)
+    if Len(hex) = 8 then return "0x" + hex
+    if Len(hex) = 6 then return "0x" + hex + "ff"
+    return "0x0b75e0ff"
+end function
 
 sub OnScrimOpacityChanged()
     if m.scrim = invalid then return
