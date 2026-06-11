@@ -482,7 +482,7 @@ sub BuildBars()
 
     if m.heroBarFill <> invalid then
         m.heroBarFill.color = m.top.cPrimary500
-        m.heroBarFill.translation = [activeX, 250]
+        m.heroBarFill.translation = [activeX, 290]
         m.heroBarFill.width = 0
         m.heroBarFill.visible = true
     end if

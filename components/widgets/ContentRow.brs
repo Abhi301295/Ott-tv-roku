@@ -148,7 +148,10 @@ function PlanRowCards(cat as object) as object
             plan.Push({ kind: "card", item: item, comp: compName, cardType: cardType, rank: i })
         end if
     end for
-    if rowType <> HC_PromotionalCard() and items.Count() >= HC_SeeAllThreshold() + 1 then
+    ' React shows See All only on CONTENT_LIST rows with a vertical/horizontal cardType
+    ' (not TOP_CONTENTS / CONTINUE_WATCHING / PROMOTIONAL).
+    seeAllRow = (rowType = HC_TypeContentList()) and (cardType = HC_CardTypeVertical() or cardType = HC_CardTypeHorizontal())
+    if seeAllRow and items.Count() >= HC_SeeAllThreshold() + 1 then
         plan.Push({ kind: "seeAll" })
     end if
     return plan
