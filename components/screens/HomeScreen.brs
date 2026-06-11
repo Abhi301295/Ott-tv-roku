@@ -706,7 +706,6 @@ sub OnHomeCategoriesResponse()
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
         print "[HOME] home categories response ok, categories="; listing.Count()
-        LogCategoryMapping(listing)
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
         end if
@@ -727,57 +726,6 @@ sub OnHomeCategoriesResponse()
     ' of Continue Watching. Rows still wait for CW so its shimmer can keep showing.
     MaybeBuildHero()
     MaybeBuildRows()
-end sub
-
-' Verification logging for content/image parity with LG. Dumps the row order, each row's
-' type/cardType/item-count, and (for TOP_CONTENTS) every item's title + thumbnail variants
-' so we can confirm Roku and LG resolve the same content and the same image per card.
-sub LogCategoryMapping(listing as object)
-    if listing = invalid then
-        print "[HOME][MAP] listing invalid"
-        return
-    end if
-    print "[HOME][MAP] ===== category mapping (rows="; listing.Count(); ") ====="
-    for i = 0 to listing.Count() - 1
-        cat = listing[i]
-        if cat <> invalid then
-            nm = ""
-            if cat.name <> invalid then nm = cat.name
-            tp = ""
-            if cat.type <> invalid then tp = cat.type
-            ct = ""
-            if cat.cardType <> invalid then ct = cat.cardType
-            cid = ""
-            if cat._id <> invalid then cid = cat._id
-            cnt = 0
-            if cat.result <> invalid then cnt = cat.result.Count()
-            print "[HOME][MAP] row#"; i; " name='"; nm; "' type="; tp; " cardType="; ct; " id="; cid; " items="; cnt
-            if tp = "TOP_CONTENTS" and cat.result <> invalid then
-                for j = 0 to cat.result.Count() - 1
-                    it = cat.result[j]
-                    if it <> invalid then
-                        itTitle = ""
-                        if it.title <> invalid then itTitle = it.title
-                        itId = ""
-                        if it._id <> invalid then itId = it._id
-                        print "[HOME][MAP]   item#"; j; " id="; itId; " title='"; itTitle; "'"
-                        if it.thumbnails <> invalid then
-                            for each th in it.thumbnails
-                                if th <> invalid then
-                                    thType = ""
-                                    if th.type <> invalid then thType = th.type
-                                    thPath = ""
-                                    if th.path <> invalid then thPath = th.path
-                                    print "[HOME][MAP]       thumb type="; thType; " path="; thPath
-                                end if
-                            end for
-                        end if
-                    end if
-                end for
-            end if
-        end if
-    end for
-    print "[HOME][MAP] ===== end mapping ====="
 end sub
 
 sub FetchLatestVersion()

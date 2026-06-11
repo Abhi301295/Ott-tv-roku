@@ -65,11 +65,15 @@ end sub
 sub ApplyColor()
     c = m.top.color
     if c = invalid or c = "" then return
-    ' Straight edges are Rectangles (their .color fill always renders). The rounded corner
-    ' sprites have the primary blue BAKED in (this engine build doesn't reliably tint a PNG
-    ' via blendColor — the white loading skeleton proves it), so we don't set blendColor.
+    ' Straight edges are Rectangles whose .color fill always renders. The rounded corner
+    ' sprites are now WHITE alpha masks, so blendColor tints them to the active theme color
+    ' (no more baked blue corners when the business theme changes to e.g. red).
     m.edgeTop.color = c
     m.edgeBottom.color = c
     m.edgeLeft.color = c
     m.edgeRight.color = c
+    m.cTL.blendColor = c
+    m.cTR.blendColor = c
+    m.cBL.blendColor = c
+    m.cBR.blendColor = c
 end sub

@@ -255,11 +255,8 @@ function BuildThemeTokens(resolved as object) as object
         end for
     end if
 
-    ' Light neutral shades (50–600) are generated from portalDesign.secondaryColor,
-    ' exactly as the web does (useTheme: colors.secondary -> generateShades -> --neutral-50..600).
-    ' The LG/webOS reference renders login/body text with this secondary ramp (pink
-    ' #e279ce here), so Roku must do the same to match — otherwise neutrals fall back to
-    ' the static gray DarkThemeTokens and the text/dividers render gray instead of pink.
+    ' Faithful 1:1 port of useTheme.ts: colors.secondary -> generateNeutralLightTokens
+    ' (neutral-50..600). No usability guard — match React exactly.
     secondary = NormalizeHex(resolved.portalSecondaryColor)
     if secondary <> "" then
         ss = GenerateShades(secondary)
@@ -268,8 +265,9 @@ function BuildThemeTokens(resolved as object) as object
             if kn >= 50 and kn <= 600 then tokens["neutral-" + k] = ss[k]
         end for
     end if
-    print "[THEMEDBG] secondary='"; secondary; "' -> neutral-500="; tokens["neutral-500"]; " neutral-50="; tokens["neutral-50"]; " neutral-600="; tokens["neutral-600"]
 
+    ' Faithful 1:1 port of useTheme.ts: colors.tertiary -> generateBgTokens
+    ' (--background + neutral-700..1000). No darkness guard — match React exactly.
     tertiary = NormalizeHex(resolved.portalTertiaryColor)
     if tertiary <> "" then
         bg = GenerateBgTokens(tertiary)

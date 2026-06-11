@@ -22,11 +22,10 @@
       <Skeleton id="skeleton" boxWidth="540" boxHeight="286" />
       <Poster id="thumb" width="540" height="286" loadWidth="540" loadHeight="286" loadDisplayMode="scaleToFill" visible="false" />
       <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0x0a0a0aff" />
-      <!-- 3-segment fill approximates React's from-primary-500 via-600 to-700 gradient
-           while staying theme-token driven (widths/colors set in code). -->
-      <Rectangle id="progressFillA" translation="[0, 278]" width="0" height="8" color="0x0b75e0ff" />
-      <Rectangle id="progressFillB" translation="[0, 278]" width="0" height="8" color="0x0760bbff" />
-      <Rectangle id="progressFillC" translation="[0, 278]" width="0" height="8" color="0x04478bff" />
+      <!-- Smooth fill gradient (parity with React from-primary-500 via-600 to-700): built in
+           code as N thin slices interpolating primary-500 -> primary-700, so the tone blends
+           continuously and stays fully theme-token driven (no baked colors). -->
+      <Group id="progressFill" translation="[0, 278]" />
       <!-- Simulator-safe rounding: MaskGroup is not honored here, so these tuned corner
            covers hide the square thumbnail/progress corners while the row background remains
            transparent. Color matches the hero bottom vignette to avoid hard black notches. -->
