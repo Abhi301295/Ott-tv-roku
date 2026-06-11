@@ -72,45 +72,45 @@
     <Poster id="bottomVignette" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 643]"
       width="1920" height="275" loadDisplayMode="scaleToFill" />
 
-    <Group id="metaHost" translation="[64, 340]">
-      <Label id="titleLabel" text="" width="760" height="80" wrap="false"
+    <Group id="metaHost" translation="[64, 300]">
+      <Label id="titleLabel" text="" width="760" height="90" wrap="false"
         color="0xf8f1f7ff" horizAlign="left" vertAlign="top">
-        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="56" />
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="67" />
       </Label>
 
       <!-- IMDB rating number + star row (parity with StarRating in hero). -->
-      <LayoutGroup id="ratingHost" translation="[0, 84]" layoutDirection="horiz"
+      <LayoutGroup id="ratingHost" translation="[0, 100]" layoutDirection="horiz"
         itemSpacings="[8]" vertAlignment="center" visible="false">
-        <Label id="ratingLabel" text="" height="32" color="0xf8f1f7ff"
+        <Label id="ratingLabel" text="" height="38" color="0xf8f1f7ff"
           horizAlign="left" vertAlign="center">
-          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="26" />
         </Label>
       </LayoutGroup>
 
       <!-- Genres + quality badge inline (parity with genre row). -->
-      <LayoutGroup id="genreHost" translation="[0, 122]" layoutDirection="horiz"
+      <LayoutGroup id="genreHost" translation="[0, 144]" layoutDirection="horiz"
         itemSpacings="[15]" vertAlignment="center">
-        <Label id="genreLabel" text="" height="32"
+        <Label id="genreLabel" text="" height="36"
           color="0xf8f1f7ff" horizAlign="left" vertAlign="center">
-          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
         </Label>
         <Group id="qualityBadge" visible="false">
-          <Rectangle id="qualityBg" width="70" height="28" color="0xffffff33" />
-          <Label id="qualityLabel" text="" width="70" height="28"
+          <Rectangle id="qualityBg" width="84" height="34" color="0xffffff33" />
+          <Label id="qualityLabel" text="" width="84" height="34"
             color="0xf8f1f7ff" horizAlign="center" vertAlign="center">
-            <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="14" />
+            <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="17" />
           </Label>
         </Group>
       </LayoutGroup>
 
-      <Label id="descLabel" translation="[0, 160]" text="" width="633" height="80" wrap="true"
+      <Label id="descLabel" translation="[0, 190]" text="" width="633" height="96" wrap="true"
         color="0xf8f1f7cc" horizAlign="left" vertAlign="top">
-        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
       </Label>
 
-      <Group id="barsHost" translation="[0, 250]" />
+      <Group id="barsHost" translation="[0, 290]" />
       <!-- Persistent active-slide fill so the timer animation never loses its binding. -->
-      <Rectangle id="heroBarFill" translation="[0, 250]" width="0" height="4" color="0x0b75e0ff" />
+      <Rectangle id="heroBarFill" translation="[0, 290]" width="0" height="4" color="0x0b75e0ff" />
     </Group>
 
     <!-- Prev/Next glass buttons at screen edges (parity with portal arrows:
@@ -157,10 +157,10 @@
         <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="48" />
       </Label>
       <Label id="counterSep" text="/" color="0xf8f1f766" horizAlign="left" vertAlign="bottom">
-        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
       </Label>
       <Label id="counterTotal" text="" color="0xf8f1f766" horizAlign="left" vertAlign="bottom">
-        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
       </Label>
     </LayoutGroup>
 

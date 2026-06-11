@@ -23,6 +23,12 @@
         color="0xf8f1f7ff">
         <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="28" />
       </Label>
+      <!-- Rounded corners (radius-10) — baked corner covers; MaskGroup doesn't clip in sim.
+           Shared round_corner_*.png (#0a0a0a). -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]"    width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[1760, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 390]"  width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[1760, 390]" width="10" height="10" />
     </Group>
     <!-- Rounded, even 3px focus frame (primitive edges + corner sprites) on top of the body. -->
     <FocusFrame id="focusBorder" translation="[0, 0]" boxWidth="1776" boxHeight="406"

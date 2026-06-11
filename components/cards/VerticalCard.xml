@@ -22,6 +22,12 @@
            rgba(40,40,40,.6) bottom -> rgba(120,120,120,.1) top). Sized in code. -->
       <Poster id="veil" width="220" height="300" loadDisplayMode="scaleToFill"
         uri="pkg:/images/ui/card_veil_vertical.png" />
+      <!-- Rounded corners (radius-10) — baked corner covers; MaskGroup doesn't clip in sim.
+           Must sit above the veil so the cut shows. Shared round_corner_*.png (#0a0a0a). -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]"   width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[210, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 290]" width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[210, 290]" width="10" height="10" />
     </Group>
     <!-- Focus frame (226×306) is created lazily on first focus — see ApplyFocusVisual. -->
   </children>

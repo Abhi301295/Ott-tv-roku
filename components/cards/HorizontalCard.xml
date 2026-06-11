@@ -17,6 +17,12 @@
     <Group id="body" translation="[3, 3]">
       <Skeleton id="skeleton" boxWidth="540" boxHeight="312" />
       <Poster id="thumb" width="540" height="312" loadWidth="540" loadHeight="312" loadDisplayMode="scaleToFill" visible="false" />
+      <!-- Rounded corners (radius-10) — baked corner covers; MaskGroup doesn't clip in sim.
+           Shared round_corner_*.png (#0a0a0a). -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]"   width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[530, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 302]" width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[530, 302]" width="10" height="10" />
     </Group>
     <!-- Focus frame (546×318) is created lazily on first focus — see ApplyFocusVisual. -->
   </children>

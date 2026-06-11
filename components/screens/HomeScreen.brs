@@ -19,9 +19,10 @@ sub init()
     m.cardIndex = 0
     m.loadingMore = false
 
-    ' Start on the header so navigation is responsive while hero/CW rows are still loading.
-    ' The user can move to another section immediately instead of waiting for CW cards.
+    ' Land on content once rows are ready (LG netflixContent sets FocusKey.CONTENT).
+    ' Until then the header stays focused so nav remains usable during shimmer.
     m.focusZone = "header"
+    m.pendingContentFocus = true
     m.menuItems = []
     m.menuIndex = 0
 
@@ -128,7 +129,6 @@ sub ConsumeHomeNavState()
     ns = m.top.navState
     if ns = invalid then return
     if ns.selectProfileId <> invalid then m.pendingSelectId = ns.selectProfileId
-    if ns.selectAvatar <> invalid then m.pendingSelectAvatar = ns.selectAvatar
 end sub
 
 sub TryStartHomeBoot()
@@ -141,12 +141,6 @@ sub TryStartHomeBoot()
     if GetProfileId() = "" and m.pendingSelectId = "" then
         RedirectToProfiles()
         return
-    end if
-
-    ' Paint the chosen avatar immediately so switching profiles never flashes the previous
-    ' profile's image in the header while select-profile is still in flight.
-    if m.pendingSelectId <> "" and m.pendingSelectAvatar <> "" and m.header <> invalid then
-        m.header.avatarUri = m.pendingSelectAvatar
     end if
 
     ' Both regions shimmer immediately on mount; they reveal independently as their data
@@ -332,6 +326,14 @@ sub ExitHeaderToRows()
     if m.header <> invalid then m.header.headerActive = false
     m.focusZone = "rows"
     ApplyHomeFocus()
+end sub
+
+' LG netflixContent.tsx sets initial focus to CONTENT once category data is ready.
+sub MaybeLandContentFocus()
+    if not m.pendingContentFocus then return
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    m.pendingContentFocus = false
+    if m.focusZone = "header" then ExitHeaderToRows()
 end sub
 
 sub HandleHeaderKey(key as string)
@@ -931,6 +933,7 @@ sub OnRowBuildTick()
         if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
         print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
         ApplyHomeFocus()
+        MaybeLandContentFocus()
     end if
 end sub
 
@@ -945,6 +948,7 @@ sub OnFirstRowBuilt()
     ' CW content has painted — drop the dark scrim so the hero bleeds behind the cards.
     m.rowsRevealed = true
     UpdateRowsScrim()
+    MaybeLandContentFocus()
     ' Warm the next row in the background while the user is still on CW.
     if m.rowWidgets.Count() > 1 then
         row1 = m.rowWidgets[1]
@@ -965,7 +969,12 @@ end sub
 sub ApplyHomeFocus()
     if m.rowsHost = invalid then return
 
-    if m.focusZone = "rows" then MaterializeNearbyRows()
+    ' Only materialize the rows that are actually on screen (the focused row + the one peeking
+    ' in at the bottom). In steady-state navigation these were already built by the idle
+    ' prefetch, so this is a no-op; the off-screen look-ahead build is deferred to OnInteractIdle
+    ' so node creation never competes with the 0.4s scroll animation (that contention was the
+    ' source of the row-switch stutter).
+    if m.focusZone = "rows" then MaterializeVisibleRows()
 
     anchorY = HC_NetflixAnchorY() - (m.rowIndex * HC_RowPitch())
     AnimateRowsHost(anchorY)
@@ -975,6 +984,20 @@ sub ApplyHomeFocus()
     end for
 
     UpdateRowsScrim()
+end sub
+
+' Materialize only the rows currently visible on screen: the focused row pinned at the anchor
+' plus the next row, which peeks in at the bottom (anchor 702 + pitch 430 = 1132, within the
+' 1080 viewport). Called on every focus change; deliberately does NOT build the off-screen
+' look-ahead row so it can't steal render-thread time from the scroll animation.
+sub MaterializeVisibleRows()
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    for i = m.rowIndex to m.rowIndex + 1
+        if i >= 0 and i < m.rowWidgets.Count() then
+            row = m.rowWidgets[i]
+            if row <> invalid then row.callFunc("Materialize", invalid)
+        end if
+    end for
 end sub
 
 ' Set the focus/dim state for a single row. Pulled out of ApplyHomeFocus so the row-build
@@ -1020,6 +1043,9 @@ sub AnimateRowsHost(targetY as integer)
     fromY = m.rowsHost.translation[1]
     if m.rowsAnim = invalid or m.rowsInterp = invalid or fromY = targetY then
         m.rowsHost.translation = [0, targetY]
+        ' No animation in flight (initial land, or left/right within a row) — safe to build the
+        ' off-screen look-ahead now so it's ready before the next animated row switch.
+        if m.focusZone = "rows" then MaterializeNearbyRows()
         return
     end if
     m.rowsInterp.keyValue = [[0, fromY], [0, targetY]]
@@ -1135,6 +1161,9 @@ end sub
 
 sub OnInteractIdle()
     m.interacting = false
+    ' User paused — now safe to build the off-screen look-ahead row(s) for the next move,
+    ' since there's no scroll animation in flight to compete with.
+    if m.focusZone = "rows" then MaterializeNearbyRows()
     ResumeRowBuilding()
 end sub
 

@@ -50,15 +50,24 @@
       <Rectangle id="rowShine4" translation="[1682, 757]" width="540" height="286" color="0x404040ff" opacity="0.0" />
     </Group>
 
-    <Animation id="anim" duration="1.0" repeat="true" easeFunction="inOutQuad">
+    <Animation id="heroAnim" duration="1.0" repeat="true" easeFunction="inOutQuad">
       <FloatFieldInterpolator id="heroInterp1" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hTitleShine.opacity" />
       <FloatFieldInterpolator id="heroInterp2" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hGenreShine.opacity" />
       <FloatFieldInterpolator id="heroInterp3" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hDesc1Shine.opacity" />
       <FloatFieldInterpolator id="heroInterp4" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="hDesc2Shine.opacity" />
+    </Animation>
+    <!-- Separate pulse for the rows so it can be frozen independently of the hero. -->
+    <Animation id="rowsAnim" duration="1.0" repeat="true" easeFunction="inOutQuad">
       <FloatFieldInterpolator id="rowsInterp1" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine1.opacity" />
       <FloatFieldInterpolator id="rowsInterp2" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine2.opacity" />
       <FloatFieldInterpolator id="rowsInterp3" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine3.opacity" />
       <FloatFieldInterpolator id="rowsInterp4" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine4.opacity" />
+    </Animation>
+
+    <!-- Dissolve the rows shimmer out (instead of a hard cut) so the heavy first-draw of
+         the real cards underneath can never show up as a stutter in the pulse. -->
+    <Animation id="rowsFade" duration="0.35" repeat="false" easeFunction="outQuad">
+      <FloatFieldInterpolator id="rowsFadeInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="rowsPulse.opacity" />
     </Animation>
   </children>
 </component>

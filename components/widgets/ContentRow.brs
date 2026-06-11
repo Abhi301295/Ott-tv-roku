@@ -202,7 +202,12 @@ sub OnCardBuildTick()
         m.buildX = m.buildX + w + gap
     else
         card = m.cardsHost.createChild(plan.comp)
-        if plan.comp = "ContinueWatchCard" and card.hasField("loaded") then
+        ' Only gate the reveal on cards that are actually on screen (buildX within the 1920
+        ' viewport). A CW row builds up to 11 cards but only ~4 are visible, so waiting on the
+        ' off-screen thumbnails kept the loading placeholder up ~1s longer than needed. The
+        ' off-screen cards keep loading behind the revealed strip and are ready by the time the
+        ' user scrolls to them.
+        if plan.comp = "ContinueWatchCard" and card.hasField("loaded") and m.buildX < 1920 then
             m.pendingMediaLoads = m.pendingMediaLoads + 1
             card.observeField("loaded", "OnCardMediaLoaded")
         end if
