@@ -201,7 +201,6 @@ sub OnCardBuildTick()
         m.cardWidths.Push(w)
         m.buildX = m.buildX + w + gap
     else
-        span = CreateObject("roTimespan")
         card = m.cardsHost.createChild(plan.comp)
         if plan.comp = "ContinueWatchCard" and card.hasField("loaded") then
             m.pendingMediaLoads = m.pendingMediaLoads + 1
@@ -213,7 +212,6 @@ sub OnCardBuildTick()
         m.cards.Push(card)
         m.cardWidths.Push(w)
         m.buildX = m.buildX + w + gap
-        print "[PERF]   card "; plan.comp; " rank="; plan.rank; " "; span.TotalMilliseconds(); "ms"
     end if
 
     m.buildIdx = m.buildIdx + 1
@@ -276,12 +274,8 @@ sub ConfigureCard(card as object, compName as string, item as object, cardType a
         ' PARITY: contentRow.tsx selects the TOP_CONTENTS thumbnail with the category's own
         ' cardType (getCardImgByType(cardType, thumbnails)) — NOT a hardcoded VERTICAL. Using
         ' VERTICAL here picked a different thumbnail variant than LG for the same item.
-        chosen = GetCardImgByType(cardType, item.thumbnails)
-        card.thumbnailUri = chosen
+        card.thumbnailUri = GetCardImgByType(cardType, item.thumbnails)
         card.rank = rank
-        dbgTitle = ""
-        if item.title <> invalid then dbgTitle = item.title
-        print "[HOME][MAP] numbered rank="; rank; " title="; dbgTitle; " cardType="; cardType; " -> uri="; chosen
     else if compName = "BannerCard" then
         thumb = ResolveBannerImage(item, GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails))
         card.thumbnailUri = thumb

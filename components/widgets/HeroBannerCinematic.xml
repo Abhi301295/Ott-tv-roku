@@ -32,10 +32,12 @@
   <script type="text/brightscript" uri="pkg:/components/widgets/HeroBannerCinematic.brs" />
 
   <children>
+    <!-- React: hero container is height:85vh (=918 on 1080p) with backgroundColor #0f1014.
+         heroBg is that container fill — same height as the banner (NOT full screen). -->
     <Rectangle id="heroBg" width="1920" height="918" color="0x0f1014ff" />
 
     <Group id="nextLayer" translation="[0, 0]">
-      <!-- React: next layer top:0, left:-20%, right:-20%, height:85vh. -->
+      <!-- React: next layer top:0, bottom:0, left:-20%, right:-20% → spans full 85vh (918). -->
       <Group id="nextClip" translation="[-384, 0]" clippingRect="[0, 0, 2688, 918]"
         clippingRectClipsChildren="true">
         <Poster id="nextPoster" width="2688" height="918" translation="[0, 0]"
@@ -44,25 +46,29 @@
     </Group>
 
     <Group id="activeLayer" translation="[0, 4]">
-      <!-- React: active layer top:4, left:0%, right:-28%, height:85vh. -->
-      <Group id="activeClip" clippingRect="[0, 0, 2458, 918]" clippingRectClipsChildren="true">
-        <Poster id="activePoster" width="2458" height="918" translation="[0, 0]"
-          loadWidth="2458" loadHeight="918" loadDisplayMode="scaleToFill" />
+      <!-- React: active layer top:4, bottom:0 → box is 914 tall (4..918). The poster bottom
+           lands exactly at 918 where the bottom gradient is fully solid, so no bright sliver
+           pokes out below the gradient (that was the seam). -->
+      <Group id="activeClip" clippingRect="[0, 0, 2458, 914]" clippingRectClipsChildren="true">
+        <Poster id="activePoster" width="2458" height="914" translation="[0, 0]"
+          loadWidth="2458" loadHeight="914" loadDisplayMode="scaleToFill" />
       </Group>
     </Group>
 
     <!-- Trailer video stays top-level: putting a Roku Video inside the clipped poster
          group makes it render above the hero controls/focus rings. Shift it upward so
          the moving frame starts behind the HomeHeader area instead of below it; the
-         rows scrim hides the lower overflow. -->
+         rows scrim hides the lower overflow. (Proven placement — do not move to y=0:
+         the simulator letterboxes the Video so a y=0 node puts a black bar in the
+         header zone, making the preview look like it starts below the nav.) -->
     <Video id="trailerVideo" width="1920" height="1080" translation="[0, -160]"
       visible="false" opacity="0.0" mute="true" enableUI="false" />
 
-    <!-- Smooth gradient vignettes (parity with the CSS linear-gradients). The TOP tint
-         is owned by the header gradient (HomeHeader scrim) so it isn't doubled here. -->
+    <!-- Smooth gradient vignettes (parity with the CSS linear-gradients), sized to the
+         85vh hero (918). The TOP tint is owned by the header gradient (HomeHeader scrim). -->
     <Poster id="leftVignette" uri="pkg:/images/ui/grad_left.png" width="1248" height="918"
       loadDisplayMode="scaleToFill" />
-    <!-- React bottom gradient: height 30% of 85vh = ~275px. -->
+    <!-- React bottom gradient: height 30% of 85vh = ~275px, bottom-aligned (643..918). -->
     <Poster id="bottomVignette" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 643]"
       width="1920" height="275" loadDisplayMode="scaleToFill" />
 
@@ -179,12 +185,16 @@
         fieldToInterp="heroBarFill.width" />
     </Animation>
 
-    <!-- Trailer fade-in (800ms). Only the VIDEO opacity animates; the poster stays at
-         full opacity underneath so a buffering/black video frame can never expose a
-         blank screen — the video simply covers the poster once it has real frames. -->
+    <!-- Trailer fade-in (800ms, parity with React's opacity 800ms crossfade). The video
+         fades IN while the poster image fades OUT simultaneously, so once the trailer has
+         real frames the poster is gone — it can never show behind/around the video. The
+         fade only starts on the "playing" state (frames ready), so a buffering/black frame
+         never exposes a blank screen. RevealPoster/StopTrailer restore activePoster.opacity. -->
     <Animation id="videoFadeAnim" duration="0.8" repeat="false" easeFunction="inOutCubic">
       <FloatFieldInterpolator id="videoFadeInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
         fieldToInterp="trailerVideo.opacity" />
+      <FloatFieldInterpolator id="posterHideInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]"
+        fieldToInterp="activePoster.opacity" />
     </Animation>
 
     <!-- Poster "glow": fade the poster in when its bitmap finishes loading, so it lands

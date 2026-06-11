@@ -822,6 +822,7 @@ sub RevealPoster()
         HideTrailerVideo()
     end if
     if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
+    if m.activePoster <> invalid then m.activePoster.opacity = 1.0
     if m.muteBtn <> invalid then m.muteBtn.visible = false
     m.isVideoPlaying = false
     m.top.trailerPlaying = false
@@ -839,6 +840,7 @@ sub StopTrailer()
         HideTrailerVideo()
     end if
     if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
+    if m.activePoster <> invalid then m.activePoster.opacity = 1.0
     if m.muteBtn <> invalid then m.muteBtn.visible = false
     m.isVideoPlaying = false
     m.top.trailerPlaying = false
