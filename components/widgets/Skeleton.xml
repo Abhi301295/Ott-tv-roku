@@ -9,6 +9,8 @@
     <field id="highlightColor" type="string" value="0xf3f3f3ff" onChange="OnColorsChanged" />
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
     <field id="animate" type="boolean" value="true" onChange="OnRunningChanged" />
+    <!-- Swap the placeholder shape (e.g. a circle for radius-full dots). -->
+    <field id="shapeUri" type="string" value="pkg:/images/ui/sk_base.png" onChange="OnShapeChanged" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/components/widgets/Skeleton.brs" />
@@ -17,9 +19,10 @@
     <!-- Rounded base (primary-700) with a highlight overlay (primary-500) that pulses
          its opacity — fully contained within the rounded box + name bar (the simulator
          can't clip a sweeping band, so we breathe the fill like react's animate-pulse). -->
-    <Poster id="base" width="150" height="150" uri="pkg:/images/ui/sk_base.png" blendColor="0xffffffff" />
+    <Poster id="base" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
+      loadDisplayMode="scaleToFill" blendColor="0xffffffff" />
     <Poster id="shine" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
-      blendColor="0xf3f3f3ff" opacity="0.0" />
+      loadDisplayMode="scaleToFill" blendColor="0xf3f3f3ff" opacity="0.0" />
     <Animation id="anim" duration="1.3" repeat="true" easeFunction="linear">
       <FloatFieldInterpolator id="interp" key="[0.0,0.5,1.0]"
         keyValue="[0.0,0.6,0.0]" fieldToInterp="shine.opacity" />

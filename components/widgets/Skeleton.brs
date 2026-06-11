@@ -11,6 +11,14 @@ sub OnSizeChanged()
     ApplySize()
 end sub
 
+sub OnShapeChanged()
+    if m.base = invalid then return
+    if m.top.shapeUri <> invalid and m.top.shapeUri <> "" then
+        m.base.uri = m.top.shapeUri
+        m.shine.uri = m.top.shapeUri
+    end if
+end sub
+
 sub OnColorsChanged()
     ApplyColors()
 end sub

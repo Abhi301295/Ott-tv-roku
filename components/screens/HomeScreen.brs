@@ -92,6 +92,10 @@ sub init()
     end if
 
     m.top.observeField("keyEvent", "OnKey")
+    ' When another screen is pushed on top (e.g. Detail), ViewManager sets this screen
+    ' invisible; pause the hero so its trailer/swipe/video stop ticking in the background,
+    ' and resume them when we're revealed again (back/pop).
+    m.top.observeField("visible", "OnHomeVisibleChanged")
 
     ' Input-priority: any keypress pauses background row/card building so node creation never
     ' competes with the user's interaction on the single render thread; building resumes a
@@ -169,6 +173,21 @@ sub OnDispose()
     ' (now removed) screen — the handlers also guard on m.top.dispose defensively.
     m.selectInFlight = false
     m.selectTask = invalid
+end sub
+
+' Pause/resume the hero when this screen is covered/revealed by the nav stack.
+' The hero's own OnVisibleChanged stops the trailer, swipe timer, video and pending
+' detail fetch when invisible, and reschedules them when visible — so we just mirror
+' the screen's visibility onto the hero (only showing it again if it has banners).
+sub OnHomeVisibleChanged()
+    if m.top.dispose = true then return
+    if m.hero = invalid then return
+    if m.top.visible = true then
+        items = m.hero.bannerItems
+        m.hero.visible = (items <> invalid and items.Count() > 0)
+    else
+        m.hero.visible = false
+    end if
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────
