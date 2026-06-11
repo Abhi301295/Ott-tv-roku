@@ -173,8 +173,20 @@ sub OnThemeChanged()
     if m.genreLabel <> invalid then m.genreLabel.color = m.top.cNeutral50
     if m.descLabel <> invalid then m.descLabel.color = "0xf8f1f7cc"
     if m.counterCurrent <> invalid then m.counterCurrent.color = m.top.cNeutral50
+    ApplyRingTheme()
     BuildBars()
     BuildStars(ItemAt(m.activeIndex))
+end sub
+
+' Tint the prev/next/mute focus rings with the theme primary-500 token (parity with the
+' React .banner-focusable outline: 3px solid var(--primary-500)). The ring PNG is a white
+' glass ring, so blendColor multiplies it to the active brand color.
+sub ApplyRingTheme()
+    c = m.top.cPrimary500
+    if c = invalid or c = "" then return
+    if m.prevFocusRing <> invalid then m.prevFocusRing.blendColor = c
+    if m.nextFocusRing <> invalid then m.nextFocusRing.blendColor = c
+    if m.muteFocusRing <> invalid then m.muteFocusRing.blendColor = c
 end sub
 
 function ItemCount() as integer
