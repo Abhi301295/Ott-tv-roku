@@ -157,7 +157,6 @@ sub OnBannerItemsChanged()
     else
         m.items = items
     end if
-    print "[HERO] bannerItems changed count="; m.items.Count()
 
     ApplySlides()
     ApplyMeta()
@@ -201,7 +200,6 @@ sub ApplySlides()
     posterUri = GetHeroBannerImage(active)
     nextUri = GetHeroBannerImage(nxt)
     m.lastPosterUri = posterUri
-    print "[HERO] ApplySlides idx="; m.activeIndex; " poster='"; posterUri; "'"
 
     if m.crossfadeLanding then
         ' Settling onto the slide we just crossfaded to. The next layer already shows this
@@ -277,7 +275,6 @@ sub OnActivePosterLoad()
     status = m.activePoster.loadStatus
     expected = ""
     if m.lastPosterUri <> invalid then expected = m.lastPosterUri
-    print "[HERO] activePoster loadStatus="; status; " expected='"; expected; "' nodeUri='"; m.activePoster.uri; "'"
 
     if status = "ready" then
         if m.crossfadeLanding then
@@ -295,7 +292,6 @@ sub OnActivePosterLoad()
         if not m.posterReadyFired then
             m.posterReadyFired = true
             m.top.posterReady = true
-            print "[HERO] first poster painted -> posterReady=true"
         end if
     else if status = "failed" then
         ' Decode failed — don't leave the poster invisible.
@@ -323,7 +319,6 @@ end sub
 
 sub OnNextPosterLoad()
     if m.nextPoster = invalid then return
-    print "[HERO] nextPoster loadStatus="; m.nextPoster.loadStatus
 end sub
 
 sub ApplyMeta()
@@ -538,10 +533,12 @@ end sub
 ' The slide runs for a FIXED duration (HC_HeroSwipeMs). The timer keeps running even
 ' while a trailer plays, so one slide is never stretched to the full trailer length —
 ' it always advances on the fixed window (parity intent + user requirement).
+' LG pauses the 15s auto-advance while a trailer plays (heroBannerCinematic.tsx clears the
+' setInterval on isVideoPlaying) and advances on the trailer "ended" event instead.
 sub StartSwipeTimer()
     if m.swipeTimer = invalid or ItemCount() < 2 then return
+    if m.isVideoPlaying then return
     m.swipeTimer.control = "start"
-    print "[HERO] swipe timer started ("; HC_HeroSwipeMs(); "ms fixed) idx="; m.activeIndex
 end sub
 
 sub StopSwipeTimer()
@@ -550,7 +547,6 @@ sub StopSwipeTimer()
 end sub
 
 sub OnSwipeTimer()
-    print "[HERO] swipe timer fired idx="; m.activeIndex; " isFading="; m.isFading; " isVideoPlaying="; m.isVideoPlaying
     if m.isFading or ItemCount() < 2 then return
     GoToSlide(NextSlideIndex())
 end sub
@@ -589,7 +585,6 @@ sub BeginCrossfade()
     ' Reveal the preloaded next slide underneath so fading the active layer crossfades to it.
     if m.nextLayer <> invalid then m.nextLayer.opacity = 1.0
     if m.metaHost <> invalid then m.metaHost.opacity = 0.0
-    print "[HERO] crossfade -> next slide"
     m.fadeAnim.control = "stop"
     m.fadeAnim.control = "start"
 end sub
@@ -645,11 +640,9 @@ sub OnTrailerTimer()
     if not m.top.visible then return
     item = ItemAt(m.activeIndex)
     if item = invalid then return
-    print "[HERO] trailer delay elapsed idx="; m.activeIndex; " -> resolving trailer"
 
     url = DirectTrailerUrl(item)
     if url <> "" then
-        print "[HERO] direct trailer url found"
         LoadTrailer(url)
         return
     end if
@@ -657,12 +650,10 @@ sub OnTrailerTimer()
     id = ""
     if item._id <> invalid then id = item._id
     if id <> "" and m.trailerCache[id] <> invalid then
-        print "[HERO] trailer url from cache"
         LoadTrailer(m.trailerCache[id])
         return
     end if
 
-    print "[HERO] fetching content detail for trailer url"
     FetchTrailerDetail(item)
 end sub
 
@@ -715,7 +706,6 @@ sub OnDetailResponse()
     end if
     ' No trailer/preview for this slide — poster simply stays for the fixed window.
     if url = "" then
-        print "[HERO] detail returned no trailer url -> poster only (idx="; m.detailReqIndex; ")"
         return
     end if
 
@@ -733,13 +723,11 @@ sub OnDetailResponse()
     if m.detailReqIndex = m.activeIndex and m.top.visible then
         LoadTrailer(url)
     else
-        print "[HERO] slide changed before trailer ready -> skip (req="; m.detailReqIndex; " active="; m.activeIndex; ")"
     end if
 end sub
 
 sub LoadTrailer(url as string)
     if m.trailerVideo = invalid or url = "" then return
-    print "[HERO] LoadTrailer idx="; m.activeIndex; " url='"; url; "'"
     ' Remember which slide this trailer belongs to so a late "playing" event from a
     ' previous slide can't fade an old video in over the new poster.
     m.playingForIndex = m.activeIndex
@@ -763,12 +751,10 @@ end sub
 sub OnTrailerState()
     if m.trailerVideo = invalid then return
     state = m.trailerVideo.state
-    print "[HERO] trailer state="; state; " idx="; m.activeIndex
 
     ' Ignore state from a stream that belongs to a slide we've already left.
     if m.playingForIndex <> m.activeIndex then
         if state = "playing" or state = "buffering" then
-            print "[HERO] stale trailer state for idx="; m.playingForIndex; " (active="; m.activeIndex; ") -> stop"
             m.trailerVideo.control = "stop"
             m.trailerVideo.content = invalid
             HideTrailerVideo()
@@ -780,7 +766,6 @@ sub OnTrailerState()
         if not m.isVideoPlaying then
             m.isVideoPlaying = true
             m.top.trailerPlaying = true
-            print "[HEROVID] trailer playing with upward placement [0,-160,1920,1080]"
             ' Show the video node only once frames are ready — keeps poster visible while
             ' buffering and prevents the black Video rectangle from occluding it.
             if m.trailerVideo <> invalid then m.trailerVideo.visible = true
@@ -789,21 +774,20 @@ sub OnTrailerState()
             UpdateMuteIcon()
             ' Ken Burns stops while the video covers the poster (parity isVideoPlaying).
             if m.zoomAnim <> invalid then m.zoomAnim.control = "stop"
+            ' Hold this slide for the full trailer: pause the fixed auto-advance window.
+            StopSwipeTimer()
         end if
     else if state = "finished" then
-        ' Trailer ended within the slide window — just reveal the poster again and let
-        ' the fixed timer advance the slide. (We do NOT advance here.)
-        print "[HERO] trailer finished -> reveal poster, keep fixed timer"
-        RevealPoster()
+        ' Parity handleEnded: the trailer ended, so advance to the next slide now.
+        AdvanceAfterTrailer()
     else if state = "error" then
-        print "[HERO] trailer error -> reveal poster, keep fixed timer"
+        ' Stall/error: fall back to the poster and resume the fixed auto-advance window.
         RevealPoster()
     end if
 end sub
 
 ' Fade the trailer video in over the poster (poster stays underneath at full opacity).
 sub BeginVideoFade()
-    print "[HERO] video playing -> fade trailer in (idx="; m.activeIndex; ")"
     if m.videoFadeAnim = invalid then
         if m.trailerVideo <> invalid then m.trailerVideo.opacity = 1.0
         return
@@ -812,8 +796,8 @@ sub BeginVideoFade()
     m.videoFadeAnim.control = "start"
 end sub
 
-' Trailer ended/failed mid-slide: hide the video so the poster shows again. The slide
-' keeps its fixed timer (no advance here).
+' Trailer stalled/failed mid-slide: hide the video, restore the poster, and resume the
+' fixed auto-advance window (parity: isVideoPlaying flips false -> setInterval re-arms).
 sub RevealPoster()
     if m.videoFadeAnim <> invalid then m.videoFadeAnim.control = "stop"
     if m.trailerVideo <> invalid then
@@ -828,6 +812,26 @@ sub RevealPoster()
     m.top.trailerPlaying = false
     m.playingForIndex = -1
     StartKenBurns()
+    if m.top.visible then StartSwipeTimer()
+end sub
+
+' Parity with React handleEnded: when the trailer's "ended" event fires it sets
+' isVideoPlaying=false and calls triggerFade(), so the slide advances the instant the
+' trailer finishes (held for the full trailer, never cut to the 15s window).
+sub AdvanceAfterTrailer()
+    if m.videoFadeAnim <> invalid then m.videoFadeAnim.control = "stop"
+    if m.trailerVideo <> invalid then
+        m.trailerVideo.control = "stop"
+        m.trailerVideo.content = invalid
+        HideTrailerVideo()
+    end if
+    if m.muteBtn <> invalid then m.muteBtn.visible = false
+    m.isVideoPlaying = false
+    m.top.trailerPlaying = false
+    m.playingForIndex = -1
+    ' Re-arm the fixed window for the upcoming slides, then advance immediately.
+    if m.top.visible then StartSwipeTimer()
+    if ItemCount() > 1 then GoToSlide(NextSlideIndex())
 end sub
 
 ' Fully tear down the trailer (slide change / banner hidden). Poster is restored.
