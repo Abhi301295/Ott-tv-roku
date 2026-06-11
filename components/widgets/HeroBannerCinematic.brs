@@ -66,6 +66,7 @@ sub init()
     m.fadeAnim.observeField("state", "OnFadeAnimState")
     m.trailerTimer.observeField("fire", "OnTrailerTimer")
     m.trailerVideo.observeField("state", "OnTrailerState")
+    m.trailerVideo.observeField("duration", "OnTrailerDuration")
     m.top.observeField("visible", "OnVisibleChanged")
     if m.activePoster <> invalid then m.activePoster.observeField("loadStatus", "OnActivePosterLoad")
     if m.nextPoster <> invalid then m.nextPoster.observeField("loadStatus", "OnNextPosterLoad")
@@ -478,12 +479,31 @@ sub BuildBars()
     StartPosterProgress()
 end sub
 
-' Blue tick fills over the FIXED slide window (15s) — its duration is tied to the slide
-' timer, never to the trailer length (parity: progress = SWIPE_INTERVAL for the slide).
+' Poster-only slide: bar fills over HC_HeroSwipeMs (parity SWIPE_INTERVAL).
 sub StartPosterProgress()
     if m.barAnim = invalid then return
     m.barAnim.duration = HC_HeroSwipeMs() / 1000.0
     StartBarFill()
+end sub
+
+' Trailer playing: bar fills over the trailer duration (parity progressDuration =
+' isVideoPlaying && videoDuration > 0 ? videoDuration : SWIPE_INTERVAL).
+sub StartTrailerProgress()
+    if m.barAnim = invalid then return
+    durSec = HC_HeroSwipeMs() / 1000.0
+    if m.trailerVideo <> invalid and m.trailerVideo.duration > 0 then
+        durSec = m.trailerVideo.duration
+    end if
+    m.barAnim.control = "stop"
+    m.barAnim.duration = durSec
+    StartBarFill()
+end sub
+
+' HLS duration can arrive after "playing" — restart the bar once metadata is known.
+sub OnTrailerDuration()
+    if not m.isVideoPlaying then return
+    if m.trailerVideo = invalid or m.trailerVideo.duration <= 0 then return
+    StartTrailerProgress()
 end sub
 
 sub StartBarFill()
@@ -530,9 +550,6 @@ sub StartKenBurns()
     m.zoomAnim.control = "start"
 end sub
 
-' The slide runs for a FIXED duration (HC_HeroSwipeMs). The timer keeps running even
-' while a trailer plays, so one slide is never stretched to the full trailer length —
-' it always advances on the fixed window (parity intent + user requirement).
 ' LG pauses the 15s auto-advance while a trailer plays (heroBannerCinematic.tsx clears the
 ' setInterval on isVideoPlaying) and advances on the trailer "ended" event instead.
 sub StartSwipeTimer()
@@ -776,6 +793,8 @@ sub OnTrailerState()
             if m.zoomAnim <> invalid then m.zoomAnim.control = "stop"
             ' Hold this slide for the full trailer: pause the fixed auto-advance window.
             StopSwipeTimer()
+            ' Restart the progress bar for trailer length (parity progressDuration).
+            StartTrailerProgress()
         end if
     else if state = "finished" then
         ' Parity handleEnded: the trailer ended, so advance to the next slide now.
@@ -813,6 +832,7 @@ sub RevealPoster()
     m.playingForIndex = -1
     StartKenBurns()
     if m.top.visible then StartSwipeTimer()
+    StartPosterProgress()
 end sub
 
 ' Parity with React handleEnded: when the trailer's "ended" event fires it sets

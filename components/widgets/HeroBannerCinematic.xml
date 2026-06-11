@@ -179,7 +179,8 @@
         keyValue="[[1.0, 1.0], [1.05, 1.05]]" fieldToInterp="activePoster.scale" />
     </Animation>
 
-    <!-- Active-slide progress fill (0 → 48px over the swipe interval). -->
+    <!-- Active-slide progress fill (0 → 48px). Duration is set at runtime: HC_HeroSwipeMs
+         for poster-only slides, trailerVideo.duration while a trailer plays (LG parity). -->
     <Animation id="barAnim" duration="15" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="barInterp" key="[0.0, 1.0]" keyValue="[0.0, 48.0]"
         fieldToInterp="heroBarFill.width" />
