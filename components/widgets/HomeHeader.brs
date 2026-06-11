@@ -13,8 +13,9 @@ sub init()
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
     m.menuRow = m.top.findNode("menuRow")
-    m.avatarImg = m.top.findNode("avatarImg")
     m.avatarBg = m.top.findNode("avatarBg")
+    m.avatarPrimary = m.top.findNode("avatarPrimary")
+    ApplyAvatarTheme()
 
     m.itemRoots = []
     m.itemLabels = []
@@ -61,24 +62,22 @@ sub OnThemeChanged()
         if m.itemFocusM[i] <> invalid then m.itemFocusM[i].color = m.top.cNeutral50
         if m.itemFocusR[i] <> invalid then m.itemFocusR[i].blendColor = m.top.cNeutral50
     end for
+    ApplyAvatarTheme()
     ApplyFocus()
+end sub
+
+' React Images.AVATAR uses var(--primary-500) for the circle + clothing; tint those layers.
+sub ApplyAvatarTheme()
+    primary = m.top.cPrimary500
+    if primary = invalid or primary = "" then primary = "0x0b75e0ff"
+    if m.avatarBg <> invalid then m.avatarBg.blendColor = primary
+    if m.avatarPrimary <> invalid then m.avatarPrimary.blendColor = primary
 end sub
 
 sub OnScrimOpacityChanged()
     if m.scrim = invalid then return
     m.scrim.opacity = m.top.scrimOpacity
     print "[HEROVID] header scrim opacity="; m.top.scrimOpacity
-end sub
-
-sub OnAvatarChanged()
-    if m.avatarImg = invalid then return
-    uri = m.top.avatarUri
-    if uri <> invalid and uri <> "" then
-        m.avatarImg.uri = uri
-        m.avatarImg.visible = true
-    else
-        m.avatarImg.visible = false
-    end if
 end sub
 
 sub OnLogoChanged()

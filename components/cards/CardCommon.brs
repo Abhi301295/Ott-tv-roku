@@ -16,6 +16,49 @@ function CardEnsureFocusFrame(card as object, existing as object, offX as float,
     return frame
 end function
 
+' Parse a "0xRRGGBBAA" (or "0xRRGGBB") color string into [r, g, b] (0-255).
+function CardHexToRgb(hex as string) as object
+    if hex = invalid or hex = "" then return [0, 0, 0]
+    s = hex
+    if Left(s, 2) = "0x" or Left(s, 2) = "0X" then s = Mid(s, 3)
+    if Len(s) < 6 then return [0, 0, 0]
+    r = CardHexByte(Mid(s, 1, 2))
+    g = CardHexByte(Mid(s, 3, 2))
+    b = CardHexByte(Mid(s, 5, 2))
+    return [r, g, b]
+end function
+
+function CardHexByte(h as string) as integer
+    v = 0
+    for i = 1 to Len(h)
+        v = v * 16 + CardHexDigit(Mid(h, i, 1))
+    end for
+    if v < 0 then v = 0
+    if v > 255 then v = 255
+    return v
+end function
+
+function CardHexDigit(c as string) as integer
+    u = UCase(c)
+    if u >= "0" and u <= "9" then return Asc(u) - Asc("0")
+    if u >= "A" and u <= "F" then return 10 + Asc(u) - Asc("A")
+    return 0
+end function
+
+' Build "0xRRGGBBff" from r,g,b (0-255), fully opaque.
+function CardRgbToHex(r as integer, g as integer, b as integer) as string
+    return "0x" + CardByteHex(r) + CardByteHex(g) + CardByteHex(b) + "ff"
+end function
+
+function CardByteHex(v as integer) as string
+    if v < 0 then v = 0
+    if v > 255 then v = 255
+    digits = "0123456789abcdef"
+    hi = (v \ 16)
+    lo = (v MOD 16)
+    return Mid(digits, hi + 1, 1) + Mid(digits, lo + 1, 1)
+end function
+
 sub CardApplyFocusBorder(border as object, focused as boolean, color as string)
     if border = invalid then return
     border.visible = focused

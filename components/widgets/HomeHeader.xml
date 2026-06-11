@@ -11,7 +11,6 @@
     <field id="headerActive" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="logoUri" type="string" value="" onChange="OnLogoChanged" />
     <field id="appName" type="string" value="" onChange="OnLogoChanged" />
-    <field id="avatarUri" type="string" value="" onChange="OnAvatarChanged" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
     <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
     <field id="cNeutral200" type="string" value="0xd4d4d4ff" onChange="OnThemeChanged" />
@@ -41,15 +40,18 @@
          never reflows its neighbors, matching React where transform doesn't affect layout. -->
     <Group id="menuRow" translation="[560, 34]" />
 
-    <!-- Active profile avatar (parity with NetflixHeader avatar). The simulator can't
-         clip, so the circle is composited via a MaskGroup with the circle mask; the
-         profile image (SK_Avatar) fills it, falling back to a neutral disc. -->
+    <!-- Static header avatar (parity with ottHeader.tsx Images.AVATAR — NOT the selected
+         profile's remote image). Two-layer art from the React SVG: primary-tinted shapes
+         + fixed-color face/highlight detail, clipped to a 64px circle (w-16 h-16). -->
     <MaskGroup id="avatarMask" translation="[1808, 26]"
       maskUri="pkg:/images/ui/avatar_circle.png" maskSize="[64, 64]">
       <Poster id="avatarBg" width="64" height="64"
-        uri="pkg:/images/ui/avatar_circle.png" blendColor="0x404040ff" />
-      <Poster id="avatarImg" width="64" height="64"
-        loadDisplayMode="scaleToFill" visible="false" />
+        uri="pkg:/images/ui/avatar_circle.png" blendColor="0x0b75e0ff" />
+      <Poster id="avatarPrimary" width="64" height="64"
+        uri="pkg:/images/ui/header_avatar_primary.png" blendColor="0x0b75e0ff"
+        loadDisplayMode="scaleToFill" />
+      <Poster id="avatarDetail" width="64" height="64"
+        uri="pkg:/images/ui/header_avatar_detail.png" loadDisplayMode="scaleToFill" />
     </MaskGroup>
   </children>
 </component>

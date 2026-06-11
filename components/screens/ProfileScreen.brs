@@ -464,14 +464,11 @@ sub DoSelectProfile(profileId as string)
     if m.selecting then return
     m.selecting = true
     StopAutoSelect()
-    ' Navigate to Home immediately and hand off the chosen profile + avatar; Home
-    ' establishes the session (select-profile) behind its shimmer, so there is no
-    ' full-screen loader on this screen.
-    avatar = ""
-    if m.selectedProfile <> invalid and m.selectedProfile.avatar <> invalid then avatar = m.selectedProfile.avatar
+    ' Navigate to Home immediately and hand off the chosen profile; Home establishes the
+    ' session (select-profile) behind its shimmer, so there is no full-screen loader here.
     SetValueByKey(SK_SelectedItem(), "Home", "app")
     if m.vm <> invalid then
-        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
+        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId })
     else
         ' Navigation unavailable — don't leave the screen permanently locked behind the
         ' m.selecting guard; surface an error and let the user try again.

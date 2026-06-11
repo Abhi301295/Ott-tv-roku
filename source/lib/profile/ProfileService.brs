@@ -10,16 +10,13 @@ function ExtractProfiles(result as object) as object
 end function
 
 ' Persist meta the rest of the app reads later (parity with fetchProfiles side effects):
-' first profile id => home, second => kid, first avatar => avatar.
+' first profile id => home, second => kid.
 sub SaveProfilesMeta(profiles as object)
     if profiles = invalid or profiles.Count() = 0 then return
 
     first = profiles[0]
     if first <> invalid and first._id <> invalid then
         SetValueByKey(SK_HomeProfileId(), first._id, "app")
-    end if
-    if first <> invalid and first.avatar <> invalid then
-        SetValueByKey(SK_Avatar(), first.avatar, "app")
     end if
 
     if profiles.Count() > 1 then
@@ -73,12 +70,9 @@ function SelectProfileRetriable(httpStatus as integer) as boolean
     return (httpStatus = 401 or httpStatus = 404 or httpStatus <= 0)
 end function
 
-' Persist the active profile identity after a successful select-profile. SaveProfilesMeta
-' only ever stores profile #1's avatar, so the explicitly-chosen avatar is written here
-' too — otherwise the home header would be stuck on the first profile's image.
-sub PersistSelectedProfile(profileId as string, avatar as string)
+' Persist the active profile identity after a successful select-profile.
+sub PersistSelectedProfile(profileId as string)
     SetProfileId(profileId)
-    if avatar <> "" then SetValueByKey(SK_Avatar(), avatar, "app")
 end sub
 
 ' Store tokens returned by select-profile. Returns true when a valid token pair
