@@ -148,10 +148,7 @@ function PlanRowCards(cat as object) as object
             plan.Push({ kind: "card", item: item, comp: compName, cardType: cardType, rank: i })
         end if
     end for
-    ' React shows See All only on CONTENT_LIST rows with a vertical/horizontal cardType
-    ' (not TOP_CONTENTS / CONTINUE_WATCHING / PROMOTIONAL).
-    seeAllRow = (rowType = HC_TypeContentList()) and (cardType = HC_CardTypeVertical() or cardType = HC_CardTypeHorizontal())
-    if seeAllRow and items.Count() >= HC_SeeAllThreshold() + 1 then
+    if rowType <> HC_PromotionalCard() and items.Count() >= HC_SeeAllThreshold() + 1 then
         plan.Push({ kind: "seeAll" })
     end if
     return plan
@@ -205,7 +202,12 @@ sub OnCardBuildTick()
         m.buildX = m.buildX + w + gap
     else
         card = m.cardsHost.createChild(plan.comp)
-        if plan.comp = "ContinueWatchCard" and card.hasField("loaded") then
+        ' Only gate the reveal on cards that are actually on screen (buildX within the 1920
+        ' viewport). A CW row builds up to 11 cards but only ~4 are visible, so waiting on the
+        ' off-screen thumbnails kept the loading placeholder up ~1s longer than needed. The
+        ' off-screen cards keep loading behind the revealed strip and are ready by the time the
+        ' user scrolls to them.
+        if plan.comp = "ContinueWatchCard" and card.hasField("loaded") and m.buildX < 1920 then
             m.pendingMediaLoads = m.pendingMediaLoads + 1
             card.observeField("loaded", "OnCardMediaLoaded")
         end if

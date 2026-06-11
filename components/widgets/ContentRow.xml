@@ -46,6 +46,8 @@
     <Animation id="cardsRevealAnim" duration="0.3" repeat="false" easeFunction="outQuad">
       <FloatFieldInterpolator id="cardsRevealInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
         fieldToInterp="cardsHost.opacity" />
+      <FloatFieldInterpolator id="titleRevealInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="rowTitle.opacity" />
     </Animation>
   </children>
 </component>

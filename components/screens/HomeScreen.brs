@@ -19,9 +19,10 @@ sub init()
     m.cardIndex = 0
     m.loadingMore = false
 
-    ' Start on the header so navigation is responsive while hero/CW rows are still loading.
-    ' The user can move to another section immediately instead of waiting for CW cards.
+    ' Land on content once rows are ready (LG netflixContent sets FocusKey.CONTENT).
+    ' Until then the header stays focused so nav remains usable during shimmer.
     m.focusZone = "header"
+    m.pendingContentFocus = true
     m.menuItems = []
     m.menuIndex = 0
 
@@ -128,7 +129,6 @@ sub ConsumeHomeNavState()
     ns = m.top.navState
     if ns = invalid then return
     if ns.selectProfileId <> invalid then m.pendingSelectId = ns.selectProfileId
-    if ns.selectAvatar <> invalid then m.pendingSelectAvatar = ns.selectAvatar
 end sub
 
 sub TryStartHomeBoot()
@@ -141,12 +141,6 @@ sub TryStartHomeBoot()
     if GetProfileId() = "" and m.pendingSelectId = "" then
         RedirectToProfiles()
         return
-    end if
-
-    ' Paint the chosen avatar immediately so switching profiles never flashes the previous
-    ' profile's image in the header while select-profile is still in flight.
-    if m.pendingSelectId <> "" and m.pendingSelectAvatar <> "" and m.header <> invalid then
-        m.header.avatarUri = m.pendingSelectAvatar
     end if
 
     ' Both regions shimmer immediately on mount; they reveal independently as their data
@@ -162,6 +156,7 @@ end sub
 ' can't leave its hero carousel/trailer/build timers running in the background.
 sub OnDispose()
     if not m.top.dispose then return
+    print "[HOME] dispose -> stopping hero + timers"
     ' Setting the hero invisible runs its OnVisibleChanged cleanup (swipe timer, trailer,
     ' video, pending detail fetch all stop).
     if m.hero <> invalid then m.hero.visible = false
@@ -240,6 +235,7 @@ end sub
 sub UpdateHeroBanner()
     if m.hero = invalid then return
     items = ExtractBannerItems(m.categories)
+    print "[HOME] UpdateHeroBanner bannerItems="; items.Count()
     ApplyThemeToHero()
     m.hero.bannerItems = items
     m.hero.visible = (items.Count() > 0)
@@ -286,6 +282,7 @@ sub ApplyHeaderBranding()
 
     ' Active profile avatar (parity with NetflixHeader): persisted by fetchProfiles.
     avatarUri = RegistryRead(SK_Avatar(), "app")
+    print "[AVATARDBG] HomeHeader reading avatar='"; avatarUri; "'"
     if avatarUri <> invalid then m.header.avatarUri = avatarUri
 
     resolved = invalid
@@ -309,7 +306,9 @@ sub UpdateHeaderScrimForHero()
     ' below the header (the red-line issue).
     m.header.scrimOpacity = 0.0
     if playing then
+        print "[HEROVID] trailer playing -> transparent header scrim"
     else
+        print "[HEROVID] trailer idle -> transparent header scrim"
     end if
 end sub
 
@@ -327,6 +326,14 @@ sub ExitHeaderToRows()
     if m.header <> invalid then m.header.headerActive = false
     m.focusZone = "rows"
     ApplyHomeFocus()
+end sub
+
+' LG netflixContent.tsx sets initial focus to CONTENT once category data is ready.
+sub MaybeLandContentFocus()
+    if not m.pendingContentFocus then return
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    m.pendingContentFocus = false
+    if m.focusZone = "header" then ExitHeaderToRows()
 end sub
 
 sub HandleHeaderKey(key as string)
@@ -461,12 +468,16 @@ sub HandleHeroKey(key as string)
             ApplyHeroFocus()
         end if
     else if key = "OK" or key = "ok" then
+        print "[KEYDBG] HandleHeroKey OK branch heroFocus='"; m.heroFocus; "' heroInvalid="; (m.hero = invalid)
         if m.hero = invalid then return
         if m.heroFocus = "prev" then
+            print "[KEYDBG] calling HeroGoPrev"
             m.hero.callFunc("HeroGoPrev", invalid)
         else if m.heroFocus = "next" then
+            print "[KEYDBG] calling HeroGoNext"
             m.hero.callFunc("HeroGoNext", invalid)
         else if m.heroFocus = "mute" then
+            print "[KEYDBG] calling HeroToggleMute"
             m.hero.callFunc("HeroToggleMute", invalid)
         end if
     end if
@@ -498,6 +509,7 @@ sub StartBootSequence()
     ' If the profile screen handed us a pending profile, establish the session first
     ' (select-profile, behind the shimmer). Content boot only fires once the token lands.
     if m.pendingSelectId <> "" then
+        print "[HOME] pending select-profile -> running behind shimmer"
         DoHomeSelect()
         return
     end if
@@ -550,6 +562,7 @@ end sub
 sub OnHomeSelectRetry()
     if m.top.dispose = true then return
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    print "[HOME] retrying select-profile (retriesLeft="; m.selectRetriesLeft; ")"
     FireHomeSelectRequest()
 end sub
 
@@ -566,12 +579,14 @@ sub OnHomeSelectResponse()
         m.pendingSelectId = ""
         m.selectInFlight = false
         if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
+        print "[HOME] select-profile ok -> boot home content"
         BootHomeContent()
         return
     end if
 
     if SelectProfileRetriable(api.httpStatus) and m.selectRetriesLeft > 0 then
         m.selectRetriesLeft = m.selectRetriesLeft - 1
+        print "[HOME] select-profile failed (httpStatus="; api.httpStatus; ") -> retry, left="; m.selectRetriesLeft
         if m.selectRetryTimer <> invalid then
             m.selectRetryTimer.control = "stop"
             m.selectRetryTimer.control = "start"
@@ -581,6 +596,7 @@ sub OnHomeSelectResponse()
         return
     end if
 
+    print "[HOME] select-profile giving up (httpStatus="; api.httpStatus; ") -> back to profiles"
     SelectFailedToProfiles()
 end sub
 
@@ -598,6 +614,7 @@ end sub
 sub OnSelectWatchdog()
     if m.top.dispose = true then return
     if not m.selectInFlight then return
+    print "[HOME] select-profile watchdog fired -> back to profiles"
     SelectFailedToProfiles()
 end sub
 
@@ -654,11 +671,13 @@ sub OnContinueWatchingResponse()
 
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
+        print "[HOME] continue-watching response ok, rows="; listing.Count()
         if listing.Count() > 0 then
             tagged = TagContinueWatchingRows(listing)
             m.categories = PrependCategories(m.categories, tagged)
         end if
     else
+        print "[HOME] continue-watching response failed/empty"
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
         end if
@@ -688,10 +707,12 @@ sub OnHomeCategoriesResponse()
 
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
+        print "[HOME] home categories response ok, categories="; listing.Count()
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
         end if
     else
+        print "[HOME] home categories response failed/empty"
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
         end if
@@ -742,6 +763,7 @@ sub MaybeBuildHero()
     if m.heroBuilt then return
     m.heroBuilt = true
     items = ExtractBannerItems(m.categories)
+    print "[HOME] MaybeBuildHero bannerItems="; items.Count()
     if items.Count() = 0 then
         ' Nothing to show in the hero — drop its shimmer immediately.
         ShowHeroSkeleton(false)
@@ -761,11 +783,13 @@ end sub
 sub MaybeBuildRows()
     if m.rowsBuilt then return
     if AnyBootLoading() then
+        print "[HOME] MaybeBuildRows waiting (initialLoading="; m.initialLoading; " continueLoading="; m.continueLoading; ")"
         return
     end if
     ' Data is in. Don't build yet — hand the render thread to the hero preview first and
     ' let the gate (trailer-live or timeout) kick off the build (see MaybeStartRowBuild).
     m.rowsDataReady = true
+    print "[HOME] MaybeBuildRows -> data ready, waiting for hero trailer / gate"
     MaybeStartRowBuild()
 end sub
 
@@ -780,7 +804,9 @@ sub MaybeStartRowBuild()
     if heroLive or m.rowGateElapsed then
         m.rowsBuilt = true
         if heroLive then
+            print "[HOME] row gate open (trailer live) -> build rows"
         else
+            print "[HOME] row gate open (timeout) -> build rows"
         end if
         ' Rows build progressively; the rows shimmer is dropped in OnRowBuildTick once the
         ' first real row exists, so the shimmer hands straight off to content (no black gap).
@@ -792,6 +818,7 @@ sub MaybeStartRowBuild()
     if not m.rowGateStarted then
         m.rowGateStarted = true
         m.rowBuildGate.control = "start"
+        print "[HOME] row build held for hero preview (gate armed)"
     end if
 end sub
 
@@ -807,23 +834,27 @@ sub OnHeroPosterReady()
     bootMs = 0
     if m.bootSpan <> invalid then bootMs = m.bootSpan.TotalMilliseconds()
     print "[PERF] hero poster painted: "; bootMs; "ms from mount (perceived first-content latency)"
+    print "[HOME] hero poster ready -> hide hero shimmer"
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     ShowHeroSkeleton(false)
 end sub
 
 ' Safety net: never let the hero shimmer outlive the wait.
 sub OnSkeletonTimeout()
+    print "[HOME] hero skeleton timeout -> hide shimmer"
     ShowHeroSkeleton(false)
 end sub
 
 sub ShowHeroSkeleton(show as boolean)
     if m.homeSkeleton = invalid then return
+    print "[HOME] ShowHeroSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
     m.homeSkeleton.heroRunning = show
 end sub
 
 sub ShowRowsSkeleton(show as boolean)
     if m.homeSkeleton = invalid then return
+    print "[HOME] ShowRowsSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
     m.homeSkeleton.rowsRunning = show
 end sub
@@ -847,6 +878,7 @@ sub BuildContentRows()
     ' row building) is driven by data, not guesswork. [PERF] tags are greppable.
     m.rowBuildSpan = CreateObject("roTimespan")
     m.rowBuildCostMs = 0
+    print "[HOME] BuildContentRows rows="; m.contentRowCats.Count()
 
     ' Skeleton visibility is owned by OnHeroPosterReady / OnSkeletonTimeout, so we don't
     ' toggle it here — rows build underneath and the shimmer drops once the hero paints.
@@ -901,6 +933,7 @@ sub OnRowBuildTick()
         if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
         print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
         ApplyHomeFocus()
+        MaybeLandContentFocus()
     end if
 end sub
 
@@ -910,10 +943,12 @@ sub OnFirstRowBuilt()
     row = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
     if row <> invalid and row.hasField("mediaReady") and row.mediaReady <> true then return
+    print "[HOME] first row media ready -> hide rows shimmer + reveal hero behind cards"
     ShowRowsSkeleton(false)
     ' CW content has painted — drop the dark scrim so the hero bleeds behind the cards.
     m.rowsRevealed = true
     UpdateRowsScrim()
+    MaybeLandContentFocus()
     ' Warm the next row in the background while the user is still on CW.
     if m.rowWidgets.Count() > 1 then
         row1 = m.rowWidgets[1]
@@ -934,7 +969,12 @@ end sub
 sub ApplyHomeFocus()
     if m.rowsHost = invalid then return
 
-    if m.focusZone = "rows" then MaterializeNearbyRows()
+    ' Only materialize the rows that are actually on screen (the focused row + the one peeking
+    ' in at the bottom). In steady-state navigation these were already built by the idle
+    ' prefetch, so this is a no-op; the off-screen look-ahead build is deferred to OnInteractIdle
+    ' so node creation never competes with the 0.4s scroll animation (that contention was the
+    ' source of the row-switch stutter).
+    if m.focusZone = "rows" then MaterializeVisibleRows()
 
     anchorY = HC_NetflixAnchorY() - (m.rowIndex * HC_RowPitch())
     AnimateRowsHost(anchorY)
@@ -944,6 +984,20 @@ sub ApplyHomeFocus()
     end for
 
     UpdateRowsScrim()
+end sub
+
+' Materialize only the rows currently visible on screen: the focused row pinned at the anchor
+' plus the next row, which peeks in at the bottom (anchor 702 + pitch 430 = 1132, within the
+' 1080 viewport). Called on every focus change; deliberately does NOT build the off-screen
+' look-ahead row so it can't steal render-thread time from the scroll animation.
+sub MaterializeVisibleRows()
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    for i = m.rowIndex to m.rowIndex + 1
+        if i >= 0 and i < m.rowWidgets.Count() then
+            row = m.rowWidgets[i]
+            if row <> invalid then row.callFunc("Materialize", invalid)
+        end if
+    end for
 end sub
 
 ' Set the focus/dim state for a single row. Pulled out of ApplyHomeFocus so the row-build
@@ -989,6 +1043,9 @@ sub AnimateRowsHost(targetY as integer)
     fromY = m.rowsHost.translation[1]
     if m.rowsAnim = invalid or m.rowsInterp = invalid or fromY = targetY then
         m.rowsHost.translation = [0, targetY]
+        ' No animation in flight (initial land, or left/right within a row) — safe to build the
+        ' off-screen look-ahead now so it's ready before the next animated row switch.
+        if m.focusZone = "rows" then MaterializeNearbyRows()
         return
     end if
     m.rowsInterp.keyValue = [[0, fromY], [0, targetY]]
@@ -1038,6 +1095,7 @@ sub OnKey()
     key = ev.key
     ' Give the render thread to this interaction: suspend any in-progress background build.
     BeginInteraction()
+    print "[KEYDBG] OnKey key='"; key; "' zone='"; m.focusZone; "' heroFocus='"; m.heroFocus; "'"
 
     if m.focusZone = "header" then
         HandleHeaderKey(key)
@@ -1103,6 +1161,9 @@ end sub
 
 sub OnInteractIdle()
     m.interacting = false
+    ' User paused — now safe to build the off-screen look-ahead row(s) for the next move,
+    ' since there's no scroll animation in flight to compete with.
+    if m.focusZone = "rows" then MaterializeNearbyRows()
     ResumeRowBuilding()
 end sub
 

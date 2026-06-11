@@ -1,5 +1,6 @@
 sub init()
     m.focusBorder = invalid
+    m.cardBg = m.top.findNode("cardBg")
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
     m.progressTrack = m.top.findNode("progressTrack")
@@ -67,6 +68,7 @@ sub ApplyAll()
         if m.dataApplied then ReportLoaded()
     end if
     CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
+    if m.cardBg <> invalid then m.cardBg.color = m.top.cNeutral700
     m.progressTrack.color = m.top.cNeutral950
     ApplyProgressFill()
 

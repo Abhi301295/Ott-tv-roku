@@ -21,12 +21,12 @@
     <Group id="body" translation="[24, 3]">
       <Skeleton id="skeleton" boxWidth="368" boxHeight="208" />
       <Poster id="thumb" width="368" height="208" loadWidth="368" loadHeight="208" loadDisplayMode="scaleToFill" visible="false" />
-      <!-- Rounded corners (radius-10): the simulator ignores MaskGroup, so tuned corner
-           covers hide the square poster corners. Color matches the dark app background. -->
-      <Poster id="maskTL" uri="pkg:/images/ui/round_mask_tl.png" translation="[0, 0]" width="12" height="12" />
-      <Poster id="maskTR" uri="pkg:/images/ui/round_mask_tr.png" translation="[356, 0]" width="12" height="12" />
-      <Poster id="maskBL" uri="pkg:/images/ui/round_mask_bl.png" translation="[0, 196]" width="12" height="12" />
-      <Poster id="maskBR" uri="pkg:/images/ui/round_mask_br.png" translation="[356, 196]" width="12" height="12" />
+      <!-- Rounded corners (radius-10): the simulator ignores MaskGroup, so baked corner covers
+           hide the square poster corners. Shared round_corner_*.png set (#0a0a0a backdrop). -->
+      <Poster id="cornerTL" uri="pkg:/images/ui/round_corner_tl.png" translation="[0, 0]" width="10" height="10" />
+      <Poster id="cornerTR" uri="pkg:/images/ui/round_corner_tr.png" translation="[358, 0]" width="10" height="10" />
+      <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 198]" width="10" height="10" />
+      <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[358, 198]" width="10" height="10" />
     </Group>
     <!-- Giant rank numeral in front of the poster (parity with numberedVerticalCard.tsx
          fs-150 fw-900, z-2 over the z-1 image, left:-5 vertically centered) with a soft
