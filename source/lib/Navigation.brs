@@ -29,7 +29,10 @@ function NavigationHandleBack(viewManager as object) as boolean
         return true
     end if
 
-    ' Any other screen → Home (replace), same as web
+    ' Any other screen → return to the previous screen. Pop to the live instance in the
+    ' stack when one exists (so we don't stack a fresh HomeScreen + leave the old one's
+    ' hero running underneath); otherwise fall back to replacing with Home.
+    if viewManager.callFunc("NavigatePop") = true then return true
     viewManager.callFunc("NavigateReplace", RouteHome(), {})
     return true
 end function

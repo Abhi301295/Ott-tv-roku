@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Detail action button — parity with the detail page action rows (contentdetail/index.tsx):
+     icon + label, transparent until focused, primary gradient + glow when focused. Watch Now
+     keeps a persistent neutral-700 background (alwaysBg). -->
+<component name="DetailActionButton" extends="Group">
+  <interface>
+    <field id="label" type="string" onChange="OnLabelChanged" />
+    <field id="iconUri" type="string" value="" onChange="OnIconChanged" />
+    <!-- React renders each action SVG at its intrinsic size (play/bookmark/grid ≈ 18×21,
+         series ≈ 25×25), centered in a fixed 20px slot at padding-left 64. -->
+    <field id="iconW" type="float" value="18" onChange="OnIconChanged" />
+    <field id="iconH" type="float" value="21" onChange="OnIconChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="ApplyStyle" />
+    <field id="alwaysBg" type="boolean" value="false" onChange="ApplyStyle" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="ApplyStyle" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="ApplyStyle" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="ApplyStyle" />
+    <field id="cNeutral50" type="string" value="0xf5f5f5ff" onChange="ApplyStyle" />
+    <!-- Focus halo color — React hardcodes shadow-[0_0_8px_#1e90ff]. -->
+    <field id="cGlow" type="string" value="0x1e90ffff" onChange="ApplyStyle" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/DetailActionButton.brs" />
+
+  <!-- Box: 500x76, radius-10, padding 26px/64px (parity with the detail action rows).
+       Icon ~20px sits at padding-left 64; text starts after icon + gap-6 (24) ≈ 108. -->
+  <children>
+    <Poster id="shadow" translation="[-22, -22]" width="544" height="120"
+      uri="pkg:/images/ui/btn_detail_glow.png" blendColor="0x1e90ffff" opacity="0.0" visible="false" />
+    <Poster id="bg" width="500" height="76" uri="pkg:/images/ui/btn_detail_flat.png"
+      blendColor="0x404040ff" opacity="0.0" />
+    <Poster id="icon" translation="[64, 28]" width="20" height="20" loadDisplayMode="scaleToFit" />
+    <Label id="text" translation="[108, 0]" text="" width="328" height="76"
+      horizAlign="left" vertAlign="center" color="0xf5f5f5ff">
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+    </Label>
+  </children>
+</component>
