@@ -133,6 +133,10 @@ sub ConsumeHomeNavState()
     ns = m.top.navState
     if ns = invalid then return
     if ns.selectProfileId <> invalid then m.pendingSelectId = ns.selectProfileId
+    ' The chosen profile's avatar is handed off alongside the id; persist it on select
+    ' success so the header shows the SELECTED profile (not the first one that
+    ' SaveProfilesMeta defaulted SK_Avatar to). Without this the avatar never updates.
+    if ns.selectAvatar <> invalid then m.pendingSelectAvatar = ns.selectAvatar
 end sub
 
 sub TryStartHomeBoot()
@@ -160,19 +164,50 @@ end sub
 ' can't leave its hero carousel/trailer/build timers running in the background.
 sub OnDispose()
     if not m.top.dispose then return
-    print "[HOME] dispose -> stopping hero + timers"
+    print "[HOME] dispose -> stopping hero + timers + in-flight tasks"
     ' Setting the hero invisible runs its OnVisibleChanged cleanup (swipe timer, trailer,
     ' video, pending detail fetch all stop).
     if m.hero <> invalid then m.hero.visible = false
+
+    ' Stop every timer that ticks on this screen.
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+    if m.rowBuildGate <> invalid then m.rowBuildGate.control = "stop"
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
     if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
-    ' Drop the in-flight select task so a late apiResult can't fire a handler on this
-    ' (now removed) screen — the handlers also guard on m.top.dispose defensively.
-    m.selectInFlight = false
+    if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
+
+    ' Kill every in-flight HTTP listener. The shared pool may still finish the request,
+    ' but unobserving guarantees no apiResult handler runs on this (removed) screen — so a
+    ' late Continue-Watching / categories response can't kick off row-building in the
+    ' background after the user has navigated to a different profile.
+    KillTask(m.selectTask)
+    KillTask(m.profilesTask)
+    KillTask(m.continueTask)
+    KillTask(m.categoryTask)
+    KillTask(m.versionTask)
+    KillTask(m.loadMoreTask)
     m.selectTask = invalid
+    m.profilesTask = invalid
+    m.continueTask = invalid
+    m.categoryTask = invalid
+    m.versionTask = invalid
+    m.loadMoreTask = invalid
+    m.selectInFlight = false
+    m.loadingMore = false
+
+    ' Detach the app-global observer (m.global outlives this screen, so its observer would
+    ' otherwise pin the removed HomeScreen in memory).
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.unobserveField("businessResolved")
+    end if
+end sub
+
+' Stop a finished/in-flight HTTP task and detach its result listener.
+sub KillTask(task as object)
+    if task = invalid then return
+    task.unobserveField("apiResult")
 end sub
 
 ' Pause/resume the hero when this screen is covered/revealed by the nav stack.
@@ -181,12 +216,23 @@ end sub
 ' the screen's visibility onto the hero (only showing it again if it has banners).
 sub OnHomeVisibleChanged()
     if m.top.dispose = true then return
-    if m.hero = invalid then return
     if m.top.visible = true then
-        items = m.hero.bannerItems
-        m.hero.visible = (items <> invalid and items.Count() > 0)
+        if m.hero <> invalid then
+            items = m.hero.bannerItems
+            m.hero.visible = (items <> invalid and items.Count() > 0)
+        end if
+        ' Resume any unfinished background row-building when revealed (the build cursor
+        ' m.rowBuildIndex survives, so it picks up where it paused).
+        if m.rowBuildTimer <> invalid and m.contentRowCats <> invalid and m.rowBuildIndex < m.contentRowCats.Count() then
+            m.rowBuildTimer.control = "start"
+        end if
     else
-        m.hero.visible = false
+        ' Covered by another screen (e.g. Detail pushed on top): stop the hero AND pause
+        ' background node-building so nothing competes with the foreground screen for the
+        ' single render thread.
+        if m.hero <> invalid then m.hero.visible = false
+        if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+        if m.interactIdle <> invalid then m.interactIdle.control = "stop"
     end if
 end sub
 
@@ -299,9 +345,9 @@ end sub
 sub ApplyHeaderBranding()
     if m.header = invalid then return
 
-    ' Active profile avatar (parity with NetflixHeader): persisted by fetchProfiles.
+    ' Active profile avatar (parity with NetflixHeader): persisted by the select-profile
+    ' handoff (PersistSelectedProfile), falling back to the first profile from fetch.
     avatarUri = RegistryRead(SK_Avatar(), "app")
-    print "[AVATARDBG] HomeHeader reading avatar='"; avatarUri; "'"
     if avatarUri <> invalid then m.header.avatarUri = avatarUri
 
     resolved = invalid
@@ -595,7 +641,14 @@ sub OnHomeSelectResponse()
 
     if api.ok and ApplySelectProfileTokens(api.result) then
         PersistSelectedProfile(m.pendingSelectId, m.pendingSelectAvatar)
+        ' The header avatar was populated during init() from the previously-stored
+        ' (first) profile; now that the chosen profile's avatar is persisted, refresh
+        ' the header so it shows the SELECTED profile rather than the stale one.
+        if m.header <> invalid and m.pendingSelectAvatar <> invalid and m.pendingSelectAvatar <> "" then
+            m.header.avatarUri = m.pendingSelectAvatar
+        end if
         m.pendingSelectId = ""
+        m.pendingSelectAvatar = ""
         m.selectInFlight = false
         if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
         print "[HOME] select-profile ok -> boot home content"
@@ -683,6 +736,7 @@ sub FetchContinueWatching()
 end sub
 
 sub OnContinueWatchingResponse()
+    if m.top.dispose = true then return
     if m.continueTask = invalid then return
     api = m.continueTask.apiResult
     if api = invalid then return
@@ -719,6 +773,7 @@ sub FetchHomeCategories(pageNum as integer)
 end sub
 
 sub OnHomeCategoriesResponse()
+    if m.top.dispose = true then return
     if m.categoryTask = invalid then return
     api = m.categoryTask.apiResult
     if api = invalid then return
@@ -757,6 +812,7 @@ sub FetchLatestVersion()
 end sub
 
 sub OnLatestVersionResponse()
+    if m.top.dispose = true then return
     if m.versionTask = invalid then return
     api = m.versionTask.apiResult
     if api = invalid then return
@@ -1224,6 +1280,7 @@ sub LoadMoreCategories()
 end sub
 
 sub OnLoadMoreResponse()
+    if m.top.dispose = true then return
     m.loadingMore = false
     if m.loadMoreTask = invalid then return
     api = m.loadMoreTask.apiResult

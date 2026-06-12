@@ -93,6 +93,11 @@ function CreateScreenForRoute(route as string, state as object) as object
         screen.navState = state
         return screen
     end if
+    if route = RouteVideoPlayer() then
+        screen = CreateObject("roSGNode", "VideoPlayerScreen")
+        screen.navState = state
+        return screen
+    end if
     return CreatePlaceholderScreen(route, state)
 end function
 
