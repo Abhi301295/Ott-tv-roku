@@ -195,9 +195,6 @@ sub LoadAndPlay()
 
     m.isTrailer = VideoIsTrailer(m.detail)
     m.resumeSecs = VideoResumeSeconds(m.detail, m.startOver)
-    print "[VP] LoadAndPlay resumeSecs="; m.resumeSecs; " startOver="; m.startOver; " videoId="; VideoProgressId(m.detail)
-    print "[VP] detail.continueWatching="; FormatJson(m.detail.continueWatching)
-    print "[VP] detail.progress(top)="; FormatJson(m.detail.progress)
     m.introStart = VideoIntroStart(m.detail)
     m.introEnd = VideoIntroEnd(m.detail)
     m.bingeTrigger = VideoBingeTrigger(m.detail)
@@ -260,7 +257,6 @@ sub ApplyPendingSeek()
     curPos = m.videoNode.position
     if curPos = invalid then curPos = 0
     ' Only seek when playStart clearly didn't take (still near the start).
-    print "[VP] ApplyPendingSeek target="; target; " curPos="; curPos
     if target > 2 and curPos < target - 3 then
         m.videoNode.seek = target
         m.position = target

@@ -100,9 +100,16 @@ sub BeginJob(job as object)
     body = HttpWorkerBody(job.body)
 
     ok = false
+    ' SetRequest is sticky on a reused keep-alive roUrlTransfer: a prior PATCH/PUT/DELETE
+    ' otherwise leaks its verb onto the next GET/POST (e.g. PATCH accounts/signin poisoning
+    ' the worker so the onboard POST /device goes out as PATCH -> "Cannot PATCH /device").
+    ' Always set the verb explicitly so the request method matches this job regardless of
+    ' what ran on this worker before.
     if method = "GET" then
+        m.xfer.SetRequest("GET")
         ok = m.xfer.AsyncGetToString()
     else if method = "POST" then
+        m.xfer.SetRequest("POST")
         ok = m.xfer.AsyncPostFromString(body)
     else if method = "PATCH" or method = "PUT" or method = "DELETE" then
         m.xfer.SetRequest(method)

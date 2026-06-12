@@ -142,7 +142,10 @@ function VideoToNumber(v as dynamic) as float
         if v = "" then return 0.0
         return Val(v)
     end if
-    if t = "roInt" or t = "Integer" or t = "roFloat" or t = "Float" or t = "Double" or t = "roDouble" or t = "LongInteger" then
+    ' Cover both unboxed names (Integer/Float/Double/LongInteger) and boxed/JSON-parsed
+    ' names. brs ParseJson yields "roInteger" for whole numbers (confirmed via telnet:
+    ' progress 22 -> type=roInteger), which the old list missed and so returned 0.
+    if t = "roInt" or t = "Integer" or t = "roInteger" or t = "roFloat" or t = "Float" or t = "Double" or t = "roDouble" or t = "LongInteger" or t = "roLongInteger" then
         return v
     end if
     return 0.0
