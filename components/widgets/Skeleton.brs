@@ -49,5 +49,6 @@ sub OnRunningChanged()
     else
         m.anim.control = "stop"
         if m.shine <> invalid then m.shine.opacity = 0.0
+        if m.base <> invalid then m.base.opacity = 1.0
     end if
 end sub

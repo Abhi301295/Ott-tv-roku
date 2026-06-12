@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Fetches an HLS master playlist and parses its variant ladder so the player can show
+     real quality options (Roku's Video node does not expose the HLS levels). One-shot:
+     set manifestUrl, control="RUN", then observe `levels`. -->
+<component name="ManifestTask" extends="Task">
+  <interface>
+    <field id="manifestUrl" type="string" />
+    <field id="levels" type="array" />
+    <field id="done" type="boolean" value="false" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/core/ManifestTask.brs" />
+</component>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Video player — parity with src/features/contentdetail/video/index.tsx.
+     HLS via Roku's native Video node (enableUI=false; we draw custom controls).
+     Leak-safe: OnDispose stops the Video, kills every Timer, flushes final progress,
+     and unobserves all fields before the node leaves the tree. -->
+<component name="VideoPlayerScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" onChange="OnNavStateReady" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/VideoPlayerScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x000000ff" />
+
+    <!-- Native player. enableUI=false → no Roku trick-bar; we render our own controls. -->
+    <Video id="videoNode" width="1920" height="1080" translation="[0, 0]"
+      enableUI="false" mute="false" />
+
+    <!-- Buffering/loading indicator (parity with React Spinner: white ring + primary
+         bottom arc spinning, with a "Loading" label). Rotation via Animation for smoothness. -->
+    <Group id="loaderGroup" translation="[960, 506]" visible="false">
+      <Group id="loaderSpin" rotation="0">
+        <Poster id="loaderRing" translation="[-32, -32]" width="64" height="64"
+          uri="pkg:/images/ui/spinner_ring.png" />
+        <Poster id="loaderArc" translation="[-32, -32]" width="64" height="64"
+          uri="pkg:/images/ui/spinner_arc.png" blendColor="0x0b75e0ff" />
+      </Group>
+      <Label id="loaderText" translation="[-100, 52]" width="200" height="32"
+        horizAlign="center" text="Loading" color="0xf5f5f5ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
+      </Label>
+      <Animation id="loaderAnim" duration="0.9" repeat="true" easeFunction="linear">
+        <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+          fieldToInterp="loaderSpin.rotation" />
+      </Animation>
+    </Group>
+
+    <!-- Skip Intro pill (bottom-right, above the control bar). -->
+    <Group id="skipIntroBtn" translation="[1620, 850]" visible="false">
+      <Poster id="skipIntroBg" uri="pkg:/images/ui/video_pill.png" width="220" height="64" />
+      <Label id="skipIntroLabel" text="Skip Intro" width="220" height="64"
+        horizAlign="center" vertAlign="center" color="0xf5f5f5ff">
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="24" />
+      </Label>
+      <Rectangle id="skipIntroRing" width="220" height="64" color="0x00000000" visible="false" />
+    </Group>
+
+    <!-- Binge / Next Episode card (bottom-right). -->
+    <Group id="bingeCard" translation="[1480, 720]" visible="false">
+      <Label id="bingeNextUp" text="Next Up" translation="[0, -40]" width="360" height="32"
+        color="0xf5f5f5ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+      </Label>
+      <Poster id="bingeGlow" uri="pkg:/images/ui/btn_detail_glow.png" translation="[-12, -12]"
+        width="384" height="280" blendColor="0x0b75e0ff" opacity="0.0" visible="false" />
+      <Rectangle id="bingeBg" width="360" height="256" color="0x0a0a0aef" />
+      <Poster id="bingeThumb" translation="[0, 0]" width="360" height="190"
+        loadDisplayMode="scaleToZoom" />
+      <Label id="bingeTitle" translation="[16, 198]" width="328" height="48" wrap="true"
+        maxLines="1" color="0xf5f5f5ff">
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="22" />
+      </Label>
+      <Label id="bingeCountdownLabel" translation="[16, 198]" width="328" height="48"
+        horizAlign="right" color="0xadadadff">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+    </Group>
+
+    <!-- Control bar (bottom). Visible toggles with idle auto-hide. -->
+    <Group id="controlsGroup" visible="false">
+      <Poster id="controlsScrim" uri="pkg:/images/ui/video_scrim.png" translation="[0, 880]"
+        width="1920" height="200" />
+
+      <!-- White (neutral-50) glyphs dimmed via opacity (op-30) and brightened to op-100
+           on focus — parity with React. blendColor/opacity are re-applied from theme
+           tokens at runtime in ApplyControlColors/ApplyControlFocus. -->
+      <Poster id="btnBack" translation="[60, 980]" width="48" height="48"
+        uri="pkg:/images/ui/ic_v_back.png" blendColor="0xf5f5f5ff" opacity="0.3" />
+      <Poster id="btnPlay" translation="[128, 980]" width="48" height="48"
+        uri="pkg:/images/ui/ic_v_play.png" blendColor="0xf5f5f5ff" opacity="0.3" />
+      <Poster id="btnFwd" translation="[196, 980]" width="48" height="48"
+        uri="pkg:/images/ui/ic_v_fwd.png" blendColor="0xf5f5f5ff" opacity="0.3" />
+
+      <Label id="timeLabel" translation="[268, 980]" width="240" height="48" vertAlign="center"
+        text="00:--:--  /  00:--:--" color="0xf5f5f5ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
+      </Label>
+
+      <!-- Scrubber: opaque grey track + primary fill + knob. -->
+      <Group id="scrubber" translation="[520, 1001]">
+        <Rectangle id="scrubTrack" width="1280" height="6" color="0x55555fff" />
+        <Rectangle id="scrubFill" width="0" height="6" color="0x0b75e0ff" />
+        <Poster id="scrubKnob" translation="[-10, -7]" width="20" height="20"
+          uri="pkg:/images/ui/ic_v_knob.png" blendColor="0x0b75e0ff" />
+      </Group>
+
+      <Poster id="btnSettings" translation="[1824, 980]" width="48" height="48"
+        uri="pkg:/images/ui/ic_v_settings.png" blendColor="0xf5f5f5ff" opacity="0.3" />
+    </Group>
+
+    <!-- Settings popup (right-side panel, parity with settingPopUp.tsx). -->
+    <Group id="settingsOverlay" visible="false">
+      <!-- React's backdrop is `bg-light_black`, which is undefined in tailwind.config.js /
+           theme.css / index.css (no compiled rule) — so it renders transparent and does
+           NOT dim the video. Match that: full-screen catcher with no fill. -->
+      <Rectangle id="settingsScrim" width="1920" height="1080" color="0x00000000" />
+      <Rectangle id="settingsPanel" translation="[1344, 0]" width="576" height="1080"
+        color="0x0a0a0aff" />
+      <Label id="settingsTitle" translation="[1380, 40]" width="400" height="48" text="Settings"
+        color="0xf5f5f5ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="30" />
+      </Label>
+      <Poster id="settingsClose" translation="[1844, 44]" width="40" height="40"
+        uri="pkg:/images/ui/ic_v_close.png" />
+      <Group id="settingsRows" translation="[1380, 120]" />
+    </Group>
+  </children>
+</component>

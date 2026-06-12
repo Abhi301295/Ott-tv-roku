@@ -23,9 +23,12 @@
       loadDisplayMode="scaleToFill" blendColor="0xffffffff" />
     <Poster id="shine" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
       loadDisplayMode="scaleToFill" blendColor="0xf3f3f3ff" opacity="0.0" />
-    <Animation id="anim" duration="1.3" repeat="true" easeFunction="linear">
+    <!-- Breathe the base opacity (parity with react animate-pulse). Pulsing the highlight
+         overlay was invisible because base+highlight are both near-white; opacity is
+         visible against any background. -->
+    <Animation id="anim" duration="1.1" repeat="true" easeFunction="inOutQuad">
       <FloatFieldInterpolator id="interp" key="[0.0,0.5,1.0]"
-        keyValue="[0.0,0.6,0.0]" fieldToInterp="shine.opacity" />
+        keyValue="[1.0,0.4,1.0]" fieldToInterp="base.opacity" />
     </Animation>
   </children>
 </component>
