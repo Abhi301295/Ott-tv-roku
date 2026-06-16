@@ -45,6 +45,18 @@ sub ApplyAll()
 end sub
 
 sub ApplyFocusVisual()
-    m.focusBorder = CardEnsureFocusFrame(m.top, m.focusBorder, 21, 0, 374, 214, m.top.cPrimary500)
+    ' Insert the focus frame between the poster body (index 0) and the rank glow/label so the
+    ' border sits behind the giant numeral — parity with numberedVerticalCard.tsx (z-1 border,
+    ' z-2 rank span on top).
+    if m.focusBorder = invalid then
+        frame = m.top.createChild("FocusFrame")
+        m.top.removeChild(frame)
+        m.top.insertChild(frame, 1)
+        frame.translation = [21, 0]
+        frame.boxWidth = 374
+        frame.boxHeight = 214
+        if m.top.cPrimary500 <> invalid and m.top.cPrimary500 <> "" then frame.color = m.top.cPrimary500
+        m.focusBorder = frame
+    end if
     CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
 end sub

@@ -29,12 +29,17 @@
   <children>
     <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
 
-    <!-- Backdrop banner + cinematic scrims (parity with detail gradient overlays). -->
-    <Poster id="banner" width="1920" height="1080" loadDisplayMode="scaleToFill" visible="false" />
-    <Poster id="gradLeft" uri="pkg:/images/ui/grad_left.png" width="1920" height="1080"
-      loadDisplayMode="scaleToFill" opacity="0.95" visible="false" />
-    <Poster id="gradBottom" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 780]"
-      width="1920" height="300" loadDisplayMode="scaleToFill" opacity="0.85" visible="false" />
+    <!-- Backdrop banner + cinematic scrims (parity with contentdetail/index.tsx).
+         Banner uses scaleToZoom (= CSS bg-cover) so the art stays sharp; gradients only
+         cover the left 55% and bottom 20% so the right side stays crystal clear. -->
+    <Poster id="banner" width="1920" height="1080" loadWidth="2560" loadHeight="1440"
+      loadDisplayMode="scaleToZoom" visible="false" />
+    <!-- after:from-black/95 to-transparent to-[55%] — vignette ends at 55% width. -->
+    <Poster id="gradLeft" uri="pkg:/images/ui/grad_left.png" width="1056" height="1080"
+      loadDisplayMode="scaleToFill" visible="false" />
+    <!-- bg-gradient-to-t from-black/85 to-transparent to-[20%] — bottom 216px only. -->
+    <Poster id="gradBottom" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 864]"
+      width="1920" height="216" loadDisplayMode="scaleToFill" opacity="0.85" visible="false" />
 
     <!-- Loading shimmer — parity with the detail skeleton (neutral-700 boxes, animate-pulse).
          Positions track the real content below so the hand-off is seamless. -->
@@ -107,21 +112,37 @@
       </Group>
     </Group>
 
-    <!-- More Like This drawer (parity with the fixed left panel). -->
+    <!-- More Like This overlay — dims the live detail UI; drawer slides up smoothly. -->
     <Group id="moreLikeOverlay" visible="false">
-      <Rectangle id="moreLikeScrim" width="1920" height="1080" color="0x000000ff" opacity="0.6" />
-      <Rectangle id="moreLikePanel" width="1920" height="1080" color="0x0a0a0aff" opacity="0.95" />
-      <Label id="moreLikeClose" translation="[1820, 40]" width="60" height="60" text="✕"
-        horizAlign="center" vertAlign="center" color="0xffffff99">
-        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="48" />
-      </Label>
-      <Group id="moreLikeCardsHost" translation="[40, 620]" />
-      <Group id="moreLikeSkeletonHost" translation="[40, 620]" visible="false">
-        <Skeleton id="mlSk0" translation="[0, 0]" boxWidth="220" boxHeight="300" />
-        <Skeleton id="mlSk1" translation="[230, 0]" boxWidth="220" boxHeight="300" />
-        <Skeleton id="mlSk2" translation="[460, 0]" boxWidth="220" boxHeight="300" />
-        <Skeleton id="mlSk3" translation="[690, 0]" boxWidth="220" boxHeight="300" />
+      <Rectangle id="moreLikeScrim" width="1920" height="1080" color="0x000000ff" opacity="0" />
+      <Group id="moreLikeDrawer" translation="[0, 1080]">
+        <Group id="moreLikeCardsHost" translation="[40, 612]" />
+        <!-- 8 shimmer placeholders — parity with React w-272 h-340 bg-neutral-700 animate-pulse. -->
+        <Group id="moreLikeSkeletonHost" translation="[40, 612]" visible="false">
+          <Skeleton id="mlSk0" translation="[0, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk1" translation="[282, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk2" translation="[564, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk3" translation="[846, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk4" translation="[1128, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk5" translation="[1410, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk6" translation="[1692, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk7" translation="[1974, 0]" boxWidth="272" boxHeight="340" />
+        </Group>
+        <Group id="moreLikeCloseHost" translation="[1824, 516]">
+          <Label id="moreLikeClose" text="✕" width="64" height="64"
+            horizAlign="center" vertAlign="center" color="0xffffff99">
+            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="48" />
+          </Label>
+        </Group>
       </Group>
+      <Animation id="moreLikeScrimIn" duration="0.3" repeat="false" easeFunction="outQuad">
+        <FloatFieldInterpolator id="moreLikeScrimInterp" key="[0.0, 1.0]"
+          keyValue="[0.0, 0.6]" fieldToInterp="moreLikeScrim.opacity" />
+      </Animation>
+      <Animation id="moreLikeDrawerIn" duration="0.3" repeat="false" easeFunction="outQuad">
+        <Vector2DFieldInterpolator id="moreLikeDrawerInterp" key="[0.0, 1.0]"
+          keyValue="[[0.0, 1080.0], [0.0, 0.0]]" fieldToInterp="moreLikeDrawer.translation" />
+      </Animation>
     </Group>
   </children>
 </component>

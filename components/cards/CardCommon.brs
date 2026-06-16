@@ -108,3 +108,52 @@ sub CardApplySkeleton(skeleton as object, neutral700 as string, neutral800 as st
     ' so a loading row reads as an intentional shimmer, not flat grey boxes.
     if skeleton.hasField("animate") then skeleton.animate = true
 end sub
+
+function CardLightenHex(hex as string, amount as integer) as string
+    rgb = CardHexToRgb(hex)
+    r = rgb[0] + amount
+    g = rgb[1] + amount
+    b = rgb[2] + amount
+    if r > 255 then r = 255
+    if g > 255 then g = 255
+    if b > 255 then b = 255
+    return CardRgbToHex(r, g, b)
+end function
+
+function CardAvgLum(hex as string) as integer
+    rgb = CardHexToRgb(hex)
+    return Int((rgb[0] + rgb[1] + rgb[2]) / 3)
+end function
+
+' Pick a skeleton base that contrasts the screen fill when brand tokens resolve near-white.
+function CardContrastSkeletonBase(bg as string, candidate as string) as string
+    if bg = invalid or bg = "" then bg = "0x121212ff"
+    if candidate = invalid or candidate = "" then candidate = "0x404040ff"
+    bgL = CardAvgLum(bg)
+    cL = CardAvgLum(candidate)
+    if bgL > 160 then
+        if cL > 120 then return "0x404040ff"
+    else if cL > 160 then
+        return "0x404040ff"
+    end if
+    return candidate
+end function
+
+sub CardApplySkeletonTree(node as object, base as string, hi as string, running as boolean)
+    if node = invalid then return
+    if node.hasField("running") and node.hasField("baseColor") then
+        CardApplySkeleton(node, base, hi)
+        node.running = running
+        return
+    end if
+    for each child in node.getChildren(-1, 0)
+        CardApplySkeletonTree(child, base, hi, running)
+    end for
+end sub
+
+sub CardDetachMediaObservers(card as object)
+    if card = invalid then return
+    if card.hasField("loaded") then card.unobserveField("loaded")
+    thumb = card.findNode("thumb")
+    if thumb <> invalid then thumb.unobserveField("loadStatus")
+end sub

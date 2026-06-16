@@ -1,10 +1,10 @@
 sub init()
     m.rowTitle = m.top.findNode("rowTitle")
     m.cardsHost = m.top.findNode("cardsHost")
-    m.cardsRevealAnim = m.top.findNode("cardsRevealAnim")
     m.cards = []
     m.cardWidths = []
     m.seeAllOrientation = HC_CardTypeVertical()
+    if m.rowTitle <> invalid then m.rowTitle.opacity = 0.0
 
     ' Cards are built progressively (a small chunk per tick) instead of all-at-once.
     ' Creating a full row's cards synchronously blocks the render thread for hundreds of
@@ -126,6 +126,7 @@ function PlanRowCards(cat as object) as object
     if cat.name <> invalid then title = cat.name
     m.rowTitle.text = title
     m.rowTitle.color = m.top.cNeutral50
+    m.rowTitle.opacity = 0.0
 
     items = cat.result
     if items = invalid or items.Count() = 0 then return invalid
@@ -180,6 +181,43 @@ sub StartCardBuild(cat as object)
     end if
 end sub
 
+' Only count on-screen cards toward the reveal gate so off-screen thumbnails do not
+' block the row from appearing.
+sub TrackCardMediaLoad(card as object, compName as string)
+    if card = invalid then return
+    if m.buildX >= 1920 then return
+    if compName = "SeeAllCard" then return
+
+    if compName = "ContinueWatchCard" and card.hasField("loaded") then
+        m.pendingMediaLoads = m.pendingMediaLoads + 1
+        if card.loaded = true then
+            OnCardMediaLoaded()
+        else
+            card.observeField("loaded", "OnCardMediaLoaded")
+        end if
+        return
+    end if
+
+    thumb = card.findNode("thumb")
+    if thumb = invalid then return
+    m.pendingMediaLoads = m.pendingMediaLoads + 1
+    st = thumb.loadStatus
+    if st = "ready" or st = "failed" then
+        OnCardMediaLoaded()
+    else
+        thumb.observeField("loadStatus", "OnThumbLoadStatusChanged")
+    end if
+end sub
+
+sub OnThumbLoadStatusChanged(event as object)
+    node = event.getRoSGNode()
+    if node = invalid then return
+    st = node.loadStatus
+    if st <> "ready" and st <> "failed" then return
+    node.unobserveField("loadStatus")
+    OnCardMediaLoaded()
+end sub
+
 sub OnCardBuildTick()
     if m.buildIdx >= m.buildPlan.Count() then
         m.cardTimer.control = "stop"
@@ -202,17 +240,9 @@ sub OnCardBuildTick()
         m.buildX = m.buildX + w + gap
     else
         card = m.cardsHost.createChild(plan.comp)
-        ' Only gate the reveal on cards that are actually on screen (buildX within the 1920
-        ' viewport). A CW row builds up to 11 cards but only ~4 are visible, so waiting on the
-        ' off-screen thumbnails kept the loading placeholder up ~1s longer than needed. The
-        ' off-screen cards keep loading behind the revealed strip and are ready by the time the
-        ' user scrolls to them.
-        if plan.comp = "ContinueWatchCard" and card.hasField("loaded") and m.buildX < 1920 then
-            m.pendingMediaLoads = m.pendingMediaLoads + 1
-            card.observeField("loaded", "OnCardMediaLoaded")
-        end if
         ConfigureCard(card, plan.comp, plan.item, plan.cardType, plan.rank)
         card.translation = [m.buildX, 0]
+        TrackCardMediaLoad(card, plan.comp)
         w = CardComponentWidth(plan.comp)
         m.cards.Push(card)
         m.cardWidths.Push(w)
@@ -252,6 +282,7 @@ end sub
 
 sub RevealNow()
     if m.revealTimer <> invalid then m.revealTimer.control = "stop"
+    if m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
     if m.cardsHost <> invalid then m.cardsHost.opacity = 1.0
     m.top.built = true
     if m.top.mediaReady <> true then m.top.mediaReady = true
@@ -262,7 +293,11 @@ sub OnRevealSafety()
     RevealNow()
 end sub
 
-sub OnCardMediaLoaded()
+sub OnCardMediaLoaded(event = invalid as object)
+    if event <> invalid then
+        node = event.getRoSGNode()
+        if node <> invalid and node.hasField("loaded") then node.unobserveField("loaded")
+    end if
     if m.pendingMediaLoads > 0 then m.pendingMediaLoads = m.pendingMediaLoads - 1
     MaybeReveal()
 end sub
@@ -356,8 +391,11 @@ end sub
 sub ClearCards()
     if m.cardTimer <> invalid then m.cardTimer.control = "stop"
     if m.revealTimer <> invalid then m.revealTimer.control = "stop"
-    if m.cardsRevealAnim <> invalid then m.cardsRevealAnim.control = "stop"
+    for each card in m.cards
+        CardDetachMediaObservers(card)
+    end for
     if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
+    if m.rowTitle <> invalid then m.rowTitle.opacity = 0.0
     m.top.built = false
     m.buildPlan = []
     m.buildIdx = 0

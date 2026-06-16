@@ -36,18 +36,11 @@
 
   <children>
     <Label id="rowTitle" text="" translation="[32, 0]" width="1800" height="48"
-      color="0xf8f1f7ff">
+      color="0xf8f1f7ff" opacity="0.0">
       <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="41" />
     </Label>
     <!-- Cards build progressively into cardsHost while it is transparent, then the whole
          strip fades in together (parity intent: the row appears populated, not stacking). -->
     <Group id="cardsHost" translation="[32, 55]" opacity="0.0" />
-
-    <Animation id="cardsRevealAnim" duration="0.3" repeat="false" easeFunction="outQuad">
-      <FloatFieldInterpolator id="cardsRevealInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
-        fieldToInterp="cardsHost.opacity" />
-      <FloatFieldInterpolator id="titleRevealInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
-        fieldToInterp="rowTitle.opacity" />
-    </Animation>
   </children>
 </component>

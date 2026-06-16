@@ -118,6 +118,12 @@ sub init()
     m.skeletonTimeout.repeat = false
     m.top.appendChild(m.skeletonTimeout)
     m.skeletonTimeout.observeField("fire", "OnSkeletonTimeout")
+    m.rowsSkeletonTimeout = CreateObject("roSGNode", "Timer")
+    m.rowsSkeletonTimeout.duration = HC_RowsSkeletonMaxSec()
+    m.rowsSkeletonTimeout.repeat = false
+    m.top.appendChild(m.rowsSkeletonTimeout)
+    m.rowsSkeletonTimeout.observeField("fire", "OnRowsSkeletonTimeout")
+    m.firstRowWatch = invalid
 
     SetupHeader()
     EnterHeader()
@@ -155,6 +161,7 @@ sub TryStartHomeBoot()
     ' lands (hero on poster paint, rows when CW + categories are ready).
     ShowHeroSkeleton(true)
     ShowRowsSkeleton(true)
+    if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
     ' Wall-clock from mount → hero poster painted = perceived first-content latency.
     m.bootSpan = CreateObject("roTimespan")
     StartBootSequence()
@@ -173,6 +180,8 @@ sub OnDispose()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
     if m.rowBuildGate <> invalid then m.rowBuildGate.control = "stop"
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
+    if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
+    DetachFirstRowWatch()
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
     if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
@@ -920,6 +929,20 @@ sub OnSkeletonTimeout()
     ShowHeroSkeleton(false)
 end sub
 
+sub OnRowsSkeletonTimeout()
+    print "[HOME] rows skeleton timeout -> hide rows shimmer"
+    ShowRowsSkeleton(false)
+    m.rowsRevealed = true
+    UpdateRowsScrim()
+    MaybeLandContentFocus()
+end sub
+
+sub DetachFirstRowWatch()
+    if m.firstRowWatch = invalid then return
+    m.firstRowWatch.unobserveField("mediaReady")
+    m.firstRowWatch = invalid
+end sub
+
 sub ShowHeroSkeleton(show as boolean)
     if m.homeSkeleton = invalid then return
     print "[HOME] ShowHeroSkeleton("; show; ")"
@@ -932,6 +955,13 @@ sub ShowRowsSkeleton(show as boolean)
     print "[HOME] ShowRowsSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
     m.homeSkeleton.rowsRunning = show
+    if m.rowsSkeletonTimeout <> invalid then
+        if show then
+            m.rowsSkeletonTimeout.control = "start"
+        else
+            m.rowsSkeletonTimeout.control = "stop"
+        end if
+    end if
 end sub
 
 ' ── Content rows (parity with netflixContent.tsx row list) ───────────────────
@@ -991,9 +1021,16 @@ sub OnRowBuildTick()
     m.rowBuildCostMs = m.rowBuildCostMs + rowMs
     print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
 
-    ' Keep the rows shimmer up until the FIRST row (Continue Watching) has actually loaded
-    ' its thumbnails, then hand off to real cards (no static grey-card gap).
-    if m.rowBuildIndex = 0 then row.observeField("mediaReady", "OnFirstRowBuilt")
+    ' Keep the rows shimmer up until the FIRST row has actually loaded its thumbnails.
+    if m.rowBuildIndex = 0 then
+        if row.cardCount = 0 or row.built = true then
+            OnFirstRowBuilt()
+        else
+            DetachFirstRowWatch()
+            m.firstRowWatch = row
+            row.observeField("mediaReady", "OnFirstRowBuilt")
+        end if
+    end if
 
     m.rowBuildY = m.rowBuildY + HC_RowPitch()
     m.rowBuildIndex = m.rowBuildIndex + 1
@@ -1018,6 +1055,7 @@ sub OnFirstRowBuilt()
     row = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
     if row <> invalid and row.hasField("mediaReady") and row.mediaReady <> true then return
+    DetachFirstRowWatch()
     print "[HOME] first row media ready -> hide rows shimmer + reveal hero behind cards"
     ShowRowsSkeleton(false)
     ' CW content has painted — drop the dark scrim so the hero bleeds behind the cards.

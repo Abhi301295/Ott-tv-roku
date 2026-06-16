@@ -31,24 +31,32 @@
   <children>
     <Rectangle id="bg" width="1920" height="1080" color="0x121212ff" />
 
-    <!-- Left pane (~1/3): brand title + season tabs (parity with the w-1/3 column). -->
-    <Label id="seriesTitle" translation="[60, 110]" width="560" height="120" wrap="true"
+    <!-- Left pane (~1/3): season tab list (built in code; scrolls via translation). Rendered
+         first so the mask + header below paint on top of any scrolled-up tabs. -->
+    <Group id="seasonsHost" translation="[40, 330]" />
+    <!-- Mask covering season overflow above the list so scrolled tabs don't bleed over the
+         brand logo / title / meta header. -->
+    <Rectangle id="leftMask" translation="[0, 0]" width="680" height="330" color="0x121212ff" />
+
+    <!-- Left header (logo → title → meta), parity with the w-1/3 column header block. -->
+    <Poster id="brandLogo" translation="[60, 64]" width="280" height="92"
+      loadDisplayMode="scaleToFit" visible="false" />
+    <Label id="brandLabel" translation="[60, 70]" width="540" height="80" wrap="false"
+      visible="false" color="0x0b75e0ff">
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="48" />
+    </Label>
+    <Label id="seriesTitle" translation="[60, 172]" width="600" height="110" wrap="true"
       maxLines="2" color="0xf5f5f5ff">
       <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="50" />
     </Label>
-    <Label id="seriesMeta" translation="[60, 232]" width="560" height="34" wrap="false"
+    <Label id="seriesMeta" translation="[60, 286]" width="560" height="34" wrap="false"
       color="0xd6d6d6ff">
       <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="24" />
     </Label>
 
-    <!-- Season tab list (built in code; scrolls via translation). -->
-    <Group id="seasonsHost" translation="[40, 300]" />
-    <!-- Mask covering season overflow above the list so scrolled tabs don't paint over the title. -->
-    <Rectangle id="leftMask" translation="[0, 0]" width="660" height="300" color="0x121212ff" />
-
-    <!-- Right pane (~2/3): season heading + vertical episode list. -->
+    <!-- Right pane (~2/3): vertical episode list (rendered first, under the mask + heading). -->
     <Group id="episodesHost" translation="[700, 250]" />
-    <!-- Mask covering episode overflow above the list so scrolled cards don't paint over the heading. -->
+    <!-- Mask covering episode overflow above the list so scrolled cards don't bleed over the heading. -->
     <Rectangle id="rightMask" translation="[660, 0]" width="1260" height="250" color="0x121212ff" />
     <Label id="sectionHeading" translation="[700, 120]" width="1160" height="56" wrap="false"
       color="0xf5f5f5ff">
@@ -59,9 +67,59 @@
       <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
     </Label>
 
-    <Label id="loadingLabel" translation="[700, 480]" width="1160" height="40" text="Loading…"
-      color="0xd6d6d6ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="28" />
-    </Label>
+    <!-- Loading skeletons — native-size PNG shapes (same technique as DetailScreen).
+         brs-engine does NOT stretch skeleton art; boxWidth/boxHeight must match each PNG. -->
+    <Group id="leftHeaderSkeleton" visible="false">
+      <Skeleton id="skLogo" translation="[60, 64]" boxWidth="160" boxHeight="40"
+        shapeUri="pkg:/images/ui/sk_series_logo.png" baseColor="0x404040ff" />
+      <Skeleton id="skTitle" translation="[60, 172]" boxWidth="400" boxHeight="80"
+        shapeUri="pkg:/images/ui/sk_detail_title.png" baseColor="0x404040ff" />
+      <Skeleton id="skMeta" translation="[60, 268]" boxWidth="300" boxHeight="20"
+        shapeUri="pkg:/images/ui/sk_detail_line_300.png" baseColor="0x404040ff" />
+    </Group>
+    <Group id="seasonSkeletonHost" translation="[40, 330]" visible="false">
+      <Skeleton id="skTab0" translation="[20, 0]" boxWidth="560" boxHeight="32"
+        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
+      <Skeleton id="skTab1" translation="[20, 80]" boxWidth="560" boxHeight="32"
+        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
+      <Skeleton id="skTab2" translation="[20, 160]" boxWidth="560" boxHeight="32"
+        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
+      <Skeleton id="skTab3" translation="[20, 240]" boxWidth="560" boxHeight="32"
+        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
+      <Skeleton id="skTab4" translation="[20, 320]" boxWidth="560" boxHeight="32"
+        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
+    </Group>
+    <Group id="rightHeaderSkeleton" visible="false">
+      <Skeleton id="skHeading" translation="[700, 120]" boxWidth="200" boxHeight="20"
+        shapeUri="pkg:/images/ui/sk_detail_line_200.png" baseColor="0x404040ff" />
+      <Skeleton id="skSubtitle" translation="[700, 156]" boxWidth="230" boxHeight="20"
+        shapeUri="pkg:/images/ui/sk_detail_line_230.png" baseColor="0x404040ff" />
+    </Group>
+    <Group id="episodeSkeletonHost" translation="[700, 250]" visible="false">
+      <Group id="epSkRow0">
+        <Skeleton translation="[16, 10]" boxWidth="320" boxHeight="180"
+          shapeUri="pkg:/images/ui/sk_episode_thumb.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 14]" boxWidth="400" boxHeight="24"
+          shapeUri="pkg:/images/ui/sk_detail_line_400.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 62]" boxWidth="600" boxHeight="16"
+          shapeUri="pkg:/images/ui/sk_detail_line_600.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 86]" boxWidth="500" boxHeight="16"
+          shapeUri="pkg:/images/ui/sk_detail_line_500.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 140]" boxWidth="260" boxHeight="20"
+          shapeUri="pkg:/images/ui/sk_detail_line_260.png" baseColor="0x404040ff" />
+      </Group>
+      <Group id="epSkRow1" translation="[0, 224]">
+        <Skeleton translation="[16, 10]" boxWidth="320" boxHeight="180"
+          shapeUri="pkg:/images/ui/sk_episode_thumb.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 14]" boxWidth="400" boxHeight="24"
+          shapeUri="pkg:/images/ui/sk_detail_line_400.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 62]" boxWidth="600" boxHeight="16"
+          shapeUri="pkg:/images/ui/sk_detail_line_600.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 86]" boxWidth="500" boxHeight="16"
+          shapeUri="pkg:/images/ui/sk_detail_line_500.png" baseColor="0x404040ff" />
+        <Skeleton translation="[360, 140]" boxWidth="260" boxHeight="20"
+          shapeUri="pkg:/images/ui/sk_detail_line_260.png" baseColor="0x404040ff" />
+      </Group>
+    </Group>
   </children>
 </component>

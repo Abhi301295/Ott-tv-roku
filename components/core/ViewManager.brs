@@ -37,6 +37,7 @@ function NavigatePop() as boolean
     end if
     m.top.currentRoute = prev.route
     m.top.navState = prev.state
+    m.top.overlayOpen = false
     return true
 end function
 

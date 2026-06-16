@@ -8,6 +8,7 @@
     <field id="overlayDismiss" type="boolean" alwaysNotify="true" />
     <function name="NavigatePush" />
     <function name="NavigateReplace" />
+    <function name="NavigatePop" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />

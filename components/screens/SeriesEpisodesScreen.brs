@@ -6,8 +6,8 @@
 function SE_SeasonTabWidth() as integer: return 560: end function
 function SE_SeasonTabHeight() as integer: return 64: end function
 function SE_SeasonTabPitch() as integer: return 80: end function
-function SE_SeasonBaseY() as integer: return 300: end function
-function SE_SeasonViewHeight() as integer: return 740: end function
+function SE_SeasonBaseY() as integer: return 330: end function
+function SE_SeasonViewHeight() as integer: return 700: end function
 
 function SE_CardWidth() as integer: return 1180: end function
 function SE_CardHeight() as integer: return 200: end function
@@ -19,6 +19,8 @@ function SE_ThumbH() as integer: return 180: end function
 
 sub init()
     m.bg = m.top.findNode("bg")
+    m.brandLogo = m.top.findNode("brandLogo")
+    m.brandLabel = m.top.findNode("brandLabel")
     m.seriesTitle = m.top.findNode("seriesTitle")
     m.seriesMeta = m.top.findNode("seriesMeta")
     m.seasonsHost = m.top.findNode("seasonsHost")
@@ -27,7 +29,10 @@ sub init()
     m.sectionSubtitle = m.top.findNode("sectionSubtitle")
     m.leftMask = m.top.findNode("leftMask")
     m.rightMask = m.top.findNode("rightMask")
-    m.loadingLabel = m.top.findNode("loadingLabel")
+    m.leftHeaderSkeleton = m.top.findNode("leftHeaderSkeleton")
+    m.seasonSkeletonHost = m.top.findNode("seasonSkeletonHost")
+    m.rightHeaderSkeleton = m.top.findNode("rightHeaderSkeleton")
+    m.episodeSkeletonHost = m.top.findNode("episodeSkeletonHost")
 
     m.contentId = ""
     m.contentType = ""
@@ -50,10 +55,15 @@ sub init()
     m.seasonScrollY = 0
     m.epScrollY = 0
     m.loading = true
+    m.prevSeasonFocusIndex = -1
+    m.prevEpisodeFocusIndex = -1
+    m.seasonFocusFullRefresh = true
+    m.episodeFocusFullRefresh = true
 
     m.vm = FindViewManager(m.top)
     LoadSeriesTokens()
     ApplyStaticColors()
+    ApplySkeletonColors()
 
     m.top.observeField("keyEvent", "OnKey")
     if m.global <> invalid and m.global.hasField("businessResolved") then
@@ -73,13 +83,28 @@ sub OnNavStateReady()
 end sub
 
 sub OnDispose()
-    ' No timers/video to tear down; left for parity with the screen interface.
+    if not m.top.dispose then return
+    SetSkeletonRunning(false)
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.unobserveField("businessResolved")
+    end if
+    m.top.unobserveField("keyEvent")
+    KillSeriesTask(m.seriesTask)
+    m.seriesTask = invalid
+end sub
+
+sub KillSeriesTask(task as object)
+    if task = invalid then return
+    task.unobserveField("apiResult")
 end sub
 
 sub OnBusinessResolved()
     LoadSeriesTokens()
     ApplyStaticColors()
-    if not m.loading then
+    if m.loading then
+        ApplySkeletonColors()
+    else
+        ApplyBranding()
         RebuildSeasonTabs()
         RebuildEpisodeCards()
         ApplySeasonFocus()
@@ -112,12 +137,84 @@ sub ApplyStaticColors()
     if m.seriesMeta <> invalid then m.seriesMeta.color = m.cNeutral300
     if m.sectionHeading <> invalid then m.sectionHeading.color = m.cNeutral50
     if m.sectionSubtitle <> invalid then m.sectionSubtitle.color = m.cNeutral300
-    if m.loadingLabel <> invalid then m.loadingLabel.color = m.cNeutral300
+end sub
+
+function SE_SkeletonBaseColor() as string
+    return CardContrastSkeletonBase(m.cNeutral800, m.cNeutral700)
+end function
+
+sub ApplySkeletonToTree(node as object, base as string, hi as string, running as boolean)
+    CardApplySkeletonTree(node, base, hi, running)
+end sub
+
+' Skeleton shimmer — contrast-safe base; pulse kept on (≤20 nodes after ep row trim).
+sub ApplySkeletonColors()
+    base = SE_SkeletonBaseColor()
+    hi = CardLightenHex(base, 26)
+    ApplySkeletonToTree(m.leftHeaderSkeleton, base, hi, true)
+    ApplySkeletonToTree(m.seasonSkeletonHost, base, hi, true)
+    ApplySkeletonToTree(m.rightHeaderSkeleton, base, hi, true)
+    ApplySkeletonToTree(m.episodeSkeletonHost, base, hi, true)
+end sub
+
+sub SetSkeletonRunning(running as boolean)
+    base = SE_SkeletonBaseColor()
+    hi = CardLightenHex(base, 26)
+    ApplySkeletonToTree(m.leftHeaderSkeleton, base, hi, running)
+    ApplySkeletonToTree(m.seasonSkeletonHost, base, hi, running)
+    ApplySkeletonToTree(m.rightHeaderSkeleton, base, hi, running)
+    ApplySkeletonToTree(m.episodeSkeletonHost, base, hi, running)
+end sub
+
+' Brand logo / app-name fallback in the left header (parity with getLogoSvg(resolved.brandingLogo
+' || config?.logo) in seriesEpisode.tsx).
+sub ApplyBranding()
+    resolved = invalid
+    if m.global <> invalid and m.global.hasField("businessResolved") then resolved = m.global.businessResolved
+    if resolved = invalid then return
+
+    logoUrl = resolved.brandingLogo
+    if logoUrl <> invalid and logoUrl <> "" then
+        if m.brandLogo <> invalid then
+            m.brandLogo.uri = logoUrl
+            m.brandLogo.visible = true
+        end if
+        if m.brandLabel <> invalid then m.brandLabel.visible = false
+    else
+        if m.brandLogo <> invalid then m.brandLogo.visible = false
+        if m.brandLabel <> invalid then
+            name = ""
+            if resolved.appName <> invalid then name = resolved.appName
+            m.brandLabel.text = name
+            m.brandLabel.color = m.cPrimary500
+            m.brandLabel.visible = (name <> "")
+        end if
+    end if
 end sub
 
 sub ShowLoading(show as boolean)
     m.loading = show
-    if m.loadingLabel <> invalid then m.loadingLabel.visible = show
+    if m.leftHeaderSkeleton <> invalid then m.leftHeaderSkeleton.visible = show
+    if m.seasonSkeletonHost <> invalid then m.seasonSkeletonHost.visible = show
+    if m.rightHeaderSkeleton <> invalid then m.rightHeaderSkeleton.visible = show
+    if m.episodeSkeletonHost <> invalid then m.episodeSkeletonHost.visible = show
+
+    if show then
+        if m.brandLogo <> invalid then m.brandLogo.visible = false
+        if m.brandLabel <> invalid then m.brandLabel.visible = false
+        if m.seriesTitle <> invalid then m.seriesTitle.visible = false
+        if m.seriesMeta <> invalid then m.seriesMeta.visible = false
+        if m.sectionHeading <> invalid then m.sectionHeading.visible = false
+        if m.sectionSubtitle <> invalid then m.sectionSubtitle.visible = false
+        ApplySkeletonColors()
+    else
+        SetSkeletonRunning(false)
+        if m.seriesTitle <> invalid then m.seriesTitle.visible = true
+        if m.seriesMeta <> invalid then m.seriesMeta.visible = true
+        if m.sectionHeading <> invalid then m.sectionHeading.visible = true
+        if m.sectionSubtitle <> invalid then m.sectionSubtitle.visible = true
+        ApplyBranding()
+    end if
 end sub
 
 ' ── Fetch ────────────────────────────────────────────────────────────────────
@@ -133,6 +230,7 @@ sub FetchSeries()
 end sub
 
 sub OnSeriesResponse()
+    if m.top.dispose = true then return
     if m.seriesTask = invalid then return
     m.seriesTask.unobserveField("apiResult")
     api = m.seriesTask.apiResult
@@ -303,19 +401,24 @@ sub RebuildSeasonTabs()
         node = m.seasonsHost.createChild("Group")
         node.translation = [0, y]
 
+        ' Left label (season name) and right label (count) split the tab's inner width with
+        ' 24px padding each side; the right column is sized to fit "NN episodes" without
+        ' truncation (parity with the justify-between season button).
         leftLabel = node.createChild("Label")
-        leftLabel.translation = [20, 16]
-        leftLabel.width = 360
+        leftLabel.translation = [24, 16]
+        leftLabel.width = 250
         leftLabel.height = 32
+        leftLabel.maxLines = 1
         font = leftLabel.createChild("Font")
         font.uri = "pkg:/fonts/Inter-SemiBold.ttf"
         font.size = 24
 
         rightLabel = node.createChild("Label")
-        rightLabel.translation = [380, 16]
-        rightLabel.width = 160
+        rightLabel.translation = [284, 16]
+        rightLabel.width = SE_SeasonTabWidth() - 24 - 284
         rightLabel.height = 32
         rightLabel.horizAlign = "right"
+        rightLabel.maxLines = 1
         rfont = rightLabel.createChild("Font")
         rfont.uri = "pkg:/fonts/Inter-Regular.ttf"
         rfont.size = 24
@@ -334,27 +437,60 @@ sub RebuildSeasonTabs()
         m.tabFrames.Push(invalid)
         y = y + SE_SeasonTabPitch()
     end for
+    m.seasonFocusFullRefresh = true
     ApplySeasonScroll()
 end sub
 
 sub ApplySeasonFocus()
-    for i = 0 to m.tabNodes.Count() - 1
-        entry = m.tabNodes[i]
-        isActive = (i = m.activeTabIndex)
-        isFocused = (m.focusZone = "seasons" and i = m.seasonFocusIndex)
-        if isActive then
-            entry.left.color = m.cPrimary500
-            entry.right.color = m.cPrimary600
-        else
-            entry.left.color = m.cNeutral50
-            entry.right.color = m.cNeutral50
-        end if
-        frame = m.tabFrames[i]
-        frame = CardEnsureFocusFrame(entry.node, frame, 0, 0, SE_SeasonTabWidth(), SE_SeasonTabHeight(), m.cPrimary600)
-        m.tabFrames[i] = frame
-        CardApplyFocusBorder(frame, isFocused, m.cPrimary600)
-    end for
+    if m.seasonFocusFullRefresh = true then
+        m.seasonFocusFullRefresh = false
+        for i = 0 to m.tabNodes.Count() - 1
+            SE_PaintSeasonTab(i)
+        end for
+        m.prevSeasonFocusIndex = m.seasonFocusIndex
+        ApplySeasonScroll()
+        return
+    end if
+
+    prev = m.prevSeasonFocusIndex
+    if m.focusZone <> "seasons" then
+        if prev >= 0 and prev < m.tabNodes.Count() then SE_SetSeasonTabFocus(prev, false)
+        m.prevSeasonFocusIndex = -1
+        return
+    end if
+
+    if prev >= 0 and prev < m.tabNodes.Count() and prev <> m.seasonFocusIndex then
+        SE_SetSeasonTabFocus(prev, false)
+    end if
+    cur = m.seasonFocusIndex
+    if cur >= 0 and cur < m.tabNodes.Count() then SE_SetSeasonTabFocus(cur, true)
+    m.prevSeasonFocusIndex = cur
     ApplySeasonScroll()
+end sub
+
+sub SE_PaintSeasonTab(i as integer)
+    entry = m.tabNodes[i]
+    isActive = (i = m.activeTabIndex)
+    isFocused = (m.focusZone = "seasons" and i = m.seasonFocusIndex)
+    if isActive then
+        entry.left.color = m.cPrimary500
+        entry.right.color = m.cPrimary600
+    else
+        entry.left.color = m.cNeutral50
+        entry.right.color = m.cNeutral50
+    end if
+    frame = m.tabFrames[i]
+    frame = CardEnsureFocusFrame(entry.node, frame, 0, 0, SE_SeasonTabWidth(), SE_SeasonTabHeight(), m.cPrimary600)
+    m.tabFrames[i] = frame
+    CardApplyFocusBorder(frame, isFocused, m.cPrimary600)
+end sub
+
+sub SE_SetSeasonTabFocus(i as integer, focused as boolean)
+    entry = m.tabNodes[i]
+    frame = m.tabFrames[i]
+    frame = CardEnsureFocusFrame(entry.node, frame, 0, 0, SE_SeasonTabWidth(), SE_SeasonTabHeight(), m.cPrimary600)
+    m.tabFrames[i] = frame
+    CardApplyFocusBorder(frame, focused, m.cPrimary600)
 end sub
 
 sub ApplySeasonScroll()
@@ -386,6 +522,14 @@ sub RebuildEpisodeCards()
         if ep = invalid then continue for
         card = m.episodesHost.createChild("Group")
         card.translation = [0, y]
+
+        ' Neutral placeholder behind the art (parity with the bg-neutral-700/gray box shown
+        ' while the episode thumbnail loads or when none is set).
+        thumbBg = card.createChild("Rectangle")
+        thumbBg.translation = [16, 10]
+        thumbBg.width = SE_ThumbW()
+        thumbBg.height = SE_ThumbH()
+        thumbBg.color = m.cNeutral700
 
         thumb = card.createChild("Poster")
         thumb.translation = [16, 10]
@@ -463,19 +607,43 @@ sub RebuildEpisodeCards()
     end for
 
     if m.episodeIndex >= m.epCards.Count() then m.episodeIndex = 0
-    ApplyEpisodeScroll()
+    m.episodeFocusFullRefresh = true
+    m.prevEpisodeFocusIndex = -1
 end sub
 
 sub ApplyEpisodeFocus()
-    for i = 0 to m.epCards.Count() - 1
-        card = m.epCards[i]
-        isFocused = (m.focusZone = "episodes" and i = m.episodeIndex)
-        frame = m.epFrames[i]
-        frame = CardEnsureFocusFrame(card, frame, 0, 0, SE_CardWidth(), SE_CardHeight(), m.cPrimary600)
-        m.epFrames[i] = frame
-        CardApplyFocusBorder(frame, isFocused, m.cPrimary600)
-    end for
+    if m.episodeFocusFullRefresh = true then
+        m.episodeFocusFullRefresh = false
+        for i = 0 to m.epCards.Count() - 1
+            SE_SetEpisodeCardFocus(i, m.focusZone = "episodes" and i = m.episodeIndex)
+        end for
+        m.prevEpisodeFocusIndex = m.episodeIndex
+        ApplyEpisodeScroll()
+        return
+    end if
+
+    prev = m.prevEpisodeFocusIndex
+    if m.focusZone <> "episodes" then
+        if prev >= 0 and prev < m.epCards.Count() then SE_SetEpisodeCardFocus(prev, false)
+        m.prevEpisodeFocusIndex = -1
+        return
+    end if
+
+    if prev >= 0 and prev < m.epCards.Count() and prev <> m.episodeIndex then
+        SE_SetEpisodeCardFocus(prev, false)
+    end if
+    cur = m.episodeIndex
+    if cur >= 0 and cur < m.epCards.Count() then SE_SetEpisodeCardFocus(cur, true)
+    m.prevEpisodeFocusIndex = cur
     ApplyEpisodeScroll()
+end sub
+
+sub SE_SetEpisodeCardFocus(i as integer, focused as boolean)
+    card = m.epCards[i]
+    frame = m.epFrames[i]
+    frame = CardEnsureFocusFrame(card, frame, 0, 0, SE_CardWidth(), SE_CardHeight(), m.cPrimary600)
+    m.epFrames[i] = frame
+    CardApplyFocusBorder(frame, focused, m.cPrimary600)
 end sub
 
 sub ApplyEpisodeScroll()
@@ -576,6 +744,7 @@ sub SelectTab(index as integer)
     m.focusZone = "episodes"
     UpdateSectionHeader()
     RebuildEpisodeCards()
+    m.seasonFocusFullRefresh = true
     ApplySeasonFocus()
     ApplyEpisodeFocus()
 end sub
