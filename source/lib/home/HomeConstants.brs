@@ -76,3 +76,8 @@ end function
 function HC_RowBuildGateSec() as float
     return 3.5
 end function
+
+' Safety net for the rows shimmer — mirror HC_HomeSkeletonMaxSec for the hero.
+function HC_RowsSkeletonMaxSec() as float
+    return 8.0
+end function

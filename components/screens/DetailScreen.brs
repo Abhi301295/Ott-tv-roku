@@ -15,9 +15,14 @@ sub init()
     m.moreLikeBtn = m.top.findNode("moreLikeBtn")
     m.trailerBtn = m.top.findNode("trailerBtn")
     m.moreLikeOverlay = m.top.findNode("moreLikeOverlay")
+    m.moreLikeScrim = m.top.findNode("moreLikeScrim")
+    m.moreLikeDrawer = m.top.findNode("moreLikeDrawer")
     m.moreLikeCardsHost = m.top.findNode("moreLikeCardsHost")
     m.moreLikeSkeletonHost = m.top.findNode("moreLikeSkeletonHost")
+    m.moreLikeCloseHost = m.top.findNode("moreLikeCloseHost")
     m.moreLikeClose = m.top.findNode("moreLikeClose")
+    m.moreLikeScrimIn = m.top.findNode("moreLikeScrimIn")
+    m.moreLikeDrawerIn = m.top.findNode("moreLikeDrawerIn")
 
     m.contentId = ""
     m.contentType = ""
@@ -27,6 +32,8 @@ sub init()
     m.moreLikeCards = []
     m.moreLikeIndex = 0
     m.moreLikeOpen = false
+    m.moreLikeFocusZone = "cards"
+    m.moreLikeCloseFrame = invalid
     m.actionIndex = 0
     m.actionIds = []
     m.loading = true
@@ -57,7 +64,38 @@ sub OnNavStateReady()
 end sub
 
 sub OnDispose()
+    if not m.top.dispose then return
     CloseMoreLike(false)
+    KillDetailTask(m.detailTask)
+    KillDetailTask(m.moreLikeTask)
+    KillDetailTask(m.watchlistTask)
+    KillDetailTask(m.watchlistMutTask)
+    m.detailTask = invalid
+    m.moreLikeTask = invalid
+    m.watchlistTask = invalid
+    m.watchlistMutTask = invalid
+    if m.vm <> invalid then m.vm.unobserveField("overlayDismiss")
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.unobserveField("businessResolved")
+    end if
+    m.top.unobserveField("keyEvent")
+    StopDetailSkeletons()
+end sub
+
+sub KillDetailTask(task as object)
+    if task = invalid then return
+    task.unobserveField("apiResult")
+end sub
+
+sub StopDetailSkeletons()
+    if m.skeletonGroup = invalid then return
+    for each sk in m.skeletonGroup.getChildren(-1, 0)
+        if sk <> invalid and sk.hasField("running") then sk.running = false
+    end for
+    if m.moreLikeSkeletonHost = invalid then return
+    for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
+        if sk <> invalid and sk.hasField("running") then sk.running = false
+    end for
 end sub
 
 sub OnBusinessResolved()
@@ -65,6 +103,7 @@ sub OnBusinessResolved()
     ApplyButtonThemes()
     ApplyContentColors()
     ApplySkeletonColors()
+    ApplyMoreLikeSkeletonColors()
     ApplyActionFocus()
     ApplyMoreLikeCardFocus()
 end sub
@@ -126,7 +165,7 @@ end sub
 sub ApplySkeletonColors()
     if m.skeletonGroup = invalid then return
     base = m.cNeutral700
-    hi = LightenHexColor(base, 26)
+    hi = CardLightenHex(base, 26)
     for each sk in m.skeletonGroup.getChildren(-1, 0)
         if sk <> invalid and sk.hasField("baseColor") then
             sk.baseColor = base
@@ -136,14 +175,7 @@ sub ApplySkeletonColors()
 end sub
 
 function LightenHexColor(hex as string, amount as integer) as string
-    rgb = CardHexToRgb(hex)
-    r = rgb[0] + amount
-    g = rgb[1] + amount
-    b = rgb[2] + amount
-    if r > 255 then r = 255
-    if g > 255 then g = 255
-    if b > 255 then b = 255
-    return CardRgbToHex(r, g, b)
+    return CardLightenHex(hex, amount)
 end function
 
 sub ShowLoading(show as boolean)
@@ -157,6 +189,8 @@ sub ShowLoading(show as boolean)
         for each sk in m.skeletonGroup.getChildren(-1, 0)
             if sk <> invalid and sk.hasField("running") then sk.running = true
         end for
+    else
+        StopDetailSkeletons()
     end if
 end sub
 
@@ -169,6 +203,7 @@ sub FetchDetail()
 end sub
 
 sub OnDetailResponse()
+    if m.top.dispose = true then return
     if m.detailTask = invalid then return
     m.detailTask.unobserveField("apiResult")
     api = m.detailTask.apiResult
@@ -325,6 +360,13 @@ sub ApplyActionFocus()
     end for
 end sub
 
+sub ClearActionFocus()
+    for each id in m.actionIds
+        btn = m.btnMap[id]
+        if btn <> invalid then btn.focusedState = false
+    end for
+end sub
+
 sub UpdateWatchlistLabel()
     if m.isWatchlisted then
         m.watchlistBtn.label = CopyRemoveWatchlist()
@@ -374,7 +416,24 @@ sub HandleActionsKey(key as string)
 end sub
 
 sub HandleMoreLikeKey(key as string)
-    if key = "left" then
+    if m.moreLikeFocusZone = "close" then
+        if key = "down" then
+            m.moreLikeFocusZone = "cards"
+            ApplyMoreLikeCloseFocus()
+            ApplyMoreLikeCardFocus()
+        else if key = "OK" or key = "ok" then
+            CloseMoreLike(true)
+        else if key = "back" then
+            CloseMoreLike(true)
+        end if
+        return
+    end if
+
+    if key = "up" then
+        m.moreLikeFocusZone = "close"
+        ApplyMoreLikeCloseFocus()
+        ApplyMoreLikeCardFocus()
+    else if key = "left" then
         if m.moreLikeIndex > 0 then m.moreLikeIndex = m.moreLikeIndex - 1
         ApplyMoreLikeCardFocus()
         ScrollMoreLikeToFocused()
@@ -440,6 +499,7 @@ sub OnWatchlistToggle()
 end sub
 
 sub OnWatchlistFoldersResponse()
+    if m.top.dispose = true then return
     if m.watchlistTask = invalid then return
     m.watchlistTask.unobserveField("apiResult")
     api = m.watchlistTask.apiResult
@@ -481,6 +541,7 @@ sub OnWatchlistFoldersResponse()
 end sub
 
 sub OnWatchlistMutResponse()
+    if m.top.dispose = true then return
     if m.watchlistMutTask = invalid then return
     m.watchlistMutTask.unobserveField("apiResult")
     api = m.watchlistMutTask.apiResult
@@ -516,14 +577,23 @@ sub OpenMoreLike()
     if m.vm <> invalid then m.vm.overlayOpen = true
     m.moreLikeOverlay.visible = true
     m.moreLikeIndex = 0
+    m.moreLikeFocusZone = "cards"
+    ClearActionFocus()
+    PlayMoreLikeOpenAnim()
 
     if m.moreLikeVideos.Count() > 0 then
+        m.moreLikeSkeletonHost.visible = false
+        m.moreLikeCardsHost.visible = true
         BuildMoreLikeCards()
+        ApplyMoreLikeCloseFocus()
         ApplyMoreLikeCardFocus()
+        ScrollMoreLikeToFocused()
         return
     end if
 
+    m.moreLikeCardsHost.visible = false
     m.moreLikeSkeletonHost.visible = true
+    ApplyMoreLikeSkeletonColors()
     title = ""
     if m.content.title <> invalid then title = m.content.title
     path = Endpoints().DETAIL.RECOMENDED_VIDEOS
@@ -532,20 +602,47 @@ sub OpenMoreLike()
     StartHttpTask(m.moreLikeTask)
 end sub
 
+sub PlayMoreLikeOpenAnim()
+    if m.moreLikeDrawer <> invalid then m.moreLikeDrawer.translation = [0, 1080]
+    if m.moreLikeScrim <> invalid then m.moreLikeScrim.opacity = 0
+    if m.moreLikeScrimIn <> invalid then
+        m.moreLikeScrimIn.control = "stop"
+        m.moreLikeScrimIn.control = "start"
+    end if
+    if m.moreLikeDrawerIn <> invalid then
+        m.moreLikeDrawerIn.control = "stop"
+        m.moreLikeDrawerIn.control = "start"
+    end if
+end sub
+
+sub ApplyMoreLikeSkeletonColors()
+    if m.moreLikeSkeletonHost = invalid then return
+    base = m.cNeutral700
+    hi = CardLightenHex(base, 26)
+    CardApplySkeletonTree(m.moreLikeSkeletonHost, base, hi, true)
+end sub
+
 sub OnMoreLikeResponse()
+    if m.top.dispose = true then return
     if m.moreLikeTask = invalid then return
     m.moreLikeTask.unobserveField("apiResult")
     api = m.moreLikeTask.apiResult
     m.moreLikeTask = invalid
-    m.moreLikeSkeletonHost.visible = false
 
     items = []
     if api <> invalid and api.result <> invalid and api.result.data <> invalid then
         items = api.result.data
     end if
     m.moreLikeVideos = items
+    m.moreLikeSkeletonHost.visible = false
+    m.moreLikeCardsHost.visible = true
+    for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
+        if sk <> invalid and sk.hasField("running") then sk.running = false
+    end for
     BuildMoreLikeCards()
+    ApplyMoreLikeCloseFocus()
     ApplyMoreLikeCardFocus()
+    ScrollMoreLikeToFocused()
 end sub
 
 sub BuildMoreLikeCards()
@@ -563,7 +660,7 @@ sub BuildMoreLikeCards()
         card.cNeutral700 = m.cNeutral700
         uri = ""
         if item.thumbnails <> invalid then
-            uri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
+            uri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
         end if
         card.thumbnailUri = uri
         m.moreLikeCards.Push(card)
@@ -582,8 +679,24 @@ end sub
 sub ApplyMoreLikeCardFocus()
     for i = 0 to m.moreLikeCards.Count() - 1
         card = m.moreLikeCards[i]
-        if card <> invalid then card.focusedState = (i = m.moreLikeIndex)
+        if card <> invalid then
+            card.focusedState = (m.moreLikeFocusZone = "cards" and i = m.moreLikeIndex)
+        end if
     end for
+end sub
+
+sub ApplyMoreLikeCloseFocus()
+    if m.moreLikeClose = invalid then return
+    focused = (m.moreLikeFocusZone = "close")
+    if focused then
+        m.moreLikeClose.color = m.cPrimary500
+    else
+        m.moreLikeClose.color = "0xffffff99"
+    end if
+    if m.moreLikeCloseHost <> invalid then
+        m.moreLikeCloseFrame = CardEnsureFocusFrame(m.moreLikeCloseHost, m.moreLikeCloseFrame, -4, -4, 72, 72, m.cPrimary500)
+        CardApplyFocusBorder(m.moreLikeCloseFrame, focused, m.cPrimary500)
+    end if
 end sub
 
 sub ScrollMoreLikeToFocused()
@@ -593,14 +706,28 @@ sub ScrollMoreLikeToFocused()
     if targetX > 40 then targetX = 40
     minX = 40 - ((m.moreLikeCards.Count() - 1) * cardW)
     if targetX < minX then targetX = minX
-    m.moreLikeCardsHost.translation = [targetX, 620]
+    m.moreLikeCardsHost.translation = [targetX, 612]
 end sub
 
 sub CloseMoreLike(refocus as boolean)
     if not m.moreLikeOpen then return
+    KillDetailTask(m.moreLikeTask)
+    m.moreLikeTask = invalid
     m.moreLikeOpen = false
+    m.moreLikeFocusZone = "cards"
     if m.vm <> invalid then m.vm.overlayOpen = false
     m.moreLikeOverlay.visible = false
     m.moreLikeSkeletonHost.visible = false
+    m.moreLikeCardsHost.visible = true
+    if m.moreLikeDrawer <> invalid then m.moreLikeDrawer.translation = [0, 1080]
+    if m.moreLikeScrim <> invalid then m.moreLikeScrim.opacity = 0
+    if m.moreLikeScrimIn <> invalid then m.moreLikeScrimIn.control = "stop"
+    if m.moreLikeDrawerIn <> invalid then m.moreLikeDrawerIn.control = "stop"
+    for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
+        if sk <> invalid and sk.hasField("running") then sk.running = false
+    end for
+    if m.moreLikeCloseFrame <> invalid then
+        CardApplyFocusBorder(m.moreLikeCloseFrame, false, m.cPrimary500)
+    end if
     if refocus then ApplyActionFocus()
 end sub

@@ -37,6 +37,7 @@ function NavigatePop() as boolean
     end if
     m.top.currentRoute = prev.route
     m.top.navState = prev.state
+    m.top.overlayOpen = false
     return true
 end function
 
@@ -95,6 +96,11 @@ function CreateScreenForRoute(route as string, state as object) as object
     end if
     if route = RouteVideoPlayer() then
         screen = CreateObject("roSGNode", "VideoPlayerScreen")
+        screen.navState = state
+        return screen
+    end if
+    if route = RouteSeriesEpisodes() then
+        screen = CreateObject("roSGNode", "SeriesEpisodesScreen")
         screen.navState = state
         return screen
     end if
