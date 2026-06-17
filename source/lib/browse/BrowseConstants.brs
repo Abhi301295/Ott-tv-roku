@@ -1,0 +1,42 @@
+' BrowseConstants.brs — shared geometry for listing grids (series / genre / new-release).
+
+function BS_ItemsPerRow() as integer
+    return 6
+end function
+
+function BS_ListLeft() as integer
+    return 56
+end function
+
+function BS_TitleY() as integer
+    return 72
+end function
+
+function BS_RowStartY() as integer
+    return 162
+end function
+
+function BS_RowPitch() as integer
+    return 400
+end function
+
+function BS_ViewHeight() as integer
+    return 900
+end function
+
+' VerticalCard with listType=true (parity with seriesRow listType prop).
+function BS_ListCardW() as integer
+    return 272
+end function
+
+function BS_ListCardH() as integer
+    return 340
+end function
+
+function BS_ListCardPitch() as integer
+    return BS_ListCardW() + HC_CardGap()
+end function
+
+function BS_ListEmptyCopy() as string
+    return "We are sorry, we can not find the content"
+end function

@@ -19,11 +19,11 @@ sub OnRunningChanged()
             m.rowsPulse.opacity = 1.0
             m.rowsPulse.visible = true
         else if m.rowsPulse.visible then
-            if m.rowsFade <> invalid then
-                m.rowsFade.control = "start"
-            else
-                m.rowsPulse.visible = false
-            end if
+            ' Hard cut once real cards are painted — a dissolve exposes black underneath.
+            if m.rowsFade <> invalid then m.rowsFade.control = "stop"
+            print "[CW_PERF] rowsPulse hidden (shimmer OFF)"
+            m.rowsPulse.visible = false
+            m.rowsPulse.opacity = 1.0
         end if
     end if
     ' Do NOT show a "Continue Watching" label during loading: a profile may have no CW

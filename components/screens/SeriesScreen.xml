@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- See All / category listing — parity with src/features/series/ (6-up vertical rows). -->
+<component name="SeriesScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" onChange="OnNavStateReady" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/SeriesListService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/SeriesScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x121212ff" />
+
+    <!-- Shimmer grid — visible until the first page title + cards reveal together. -->
+    <Group id="skeletonHost" translation="[56, 72]" visible="false">
+      <Skeleton id="skTitle" translation="[0, 0]" boxWidth="360" boxHeight="40"
+        baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk00" translation="[0, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk01" translation="[282, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk02" translation="[564, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk03" translation="[846, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk04" translation="[1128, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk05" translation="[1410, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk10" translation="[0, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk11" translation="[282, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk12" translation="[564, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk13" translation="[846, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk14" translation="[1128, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+      <Skeleton id="sk15" translation="[1410, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
+    </Group>
+
+    <!-- Real content stays transparent until thumbnails are ready. -->
+    <Group id="contentHost" opacity="0.0">
+      <Label id="titleLabel" translation="[56, 72]" width="1700" height="56" wrap="false"
+        color="0xf5f5f5ff" text="" opacity="0.0">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="43" />
+      </Label>
+
+      <Group id="rowsHost" translation="[56, 162]" clippingRect="[0, 0, 1808, 900]" />
+    </Group>
+
+    <Label id="emptyLabel" translation="[360, 420]" width="1200" height="80" wrap="true"
+      horizAlign="center" vertAlign="center" visible="false" color="0x404040ff"
+      text="We are sorry, we can not find the content">
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="43" />
+    </Label>
+  </children>
+</component>
