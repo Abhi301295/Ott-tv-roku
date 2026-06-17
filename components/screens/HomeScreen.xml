@@ -21,11 +21,13 @@
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeNav.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
@@ -33,7 +35,7 @@
   <children>
     <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
 
-    <HeroBannerCinematic id="hero" translation="[0, 0]" visible="false" />
+    <HeroBannerHost id="hero" translation="[0, 0]" visible="false" />
 
     <!-- Row backdrop is intentionally transparent; HomeSkeleton/row shimmers cover loading
          state while the hero remains visible behind the content rows, matching LG. -->
@@ -49,8 +51,23 @@
         fieldToInterp="rowsHost.translation" />
     </Animation>
 
+    <Animation id="layoutAnim" duration="0.3" repeat="false" easeFunction="inOutCubic">
+      <Vector2DFieldInterpolator id="heroLayoutInterp" key="[0.0, 1.0]"
+        fieldToInterp="hero.translation" />
+      <Vector2DFieldInterpolator id="rowsLayoutInterp" key="[0.0, 1.0]"
+        fieldToInterp="rowsHost.translation" />
+      <Vector2DFieldInterpolator id="scrimGradLayoutInterp" key="[0.0, 1.0]"
+        fieldToInterp="rowsScrimGrad.translation" />
+      <Vector2DFieldInterpolator id="scrimLayoutInterp" key="[0.0, 1.0]"
+        fieldToInterp="rowsScrim.translation" />
+      <Vector2DFieldInterpolator id="skeletonLayoutInterp" key="[0.0, 1.0]"
+        fieldToInterp="homeSkeleton.translation" />
+    </Animation>
+
     <HomeSkeleton id="homeSkeleton" visible="true" />
 
-    <HomeHeader id="homeHeader" translation="[0, 0]" />
+    <!-- Direct header nodes (no proxy host) — Netflix bar matches dev HomeHeader wiring. -->
+    <HomeHeader id="homeHeaderNetflix" translation="[0, 0]" visible="false" />
+    <HomeSidebarHeader id="homeHeaderSidebar" translation="[0, 0]" visible="false" />
   </children>
 </component>

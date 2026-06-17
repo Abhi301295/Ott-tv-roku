@@ -40,6 +40,7 @@ sub init()
     m.paintTimer.observeField("fire", "OnPaintPoll")
     m.cwPerfSpan = invalid
     m.paintPollCount = 0
+    m.paintStableCount = 0
 end sub
 
 sub OnCategoryChanged()
@@ -188,6 +189,7 @@ sub StartCardBuild(cat as object)
 
     m.cwPerfSpan = CreateObject("roTimespan")
     m.paintPollCount = 0
+    m.paintStableCount = 0
     CwPerfMark(m.cwPerfSpan, "row StartCardBuild", "cards=" + Str(plan.Count()))
 
     m.buildPlan = plan
@@ -321,6 +323,7 @@ sub RevealNow()
     if m.top.mediaReady <> true then m.top.mediaReady = true
     CwPerfMark(m.cwPerfSpan, "row RevealNow", "pendingLoads=0 cards=" + Str(m.cards.Count()))
     m.paintPollCount = 0
+    m.paintStableCount = 0
     StartPaintPoll()
 end sub
 
@@ -330,6 +333,7 @@ sub StartPaintPoll()
 end sub
 
 function FirstVisibleCardPainted() as boolean
+    if m.top.opacity < 1.0 then return false
     if m.cardsHost = invalid or m.cardsHost.opacity < 1.0 then return false
     if m.cards.Count() = 0 then return true
     for each card in m.cards
@@ -351,12 +355,18 @@ end function
 sub OnPaintPoll()
     m.paintPollCount = m.paintPollCount + 1
     painted = FirstVisibleCardPainted()
+    if painted then
+        m.paintStableCount = m.paintStableCount + 1
+    else
+        m.paintStableCount = 0
+    end if
     if painted or m.paintPollCount = 1 or m.paintPollCount >= 120 then
         chop = 0.0
         if m.cardsHost <> invalid then chop = m.cardsHost.opacity
-        CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
+        CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " stable=" + Str(m.paintStableCount) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
     end if
-    if painted then
+    ' Two consecutive painted frames — avoids cutting shimmer before compositor shows cards.
+    if m.paintStableCount >= 2 then
         MarkPaintedReady(false)
         return
     end if

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Switches hero widgets by ThemeConfig (homeLayout + heroBannerStyle). -->
+<component name="HeroBannerHost" extends="Group">
+  <interface>
+    <field id="bannerItems" type="array" onChange="OnBannerItemsChanged" />
+    <field id="activeItem" type="assocarray" onChange="OnActiveItemChanged" />
+    <field id="posterReady" type="boolean" value="false" alwaysNotify="true" />
+    <field id="trailerPlaying" type="boolean" value="false" alwaysNotify="true" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="focusTarget" type="string" value="" onChange="OnFocusTargetChanged" />
+    <!-- Usable width after the left sidebar inset (1920 − offset). Keeps hero controls in view. -->
+    <field id="contentWidth" type="integer" value="1920" onChange="OnContentWidthChanged" />
+    <function name="HeroGoNext" />
+    <function name="HeroGoPrev" />
+    <function name="HeroToggleMute" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/HeroBannerHost.brs" />
+
+  <children>
+    <HeroBannerCinematic id="heroCinematic" visible="false" />
+    <HeroBannerPageFlip id="heroPageFlip" visible="false" />
+    <HeroBannerParallax id="heroParallax" visible="false" />
+    <HeroBannerOtt id="heroOtt" visible="false" />
+  </children>
+</component>

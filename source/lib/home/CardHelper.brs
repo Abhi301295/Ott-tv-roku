@@ -89,9 +89,29 @@ function HC_RowPitch() as integer
     return 430
 end function
 
-' Anchor focused row at ~65vh on a 1080p canvas.
+' Anchor focused row at ~65vh on a 1080p canvas (netflixContent.tsx).
 function HC_NetflixAnchorY() as integer
     return 702
+end function
+
+' OTT layout row pitch (content.tsx scroll step ~280px).
+function HC_OttRowPitch() as integer
+    return 280
+end function
+
+' OTT rows overlap the banner (marginTop -55vh ≈ 594px on 1080p canvas).
+function HC_OttAnchorY() as integer
+    return 486
+end function
+
+function HC_RowPitchForLayout(homeLayout as string) as integer
+    if homeLayout = HC_HomeLayoutOtt() then return HC_OttRowPitch()
+    return HC_RowPitch()
+end function
+
+function HC_AnchorYForLayout(homeLayout as string) as integer
+    if homeLayout = HC_HomeLayoutOtt() then return HC_OttAnchorY()
+    return HC_NetflixAnchorY()
 end function
 
 function CardComponentWidth(compName as string, orientation = "" as string) as integer
@@ -145,6 +165,29 @@ function ExtractBannerItems(categories as object) as object
         end if
     end if
     return []
+end function
+
+' First content card for OTT focus-reactive banner (parity with Content.tsx activeItem).
+function ExtractOttActiveItem(categories as object) as object
+    contentRows = FilterContentRows(categories)
+    for each cat in contentRows
+        if cat = invalid then continue for
+        items = cat.result
+        if items <> invalid and items.Count() > 0 then return items[0]
+    end for
+    banner = ExtractBannerItems(categories)
+    if banner.Count() > 0 then return banner[0]
+    return invalid
+end function
+
+function ItemAtRowCard(categories as object, rowIndex as integer, cardIndex as integer) as object
+    if categories = invalid then return invalid
+    contentRows = FilterContentRows(categories)
+    if rowIndex < 0 or rowIndex >= contentRows.Count() then return invalid
+    cat = contentRows[rowIndex]
+    if cat = invalid or cat.result = invalid then return invalid
+    if cardIndex < 0 or cardIndex >= cat.result.Count() then return invalid
+    return cat.result[cardIndex]
 end function
 
 function TruncateHeroText(text as string, maxLen as integer) as string

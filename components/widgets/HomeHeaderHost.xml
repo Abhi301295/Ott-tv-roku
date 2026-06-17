@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Switches header widgets by ThemeConfig headerStyle (NETFLIX | SIDEBAR). -->
+<component name="HomeHeaderHost" extends="Group">
+  <interface>
+    <field id="menuTexts" type="array" onChange="OnMenuChanged" />
+    <field id="menuItems" type="array" onChange="OnMenuChanged" />
+    <field id="focusedIndex" type="integer" value="0" onChange="OnFocusProxy" />
+    <field id="selectedIndex" type="integer" value="0" onChange="OnFocusProxy" />
+    <field id="headerActive" type="boolean" value="false" onChange="OnFocusProxy" />
+    <field id="logoUri" type="string" value="" onChange="OnBrandingProxy" />
+    <field id="logoCroppedUri" type="string" value="" onChange="OnBrandingProxy" />
+    <field id="appName" type="string" value="" onChange="OnBrandingProxy" />
+    <field id="avatarUri" type="string" value="" onChange="OnBrandingProxy" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeProxy" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeProxy" />
+    <field id="cNeutral200" type="string" value="0xd4d4d4ff" onChange="OnThemeProxy" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeProxy" />
+    <field id="cNeutral950" type="string" value="0x0a0a0aff" onChange="OnThemeProxy" />
+    <field id="scrimOpacity" type="float" value="0.0" onChange="OnScrimProxy" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/HomeHeaderHost.brs" />
+
+  <children>
+    <HomeHeader id="headerNetflix" visible="false" />
+    <HomeSidebarHeader id="headerSidebar" visible="false" />
+  </children>
+</component>

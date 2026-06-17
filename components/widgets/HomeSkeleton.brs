@@ -4,24 +4,18 @@ sub init()
     m.rowsTitle = m.top.findNode("rowsTitle")
     m.heroAnim = m.top.findNode("heroAnim")
     m.rowsAnim = m.top.findNode("rowsAnim")
-    m.rowsFade = m.top.findNode("rowsFade")
-    if m.rowsFade <> invalid then m.rowsFade.observeField("state", "OnRowsFadeState")
 end sub
 
 ' Either region running keeps the shared pulse animation alive; each region's own
 ' visibility is driven independently so the hero and rows can reveal separately.
 sub OnRunningChanged()
     if m.heroPulse <> invalid then m.heroPulse.visible = m.top.heroRunning
-    ' Rows region reveals via a dissolve, not a hard cut (see OnRowsFadeState).
     if m.rowsPulse <> invalid then
         if m.top.rowsRunning then
-            if m.rowsFade <> invalid then m.rowsFade.control = "stop"
             m.rowsPulse.opacity = 1.0
             m.rowsPulse.visible = true
         else if m.rowsPulse.visible then
             ' Hard cut once real cards are painted — a dissolve exposes black underneath.
-            if m.rowsFade <> invalid then m.rowsFade.control = "stop"
-            print "[CW_PERF] rowsPulse hidden (shimmer OFF)"
             m.rowsPulse.visible = false
             m.rowsPulse.opacity = 1.0
         end if
@@ -40,25 +34,11 @@ sub OnRunningChanged()
         end if
     end if
 
-    ' Rows pulse animates the whole time the rows are loading; the shimmer→cards handoff
-    ' is a dissolve (rowsFade), so the pulse can keep running right up to the reveal.
     if m.rowsAnim <> invalid then
         if m.top.rowsRunning then
             m.rowsAnim.control = "start"
         else
             m.rowsAnim.control = "stop"
-        end if
-    end if
-end sub
-
-sub OnRowsFadeState()
-    if m.rowsFade = invalid then return
-    ' Only finalize the hide if the rows are still meant to be gone; if a re-entry turned
-    ' the shimmer back on mid-fade, the running branch already restored it.
-    if m.rowsFade.state = "stopped" and m.top.rowsRunning = false then
-        if m.rowsPulse <> invalid then
-            m.rowsPulse.visible = false
-            m.rowsPulse.opacity = 1.0
         end if
     end if
 end sub

@@ -12,6 +12,7 @@
     <!-- Which hero control the parent screen has focused: "prev" | "next" | "mute" | "".
          Drives the focus ring highlight (parity with the portal arrow/mute focus). -->
     <field id="focusTarget" type="string" value="" onChange="OnFocusTargetChanged" />
+    <field id="contentWidth" type="integer" value="1920" onChange="OnContentWidthChanged" />
     <!-- True while a trailer is actually playing, so the screen knows the mute control is
          available for D-pad focus (parity with isVideoPlaying gating the mute button). -->
     <field id="trailerPlaying" type="boolean" value="false" />

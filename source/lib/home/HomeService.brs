@@ -3,7 +3,7 @@
 
 ' Resolved home layout for this build (parity with themeConfig.homeLayout).
 function HomeLayoutMode() as string
-    return HC_HomeLayoutNetflix()
+    return ThemeHomeLayout()
 end function
 
 ' Pull listing[] from a home/continue API result envelope.

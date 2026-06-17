@@ -1,9 +1,17 @@
 sub init()
     m.hero = m.top.findNode("hero")
-    m.header = m.top.findNode("homeHeader")
+    m.headerNetflix = m.top.findNode("homeHeaderNetflix")
+    m.headerSidebar = m.top.findNode("homeHeaderSidebar")
+    ApplyActiveHeader()
     m.rowsHost = m.top.findNode("rowsHost")
     m.rowsAnim = m.top.findNode("rowsAnim")
     m.rowsInterp = m.top.findNode("rowsInterp")
+    m.layoutAnim = m.top.findNode("layoutAnim")
+    m.heroLayoutInterp = m.top.findNode("heroLayoutInterp")
+    m.rowsLayoutInterp = m.top.findNode("rowsLayoutInterp")
+    m.scrimGradLayoutInterp = m.top.findNode("scrimGradLayoutInterp")
+    m.scrimLayoutInterp = m.top.findNode("scrimLayoutInterp")
+    m.skeletonLayoutInterp = m.top.findNode("skeletonLayoutInterp")
     m.homeSkeleton = m.top.findNode("homeSkeleton")
     m.rowsScrim = m.top.findNode("rowsScrim")
     m.rowsScrimGrad = m.top.findNode("rowsScrimGrad")
@@ -25,6 +33,13 @@ sub init()
     m.pendingContentFocus = true
     m.menuItems = []
     m.menuIndex = 0
+    m.headerReturnZone = "rows"
+    m.headerReturnRowIndex = 0
+    m.headerReturnCardIndex = 0
+    m.headerReturnHeroFocus = "next"
+    m.layoutOffsetX = 0
+    m.pendingLayoutOffX = 0
+    m.pendingLayoutViewportW = 1920
 
     m.contentRowCats = []
     m.rowBuildIndex = 0
@@ -39,6 +54,9 @@ sub init()
     m.hasMore = true
     m.homeLayout = HomeLayoutMode()
     m.showUpdate = false
+    print ThemeLayoutSummary()
+    print "[LAYOUT TEST] checks: "; ThemeLayoutChecklist()
+    ApplyLayoutGeometry()
 
     m.initialLoading = true
     m.continueLoading = true
@@ -138,8 +156,14 @@ sub init()
     m.cwRowBuildSpan = invalid
     m.cwRevealAtMs = -1
 
+    if m.layoutAnim <> invalid then m.layoutAnim.observeField("state", "OnLayoutAnimState")
+
     SetupHeader()
-    EnterHeader()
+    if ThemeIsLayoutCase4() then
+        EnterSidebarHomeDefault(false)
+    else
+        EnterHeader(false)
+    end if
     ' Boot (redirect check, shimmer, API calls) waits for navState — see OnNavStateReady.
 end sub
 
@@ -275,7 +299,9 @@ sub LoadThemeTokens()
     m.cPrimary600 = TokenColor(tokens, "primary-600", "#459adb")
     m.cPrimary700 = TokenColor(tokens, "primary-700", "#80bbe9")
     m.cNeutral50 = TokenColor(tokens, "neutral-50", "#ffffff")
+    m.cNeutral100 = TokenColor(tokens, "neutral-100", "#f8f8f8")
     m.cNeutral200 = TokenColor(tokens, "neutral-200", "#e5e5e5")
+    m.cNeutral400 = TokenColor(tokens, "neutral-400", "#c8c8c8")
     m.cNeutral700 = TokenColor(tokens, "neutral-700", "#181818")
     m.cNeutral800 = TokenColor(tokens, "neutral-800", "#121212")
     m.cNeutral950 = TokenColor(tokens, "neutral-900", "#0a0a0a")
@@ -317,6 +343,131 @@ sub ApplyThemeToRow(row as object)
     row.cNeutral700 = m.cNeutral700
 end sub
 
+sub ApplyActiveHeader()
+    if ThemeIsSidebarHeader() then
+        m.header = m.headerSidebar
+        if m.headerNetflix <> invalid then m.headerNetflix.visible = false
+        if m.headerSidebar <> invalid then m.headerSidebar.visible = true
+    else
+        m.header = m.headerNetflix
+        if m.headerNetflix <> invalid then m.headerNetflix.visible = true
+        if m.headerSidebar <> invalid then m.headerSidebar.visible = false
+    end if
+end sub
+
+sub ApplyLayoutGeometry(animate = false as boolean)
+    m.layoutRowPitch = HC_RowPitchForLayout(m.homeLayout)
+    m.layoutAnchorY = HC_AnchorYForLayout(m.homeLayout)
+
+    if not ThemeIsSidebarHeader() then
+        m.layoutOffsetX = 0
+        if ThemeIsOttHome() and m.rowsHost <> invalid then
+            m.rowsHost.translation = [0, m.layoutAnchorY]
+        end if
+        ApplyContentLayout(0, 1920)
+        return
+    end if
+
+    expanded = false
+    if m.header <> invalid and m.header.headerActive = true then expanded = true
+    offX = ThemeSidebarOffset(expanded)
+    viewportW = 1920 - offX
+
+    doAnimate = animate and ShouldAnimateSidebarLayout()
+    if doAnimate and m.layoutAnim <> invalid then
+        StartLayoutOffsetAnim(offX, viewportW)
+    else
+        m.layoutOffsetX = offX
+        ApplyContentLayout(offX, viewportW)
+    end if
+end sub
+
+function ShouldAnimateSidebarLayout() as boolean
+    if m.pendingContentFocus then return false
+    if not m.rowsRevealed then return false
+    return true
+end function
+
+sub ApplyContentLayout(offX as integer, viewportW as integer)
+    if m.hero <> invalid then
+        m.hero.translation = [offX, 0]
+        if m.hero.hasField("contentWidth") then m.hero.contentWidth = viewportW
+    end if
+    if m.rowsScrimGrad <> invalid then
+        y = m.rowsScrimGrad.translation[1]
+        m.rowsScrimGrad.translation = [offX, y]
+        m.rowsScrimGrad.width = viewportW
+    end if
+    if m.rowsScrim <> invalid then
+        y = m.rowsScrim.translation[1]
+        m.rowsScrim.translation = [offX, y]
+        m.rowsScrim.width = viewportW
+    end if
+    if m.rowsHost <> invalid then
+        curY = m.rowsHost.translation[1]
+        m.rowsHost.translation = [offX, curY]
+    end if
+    if m.homeSkeleton <> invalid then m.homeSkeleton.translation = [offX, 0]
+end sub
+
+sub StartLayoutOffsetAnim(targetOffX as integer, targetViewportW as integer)
+    fromOffX = 0
+    if m.layoutOffsetX <> invalid then fromOffX = m.layoutOffsetX
+    if fromOffX = targetOffX then
+        m.layoutOffsetX = targetOffX
+        ApplyContentLayout(targetOffX, targetViewportW)
+        return
+    end if
+
+    m.pendingLayoutOffX = targetOffX
+    m.pendingLayoutViewportW = targetViewportW
+
+    if m.heroLayoutInterp <> invalid and m.hero <> invalid then
+        fromT = m.hero.translation
+        m.heroLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.rowsLayoutInterp <> invalid and m.rowsHost <> invalid then
+        fromT = m.rowsHost.translation
+        m.rowsLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.scrimGradLayoutInterp <> invalid and m.rowsScrimGrad <> invalid then
+        fromT = m.rowsScrimGrad.translation
+        m.scrimGradLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.scrimLayoutInterp <> invalid and m.rowsScrim <> invalid then
+        fromT = m.rowsScrim.translation
+        m.scrimLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.skeletonLayoutInterp <> invalid and m.homeSkeleton <> invalid then
+        fromT = m.homeSkeleton.translation
+        m.skeletonLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+
+    ' Width snaps at end of slide; hero clips continuously via contentWidth.
+    if m.hero <> invalid and m.hero.hasField("contentWidth") then
+        m.hero.contentWidth = targetViewportW
+    end if
+    if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.width = targetViewportW
+    if m.rowsScrim <> invalid then m.rowsScrim.width = targetViewportW
+
+    m.layoutAnim.control = "start"
+end sub
+
+sub OnLayoutAnimState()
+    if m.layoutAnim = invalid then return
+    if m.layoutAnim.state <> "stopped" then return
+    m.layoutOffsetX = m.pendingLayoutOffX
+    ApplyContentLayout(m.pendingLayoutOffX, m.pendingLayoutViewportW)
+end sub
+
+sub UpdateOttHeroFromFocus()
+    if not ThemeIsOttHome() then return
+    if m.hero = invalid then return
+    item = ItemAtRowCard(m.contentRowCats, m.rowIndex, m.cardIndex)
+    if item = invalid then item = ExtractOttActiveItem(m.categories)
+    if item <> invalid then m.hero.activeItem = item
+end sub
+
 sub ApplyThemeToHero()
     if m.hero = invalid then return
     m.hero.cNeutral50 = m.cNeutral50
@@ -326,10 +477,13 @@ end sub
 sub UpdateHeroBanner()
     if m.hero = invalid then return
     items = ExtractBannerItems(m.categories)
-    print "[HOME] UpdateHeroBanner bannerItems="; items.Count()
+    print "[HOME] UpdateHeroBanner bannerItems="; items.Count(); " layout="; m.homeLayout
     ApplyThemeToHero()
     m.hero.bannerItems = items
-    m.hero.visible = (items.Count() > 0)
+    m.hero.visible = (items.Count() > 0 or ThemeIsOttHome())
+    if ThemeIsOttHome() then
+        m.hero.activeItem = ExtractOttActiveItem(m.categories)
+    end if
 end sub
 
 ' ── Header (parity with ottHeader.tsx NetflixHeader) ─────────────────────────
@@ -345,12 +499,15 @@ sub SetupHeader()
     end if
 
     m.menuItems = HeaderMenuItems(reels)
-    texts = []
-    for each it in m.menuItems
-        texts.Push(it.text)
-    end for
-
-    m.header.menuTexts = texts
+    if ThemeIsSidebarHeader() then
+        m.header.menuItems = SidebarMenuItems(reels)
+    else
+        texts = []
+        for each it in m.menuItems
+            texts.Push(it.text)
+        end for
+        m.header.menuTexts = texts
+    end if
     m.header.selectedIndex = HeaderSelectedIndex(m.menuItems, RouteHome())
     if m.focusZone <> "header" then m.menuIndex = m.header.selectedIndex
 
@@ -366,6 +523,9 @@ sub ApplyHeaderTheme()
     m.header.cNeutral200 = m.cNeutral200
     m.header.cNeutral800 = m.cNeutral800
     m.header.cNeutral950 = m.cNeutral950
+    if m.header.hasField("cPrimary700") then m.header.cPrimary700 = m.cPrimary700
+    if m.header.hasField("cNeutral100") then m.header.cNeutral100 = m.cNeutral100
+    if m.header.hasField("cNeutral700") then m.header.cNeutral700 = m.cNeutral700
 end sub
 
 sub ApplyHeaderBranding()
@@ -379,7 +539,10 @@ sub ApplyHeaderBranding()
     resolved = invalid
     if m.global <> invalid then resolved = m.global.businessResolved
     if resolved = invalid then return
-    if resolved.brandingLogo <> invalid then m.header.logoUri = resolved.brandingLogo
+    if resolved.brandingLogo <> invalid then
+        m.header.logoUri = resolved.brandingLogo
+        if m.header.hasField("logoCroppedUri") then m.header.logoCroppedUri = resolved.brandingLogo
+    end if
     if resolved.appName <> invalid then m.header.appName = resolved.appName
 end sub
 
@@ -403,12 +566,13 @@ sub UpdateHeaderScrimForHero()
     end if
 end sub
 
-sub EnterHeader()
+sub EnterHeader(animateLayout = true as boolean)
     if m.header = invalid then return
     m.focusZone = "header"
     m.menuIndex = m.header.selectedIndex
     m.header.focusedIndex = m.menuIndex
     m.header.headerActive = true
+    if ThemeIsSidebarHeader() then ApplyLayoutGeometry(animateLayout)
     row = CurrentRow()
     if row <> invalid then row.cardFocusIndex = -1
     ApplyAllRowFocusStates()
@@ -416,7 +580,57 @@ end sub
 
 sub ExitHeaderToRows()
     if m.header <> invalid then m.header.headerActive = false
+    if ThemeIsSidebarHeader() then ApplyLayoutGeometry(true)
     m.focusZone = "rows"
+    ApplyHomeFocus()
+end sub
+
+' Case 4: expanded sidebar on Home — focus in menu, not Continue Watching.
+sub EnterSidebarHomeDefault(animateLayout = true as boolean)
+    if m.header = invalid then return
+    idx = HeaderSelectedIndex(m.menuItems, RouteHome())
+    if idx < 0 then idx = 0
+    m.menuIndex = idx
+    m.header.selectedIndex = idx
+    m.header.focusedIndex = idx
+    EnterHeader(animateLayout)
+end sub
+
+' Sidebar (case 4/6): remember where focus was before opening the expanded menu.
+sub RememberHeaderReturnZone()
+    if m.focusZone = "hero" then
+        m.headerReturnZone = "hero"
+        m.headerReturnHeroFocus = m.heroFocus
+    else if m.focusZone = "rows" then
+        m.headerReturnZone = "rows"
+        m.headerReturnRowIndex = m.rowIndex
+        m.headerReturnCardIndex = m.cardIndex
+    end if
+end sub
+
+' Case 4 parity: LEFT from hero/rows opens sidebar (case 1 uses UP for top header).
+sub EnterHeaderFromContent()
+    RememberHeaderReturnZone()
+    EnterHeader()
+end sub
+
+' RIGHT leaves sidebar — collapse to icons and restore hero or row focus.
+sub ExitHeaderToPrevious()
+    if m.header <> invalid then m.header.headerActive = false
+    if ThemeIsSidebarHeader() then ApplyLayoutGeometry(true)
+
+    zone = m.headerReturnZone
+    if zone = "hero" and HeroAvailable() then
+        target = m.headerReturnHeroFocus
+        if target = invalid or target = "" then target = "next"
+        EnterHero(target)
+        return
+    end if
+
+    m.focusZone = "rows"
+    if m.headerReturnRowIndex <> invalid then m.rowIndex = m.headerReturnRowIndex
+    if m.headerReturnCardIndex <> invalid then m.cardIndex = m.headerReturnCardIndex
+    ClampCardIndex()
     ApplyHomeFocus()
 end sub
 
@@ -425,10 +639,35 @@ sub MaybeLandContentFocus()
     if not m.pendingContentFocus then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
     m.pendingContentFocus = false
+    if ThemeIsLayoutCase4() then
+        EnterSidebarHomeDefault(false)
+        return
+    end if
     if m.focusZone = "header" then ExitHeaderToRows()
 end sub
 
 sub HandleHeaderKey(key as string)
+    if ThemeIsSidebarHeader() then
+        if key = "up" then
+            if m.menuIndex > 0 then
+                m.menuIndex = m.menuIndex - 1
+                m.header.focusedIndex = m.menuIndex
+            end if
+        else if key = "down" then
+            if m.menuIndex < m.menuItems.Count() - 1 then
+                m.menuIndex = m.menuIndex + 1
+                m.header.focusedIndex = m.menuIndex
+            else
+                EnterHeroFromHeader()
+            end if
+        else if key = "right" then
+            ExitHeaderToPrevious()
+        else if key = "OK" or key = "ok" then
+            SelectHeaderItem()
+        end if
+        return
+    end if
+
     if key = "left" then
         if m.menuIndex > 0 then
             m.menuIndex = m.menuIndex - 1
@@ -450,6 +689,7 @@ end sub
 ' Vertical flow:  HEADER ↕ HERO (prev/next/mute) ↕ CONTINUE WATCHING.
 
 function HeroAvailable() as boolean
+    if ThemeIsOttHome() then return false
     if m.hero = invalid or m.hero.visible <> true then return false
     items = m.hero.bannerItems
     if items = invalid or items.Count() = 0 then return false
@@ -478,7 +718,11 @@ end function
 
 sub EnterHeroOrHeader()
     if not HeroAvailable() then
-        EnterHeader()
+        if ThemeIsSidebarHeader() then
+            EnterHeaderFromContent()
+        else
+            EnterHeader()
+        end if
         return
     end if
     target = "next"
@@ -529,12 +773,31 @@ sub EnterRowsFromHero()
     UpdateRowsScrim()
 end sub
 
+function HeroIsPageFlip() as boolean
+    return ThemeHeroBannerStyle() = TC_HeroPageFlip()
+end function
+
+function HeroIsParallaxSlide() as boolean
+    return ThemeHeroBannerStyle() = TC_HeroParallaxSlide()
+end function
+
+function HeroUsesFrostNav() as boolean
+    return HeroIsPageFlip() or HeroIsParallaxSlide()
+end function
+
 sub HandleHeroKey(key as string)
     multi = HeroMultiSlide()
     playing = (m.hero <> invalid and m.hero.trailerPlaying = true)
+    frostNav = HeroUsesFrostNav()
 
     if key = "up" then
-        if m.heroFocus = "mute" then
+        if ThemeIsSidebarHeader() then
+            ' Vertical hero controls only — sidebar is opened with LEFT, not UP.
+            if m.heroFocus = "mute" then
+                m.heroFocus = "next"
+                ApplyHeroFocus()
+            end if
+        else if m.heroFocus = "mute" then
             m.heroFocus = "next"
             ApplyHeroFocus()
         else
@@ -542,35 +805,44 @@ sub HandleHeroKey(key as string)
             EnterHeader()
         end if
     else if key = "down" then
-        if m.heroFocus = "next" and playing then
+        if m.heroFocus = "next" and playing and not frostNav then
             m.heroFocus = "mute"
             ApplyHeroFocus()
         else
             EnterRowsFromHero()
         end if
     else if key = "left" then
-        if m.heroFocus = "next" and multi then
+        if frostNav and multi then
+            if m.hero <> invalid then m.hero.callFunc("HeroGoPrev", invalid)
+        else if ThemeIsSidebarHeader() then
+            if m.heroFocus = "next" and multi then
+                m.heroFocus = "prev"
+                ApplyHeroFocus()
+            else if m.heroFocus = "mute" then
+                EnterRowsFromHero()
+            else
+                EnterHeaderFromContent()
+            end if
+        else if m.heroFocus = "next" and multi then
             m.heroFocus = "prev"
             ApplyHeroFocus()
         else if m.heroFocus = "mute" then
             EnterRowsFromHero()
         end if
     else if key = "right" then
-        if m.heroFocus = "prev" and multi then
+        if frostNav and multi then
+            if m.hero <> invalid then m.hero.callFunc("HeroGoNext", invalid)
+        else if m.heroFocus = "prev" and multi then
             m.heroFocus = "next"
             ApplyHeroFocus()
         end if
     else if key = "OK" or key = "ok" then
-        print "[KEYDBG] HandleHeroKey OK branch heroFocus='"; m.heroFocus; "' heroInvalid="; (m.hero = invalid)
         if m.hero = invalid then return
-        if m.heroFocus = "prev" then
-            print "[KEYDBG] calling HeroGoPrev"
-            m.hero.callFunc("HeroGoPrev", invalid)
-        else if m.heroFocus = "next" then
-            print "[KEYDBG] calling HeroGoNext"
+        if frostNav or m.heroFocus = "next" then
             m.hero.callFunc("HeroGoNext", invalid)
+        else if m.heroFocus = "prev" then
+            m.hero.callFunc("HeroGoPrev", invalid)
         else if m.heroFocus = "mute" then
-            print "[KEYDBG] calling HeroToggleMute"
             m.hero.callFunc("HeroToggleMute", invalid)
         end if
     end if
@@ -583,7 +855,9 @@ sub SelectHeaderItem()
     SetValueByKey(SK_SelectedItem(), item.text, "app")
 
     if item.route = RouteHome() then
-        if m.rowWidgets.Count() > 0 then
+        if ThemeIsLayoutCase4() then
+            EnterSidebarHomeDefault(true)
+        else if m.rowWidgets.Count() > 0 then
             ExitHeaderToRows()
         else
             EnterHeader()
@@ -968,8 +1242,15 @@ end sub
 sub OnRowsForceHideTimer()
     print "[HOME] rows force-hide safety -> drop shimmer"
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
-    if m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+    row0 = invalid
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
+    painted = false
+    if row0 <> invalid and row0.hasField("paintedReady") then painted = row0.paintedReady
+    if painted and m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+        CwPerfInstant("force-hide", "paintedReady=true -> reveal")
         PrepareFirstRowReveal()
+    else
+        CwPerfInstant("force-hide skipped", "paintedReady=" + CwPerfBool(painted) + " shimmer=" + CwPerfBool(m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true))
     end if
 end sub
 
@@ -997,7 +1278,6 @@ sub ShowRowsSkeleton(show as boolean)
         CwPerfMark(m.cwShimmerSpan, "shimmer OFF", detail)
         m.cwShimmerSpan = invalid
     end if
-    print "[HOME] ShowRowsSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
     m.homeSkeleton.rowsRunning = show
     if m.rowsSkeletonTimeout <> invalid then
@@ -1079,7 +1359,7 @@ sub OnRowBuildTick()
         end if
     end if
 
-    m.rowBuildY = m.rowBuildY + HC_RowPitch()
+    m.rowBuildY = m.rowBuildY + m.layoutRowPitch
     m.rowBuildIndex = m.rowBuildIndex + 1
 
     ' Touch only the row we just built — the full ApplyHomeFocus (which also drives the
@@ -1131,17 +1411,33 @@ sub LogCwRowState(tag as string)
     CwPerfInstant(tag, detail)
 end sub
 
-' Make row 0 visible, then cut the shimmer instantly once cards are on screen.
+' Make row 0 visible, cut shimmer, then move focus (sidebar / rows) so layout
+' animation cannot open a gap between shimmer-off and card-populate.
 sub PrepareFirstRowReveal()
-    MaybeLandContentFocus()
+    EnsureFirstRowVisibleUnderShimmer()
     m.rowsRevealed = true
-    ApplyHomeFocus()
     ApplyAllRowFocusStates()
-    LogCwRowState("focus applied -> hide shimmer")
+    LogCwRowState("cards painted -> hide shimmer")
     ShowRowsSkeleton(false)
     UpdateRowsScrim()
     LogCwRowState("shimmer hidden")
+    MaybeLandContentFocus()
+    ApplyHomeFocus()
+    LogCwRowState("post-focus")
     ScheduleSecondRowWarmup()
+end sub
+
+sub EnsureFirstRowVisibleUnderShimmer()
+    if m.rowsHost <> invalid then m.rowsHost.visible = true
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    row0 = m.rowWidgets[0]
+    if row0 = invalid then return
+    if row0.hasField("rowPeekVisible") then row0.rowPeekVisible = true
+    row0.opacity = 1.0
+    host = row0.findNode("cardsHost")
+    if host <> invalid and host.opacity < 1.0 then host.opacity = 1.0
+    title = row0.findNode("rowTitle")
+    if title <> invalid and title.opacity < 1.0 then title.opacity = 1.0
 end sub
 
 sub ScheduleSecondRowWarmup()
@@ -1175,7 +1471,9 @@ sub ApplyHomeFocus()
     ' source of the row-switch stutter).
     if m.focusZone = "rows" then MaterializeVisibleRows()
 
-    anchorY = HC_NetflixAnchorY() - (m.rowIndex * HC_RowPitch())
+    pitch = m.layoutRowPitch
+    if pitch = invalid or pitch <= 0 then pitch = HC_RowPitchForLayout(m.homeLayout)
+    anchorY = m.layoutAnchorY - (m.rowIndex * pitch)
     AnimateRowsHost(anchorY)
 
     for i = 0 to m.rowWidgets.Count() - 1
@@ -1183,6 +1481,7 @@ sub ApplyHomeFocus()
     end for
 
     UpdateRowsScrim()
+    UpdateOttHeroFromFocus()
 end sub
 
 ' Materialize only the rows currently visible on screen: the focused row pinned at the anchor
@@ -1255,15 +1554,17 @@ end sub
 ' Smooth row pinning (parity with netflixContent.tsx 400ms translate).
 sub AnimateRowsHost(targetY as integer)
     if m.rowsHost = invalid then return
+    offX = 0
+    if m.layoutOffsetX <> invalid then offX = m.layoutOffsetX
     fromY = m.rowsHost.translation[1]
     if m.rowsAnim = invalid or m.rowsInterp = invalid or fromY = targetY then
-        m.rowsHost.translation = [0, targetY]
+        m.rowsHost.translation = [offX, targetY]
         ' No animation in flight (initial land, or left/right within a row) — safe to build the
         ' off-screen look-ahead now so it's ready before the next animated row switch.
         if m.focusZone = "rows" then MaterializeNearbyRows()
         return
     end if
-    m.rowsInterp.keyValue = [[0, fromY], [0, targetY]]
+    m.rowsInterp.keyValue = [[offX, fromY], [offX, targetY]]
     m.rowsAnim.control = "start"
 end sub
 
@@ -1330,7 +1631,9 @@ sub OnKey()
     end if
 
     if key = "left" then
-        if m.cardIndex > 0 then
+        if ThemeIsSidebarHeader() and m.cardIndex = 0 then
+            EnterHeaderFromContent()
+        else if m.cardIndex > 0 then
             m.cardIndex = m.cardIndex - 1
             ApplyHomeFocus()
         end if
@@ -1438,7 +1741,7 @@ sub OnLoadMoreResponse()
             ' Append-only: keep existing row nodes and build only the new categories.
             if m.contentRowCats.Count() > prevCatCount then
                 m.rowBuildIndex = prevCatCount
-                m.rowBuildY = prevCatCount * HC_RowPitch()
+                m.rowBuildY = prevCatCount * m.layoutRowPitch
                 m.rowsHost.visible = true
                 m.rowBuildTimer.control = "start"
             end if

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Parallax vertical-slide hero — parity with heroBannerParallax.tsx. -->
+<component name="HeroBannerParallax" extends="Group">
+  <interface>
+    <field id="bannerItems" type="array" onChange="OnBannerItemsChanged" />
+    <field id="posterReady" type="boolean" value="false" alwaysNotify="true" />
+    <field id="trailerPlaying" type="boolean" value="false" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="focusTarget" type="string" value="" onChange="OnFocusTargetChanged" />
+    <function name="HeroGoNext" />
+    <function name="HeroGoPrev" />
+    <function name="HeroToggleMute" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeroBannerCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/HeroBannerParallax.brs" />
+
+  <children>
+    <Rectangle id="heroBg" width="1920" height="918" color="0x0f1014ff" />
+
+    <!-- Layer 1: next slide — clipped full-bleed (no scale transform; scale causes side bleed). -->
+    <Group id="nextClip" clippingRect="[0, 0, 1920, 918]" clippingRectClipsChildren="true">
+      <Poster id="nextPoster" width="2016" height="964" translation="[-48, -23]"
+        loadWidth="2016" loadHeight="964" loadDisplayMode="scaleToFill" />
+    </Group>
+
+    <!-- Layer 2: active slide — vertical slide with parallax inside clip -->
+    <Group id="slideHost" clippingRect="[0, 0, 1920, 918]" clippingRectClipsChildren="true">
+      <Group id="activeLayer" translation="[0, 0]">
+        <Group id="activeClip" clippingRect="[0, 0, 1920, 918]" clippingRectClipsChildren="true">
+          <Poster id="activePoster" width="2016" height="964" translation="[-48, -53]"
+            loadWidth="2016" loadHeight="964" loadDisplayMode="scaleToFill" />
+        </Group>
+        <Poster id="slideShadow" translation="[0, 642]" width="1920" height="276"
+          uri="pkg:/images/ui/grad_bottom.png" opacity="0.0" loadDisplayMode="scaleToFill" />
+      </Group>
+    </Group>
+
+    <!-- Layer 3: gradient overlays (React z-index 3) -->
+    <Poster id="leftGrad" uri="pkg:/images/ui/grad_left.png" width="768" height="918"
+      loadDisplayMode="scaleToFill" />
+    <Poster id="topVignette" uri="pkg:/images/ui/grad_top.png" width="1920" height="184"
+      loadDisplayMode="scaleToFill" />
+    <Poster id="bottomVignette" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 551]"
+      width="1920" height="367" loadDisplayMode="scaleToFill" />
+
+    <!-- Layer 4: meta — bottom: 45% (positioned in .brs) -->
+    <Group id="metaHost" translation="[48, 183]">
+      <Rectangle id="accentLine" width="0" height="3" color="0x0b75e0ff" />
+      <Label id="titleLabel" translation="[0, 18]" text="" width="760" height="90" wrap="false"
+        color="0xf8f1f7ff" horizAlign="left" vertAlign="top">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="56" />
+      </Label>
+      <LayoutGroup id="ratingHost" translation="[0, 114]" layoutDirection="horiz"
+        itemSpacings="[8]" vertAlignment="center" visible="false">
+        <Label id="ratingLabel" text="" height="38" color="0xf8f1f7ff"
+          horizAlign="left" vertAlign="center">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+        </Label>
+      </LayoutGroup>
+      <LayoutGroup id="genreHost" translation="[0, 158]" layoutDirection="horiz"
+        itemSpacings="[15]" vertAlignment="center">
+        <Label id="genreLabel" text="" height="36"
+          color="0xf8f1f7ff" horizAlign="left" vertAlign="center">
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+        </Label>
+        <Group id="qualityBadge" visible="false">
+          <Rectangle id="qualityBg" width="84" height="34" color="0xffffff33" />
+          <Label id="qualityLabel" text="" width="84" height="34"
+            color="0xf8f1f7ff" horizAlign="center" vertAlign="center">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="14" />
+          </Label>
+        </Group>
+      </LayoutGroup>
+      <Label id="descLabel" translation="[0, 202]" text="" width="633" height="120"
+        wrap="true" color="0xf8f1f7cc" horizAlign="left" vertAlign="top">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+    </Group>
+
+    <!-- Layer 5: frosted pill — grey bg clipped to 58px, thumbs centered at Y=8 -->
+    <Group id="frostStrip" translation="[660, 539]" visible="false">
+      <FocusFrame id="frostFocusRing" translation="[-4, -4]" boxWidth="608" boxHeight="66"
+        color="0x0b75e0ff" visible="false" />
+      <Group id="frostInner" clippingRect="[0, 0, 600, 52]" clippingRectClipsChildren="true">
+        <Poster id="frostPanel" uri="pkg:/images/ui/parallax_frost_panel.png"
+          width="600" height="52" loadDisplayMode="scaleToFill" />
+        <LayoutGroup id="thumbHost" translation="[16, 8]" layoutDirection="horiz"
+          itemSpacings="[12]" vertAlignment="center" />
+      </Group>
+    </Group>
+
+    <!-- Layer 6: vertical dots — right: 28px, vertically centered in .brs -->
+    <LayoutGroup id="vertDots" translation="[1888, 424]" layoutDirection="vert"
+      itemSpacings="[6]" horizAlignment="center" />
+
+    <Timer id="swipeTimer" repeat="true" duration="5.5" />
+    <Timer id="contentDelayTimer" repeat="false" duration="0.15" />
+    <Animation id="slideAnim" duration="0.8" repeat="false" easeFunction="linear">
+      <Vector2DFieldInterpolator id="slideInterp" key="[0.0, 1.0]"
+        fieldToInterp="activeLayer.translation" />
+    </Animation>
+    <Animation id="parallaxAnim" duration="0.8" repeat="false" easeFunction="linear">
+      <Vector2DFieldInterpolator id="parallaxInterp" key="[0.0, 1.0]"
+        fieldToInterp="activePoster.translation" />
+    </Animation>
+    <Animation id="contentAnim" duration="0.5" repeat="false" easeFunction="outCubic">
+      <FloatFieldInterpolator id="contentOpacityInterp" key="[0.0, 1.0]"
+        fieldToInterp="metaHost.opacity" />
+    </Animation>
+    <Animation id="accentAnim" duration="0.7" repeat="false" easeFunction="outCubic">
+      <FloatFieldInterpolator id="accentWidthInterp" key="[0.0, 1.0]"
+        fieldToInterp="accentLine.width" />
+    </Animation>
+  </children>
+</component>

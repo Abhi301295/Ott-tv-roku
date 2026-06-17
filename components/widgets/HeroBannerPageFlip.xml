@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Page-flip hero — parity with heroBanner.tsx (5s interval, 900ms curl flip). -->
+<component name="HeroBannerPageFlip" extends="Group">
+  <interface>
+    <field id="bannerItems" type="array" onChange="OnBannerItemsChanged" />
+    <field id="posterReady" type="boolean" value="false" alwaysNotify="true" />
+    <field id="trailerPlaying" type="boolean" value="false" />
+    <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="focusTarget" type="string" value="" onChange="OnFocusTargetChanged" />
+    <function name="HeroGoNext" />
+    <function name="HeroGoPrev" />
+    <function name="HeroToggleMute" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeroBannerCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/UpNextLayout.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/HeroBannerPageFlip.brs" />
+
+  <children>
+    <Rectangle id="heroBg" width="1920" height="918" color="0x0f1014ff" />
+
+    <!-- Layer 1: next slide (revealed as the page curls away) -->
+    <Poster id="nextPoster" width="1920" height="918" loadDisplayMode="scaleToFill" />
+
+    <!-- Layer 2: current slide — strip-curl page turn (parity rotateY page flip) -->
+    <Group id="flipClip" clippingRect="[0, 0, 1920, 918]" clippingRectClipsChildren="true">
+      <Group id="activePage">
+        <Poster id="activePoster" width="1920" height="918" loadDisplayMode="scaleToFill" />
+      </Group>
+      <Group id="stripHost" visible="false" />
+      <Poster id="curlFold" translation="[1920, 0]" width="200" height="918"
+        uri="pkg:/images/ui/page_curl_fold.png" opacity="0.0" loadDisplayMode="scaleToFill" />
+      <Poster id="curlFoldSoft" translation="[1920, 0]" width="320" height="918"
+        uri="pkg:/images/ui/grad_left.png" opacity="0.0" loadDisplayMode="scaleToFill" />
+    </Group>
+
+    <!-- Layer 3: spine shadow on revealed page -->
+    <Poster id="spineShadow" uri="pkg:/images/ui/grad_left.png" width="288" height="918"
+      opacity="0.0" loadDisplayMode="scaleToFill" />
+
+    <!-- Layer 4: gradient overlays -->
+    <Poster id="leftGrad" uri="pkg:/images/ui/grad_left.png" width="576" height="918"
+      loadDisplayMode="scaleToFill" />
+    <Poster id="topVignette" uri="pkg:/images/ui/grad_top.png" width="1920" height="202"
+      loadDisplayMode="scaleToFill" />
+    <Poster id="bottomVignette" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 716]"
+      width="1920" height="202" loadDisplayMode="scaleToFill" />
+
+    <!-- Layer 5: metadata (fades during flip) -->
+    <Group id="metaHost" translation="[48, 252]">
+      <Label id="titleLabel" text="" width="760" height="90" wrap="false"
+        color="0xf8f1f7ff" horizAlign="left" vertAlign="top">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="56" />
+      </Label>
+      <LayoutGroup id="ratingHost" translation="[0, 96]" layoutDirection="horiz"
+        itemSpacings="[8]" vertAlignment="center" visible="false">
+        <Label id="ratingLabel" text="" height="38" color="0xf8f1f7ff"
+          horizAlign="left" vertAlign="center">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+        </Label>
+      </LayoutGroup>
+      <Label id="genreLabel" translation="[0, 140]" text="" height="36"
+        color="0xf8f1f7ff" horizAlign="left" vertAlign="center">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+      <Group id="qualityBadge" translation="[400, 136]" visible="false">
+        <Rectangle id="qualityBg" width="84" height="34" color="0xffffff33" />
+        <Label id="qualityLabel" text="" width="84" height="34"
+          color="0xf8f1f7ff" horizAlign="center" vertAlign="center">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="14" />
+        </Label>
+      </Group>
+      <Label id="descLabel" translation="[0, 184]" text="" width="760" height="120"
+        wrap="true" color="0xf8f1f7cc" horizAlign="left" vertAlign="top">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+      <LayoutGroup id="dotsHost" translation="[0, 316]" layoutDirection="horiz"
+        itemSpacings="[8]" vertAlignment="center" />
+    </Group>
+
+    <!-- Layer 6: Up Next — heroBanner.tsx right:28 top:28% 155×220 cutout -->
+    <Group id="upNextHost" translation="[1737, 257]" visible="false">
+      <Label id="upNextLabel" text="UP NEXT" width="155" height="18"
+        color="0xf8f1f799" horizAlign="center" vertAlign="top">
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="14" />
+      </Label>
+      <Group id="upNextCard" translation="[0, 22]">
+        <FocusFrame id="upNextFocusRing" translation="[-3, -3]" boxWidth="161" boxHeight="226"
+          color="0x0b75e0ff" visible="false" />
+        <Poster id="upNextShadow" translation="[-6, 4]" width="235" height="300"
+          uri="pkg:/images/ui/upnext_shadow.png" loadDisplayMode="scaleToFill" />
+        <UpNextShapedCard id="upNextShape" />
+      </Group>
+    </Group>
+
+    <Timer id="swipeTimer" repeat="true" duration="5.0" />
+    <Animation id="curlFoldAnim" duration="0.9" repeat="false" easeFunction="inOutCubic">
+      <Vector2DFieldInterpolator id="curlFoldInterp" key="[0.0, 1.0]"
+        fieldToInterp="curlFold.translation" />
+    </Animation>
+    <Animation id="curlFoldSoftAnim" duration="0.9" repeat="false" easeFunction="inOutCubic">
+      <Vector2DFieldInterpolator id="curlFoldSoftInterp" key="[0.0, 1.0]"
+        fieldToInterp="curlFoldSoft.translation" />
+    </Animation>
+    <Animation id="curlFoldFade" duration="0.9" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="curlFoldFadeInterp" key="[0.0, 0.3, 0.7, 1.0]"
+        fieldToInterp="curlFold.opacity" keyValue="[0.0, 1.0, 0.9, 0.0]" />
+    </Animation>
+    <Animation id="curlFoldSoftFade" duration="0.9" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="curlFoldSoftFadeInterp" key="[0.0, 0.4, 1.0]"
+        fieldToInterp="curlFoldSoft.opacity" keyValue="[0.0, 0.45, 0.0]" />
+    </Animation>
+    <Animation id="spineAnim" duration="0.45" repeat="false" easeFunction="outCubic">
+      <FloatFieldInterpolator id="spineInterp" key="[0.0, 1.0]"
+        fieldToInterp="spineShadow.opacity" />
+    </Animation>
+    <Animation id="metaFadeAnim" duration="0.2" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="metaFadeInterp" key="[0.0, 1.0]"
+        fieldToInterp="metaHost.opacity" />
+    </Animation>
+    <Animation id="metaRestoreAnim" duration="0.4" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="metaRestoreInterp" key="[0.0, 1.0]"
+        fieldToInterp="metaHost.opacity" />
+    </Animation>
+  </children>
+</component>
