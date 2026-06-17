@@ -124,9 +124,17 @@ function ResumeBuild(dummy = invalid as dynamic) as boolean
     return true
 end function
 
-' Safety net for Home rows shimmer timeout — reveal title + cards even if a thumbnail
-' never reported back.
+' Safety net for Home rows shimmer timeout — finish the card build first, then reveal.
 function ForceReveal(dummy = invalid as dynamic) as boolean
+    if not m.buildComplete then
+        CwPerfInstant("row ForceReveal — accelerating card build")
+        if m.cardTimer <> invalid then
+            m.cardTimer.duration = 0.001
+            m.cardTimer.control = "start"
+        end if
+        if m.revealTimer <> invalid then m.revealTimer.control = "start"
+        return true
+    end if
     OnRevealSafety()
     return true
 end function
@@ -283,6 +291,7 @@ sub OnCardBuildTick()
 
     if m.buildIdx >= m.buildPlan.Count() then
         m.cardTimer.control = "stop"
+        if m.cardTimer <> invalid then m.cardTimer.duration = 0.01
         OnCardFocusChanged()
         m.buildComplete = true
         m.buildActive = false
@@ -342,9 +351,11 @@ end function
 sub OnPaintPoll()
     m.paintPollCount = m.paintPollCount + 1
     painted = FirstVisibleCardPainted()
-    chop = 0.0
-    if m.cardsHost <> invalid then chop = m.cardsHost.opacity
-    CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
+    if painted or m.paintPollCount = 1 or m.paintPollCount >= 120 then
+        chop = 0.0
+        if m.cardsHost <> invalid then chop = m.cardsHost.opacity
+        CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
+    end if
     if painted then
         MarkPaintedReady(false)
         return
@@ -365,6 +376,7 @@ sub MarkPaintedReady(forced as boolean)
 end sub
 
 sub OnRevealSafety()
+    if not m.buildComplete then return
     m.pendingMediaLoads = 0
     RevealNow()
 end sub

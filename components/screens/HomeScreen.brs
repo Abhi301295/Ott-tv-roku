@@ -1190,6 +1190,7 @@ end sub
 ' 1080 viewport). Called on every focus change; deliberately does NOT build the off-screen
 ' look-ahead row so it can't steal render-thread time from the scroll animation.
 sub MaterializeVisibleRows()
+    if not m.rowsRevealed then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
     for i = m.rowIndex to m.rowIndex + 1
         if i >= 0 and i < m.rowWidgets.Count() then
@@ -1204,6 +1205,7 @@ end sub
 ' every 30ms tick (which also needlessly re-triggers the rows-host scroll animation).
 ' Materialize deferred row shells within a 1-row prefetch window around focus.
 sub MaterializeNearbyRows()
+    if not m.rowsRevealed then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
     lo = m.rowIndex - 1
     if lo < 0 then lo = 0
@@ -1222,7 +1224,11 @@ sub ApplyRowFocusState(i as integer)
     row.rowFocused = (m.focusZone = "rows" and i = m.rowIndex)
     row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
     peek = false
-    if m.rowsRevealed and i = 0 and (m.focusZone = "header" or m.focusZone = "hero") then peek = true
+    if i = 0 and not m.rowsRevealed then
+        peek = true
+    else if m.rowsRevealed and i = 0 and (m.focusZone = "header" or m.focusZone = "hero") then
+        peek = true
+    end if
     if row.hasField("rowPeekVisible") then row.rowPeekVisible = peek
     if m.focusZone = "rows" and i = m.rowIndex then
         ClampCardIndex()
