@@ -31,6 +31,15 @@ sub init()
     m.revealTimer.repeat = false
     m.top.appendChild(m.revealTimer)
     m.revealTimer.observeField("fire", "OnRevealSafety")
+
+    ' Defer paintedReady until the first on-screen card has a painted thumbnail.
+    m.paintTimer = CreateObject("roSGNode", "Timer")
+    m.paintTimer.duration = 0.05
+    m.paintTimer.repeat = false
+    m.top.appendChild(m.paintTimer)
+    m.paintTimer.observeField("fire", "OnPaintPoll")
+    m.cwPerfSpan = invalid
+    m.paintPollCount = 0
 end sub
 
 sub OnCategoryChanged()
@@ -52,6 +61,8 @@ sub OnRowVisualChanged()
         m.top.opacity = 1.0
     else if m.top.rowDimmed = true then
         m.top.opacity = 0.4
+    else if m.top.rowPeekVisible = true then
+        m.top.opacity = 1.0
     else
         m.top.opacity = 0.0
     end if
@@ -77,6 +88,7 @@ function PrepareShell(cat as object) as boolean
     m.top.cardCount = m.buildPlan.Count()
     m.top.built = false
     m.top.mediaReady = false
+    m.top.paintedReady = false
     m.buildComplete = false
     m.buildActive = false
     if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
@@ -109,6 +121,13 @@ function ResumeBuild(dummy = invalid as dynamic) as boolean
     if m.buildPlan = invalid then return false
     if m.buildIdx >= m.buildPlan.Count() then return false
     if m.cardTimer <> invalid then m.cardTimer.control = "start"
+    return true
+end function
+
+' Safety net for Home rows shimmer timeout — reveal title + cards even if a thumbnail
+' never reported back.
+function ForceReveal(dummy = invalid as dynamic) as boolean
+    OnRevealSafety()
     return true
 end function
 
@@ -159,9 +178,14 @@ sub StartCardBuild(cat as object)
     plan = PlanRowCards(cat)
     if plan = invalid then return
 
+    m.cwPerfSpan = CreateObject("roTimespan")
+    m.paintPollCount = 0
+    CwPerfMark(m.cwPerfSpan, "row StartCardBuild", "cards=" + Str(plan.Count()))
+
     m.buildPlan = plan
     m.top.cardCount = m.buildPlan.Count()
     m.top.mediaReady = false
+    m.top.paintedReady = false
     m.buildIdx = 0
     m.buildX = 0
     m.pendingMediaLoads = 0
@@ -181,12 +205,11 @@ sub StartCardBuild(cat as object)
     end if
 end sub
 
-' Only count on-screen cards toward the reveal gate so off-screen thumbnails do not
-' block the row from appearing.
+' Only count cards that intersect the first-screen strip toward the reveal gate.
 sub TrackCardMediaLoad(card as object, compName as string)
     if card = invalid then return
-    if m.buildX >= 1920 then return
     if compName = "SeeAllCard" then return
+    if m.buildX >= 1920 then return
 
     if compName = "ContinueWatchCard" and card.hasField("loaded") then
         m.pendingMediaLoads = m.pendingMediaLoads + 1
@@ -282,10 +305,63 @@ end sub
 
 sub RevealNow()
     if m.revealTimer <> invalid then m.revealTimer.control = "stop"
+    if m.paintTimer <> invalid then m.paintTimer.control = "stop"
     if m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
     if m.cardsHost <> invalid then m.cardsHost.opacity = 1.0
     m.top.built = true
     if m.top.mediaReady <> true then m.top.mediaReady = true
+    CwPerfMark(m.cwPerfSpan, "row RevealNow", "pendingLoads=0 cards=" + Str(m.cards.Count()))
+    m.paintPollCount = 0
+    StartPaintPoll()
+end sub
+
+sub StartPaintPoll()
+    if m.paintTimer = invalid then return
+    m.paintTimer.control = "start"
+end sub
+
+function FirstVisibleCardPainted() as boolean
+    if m.cardsHost = invalid or m.cardsHost.opacity < 1.0 then return false
+    if m.cards.Count() = 0 then return true
+    for each card in m.cards
+        if card = invalid then continue for
+        x = card.translation[0]
+        if x >= 1920 then continue for
+        thumb = card.findNode("thumb")
+        skel = card.findNode("skeleton")
+        if thumb = invalid then return false
+        st = thumb.loadStatus
+        if st <> "ready" and st <> "failed" then return false
+        if thumb.visible <> true then return false
+        if skel <> invalid and skel.visible = true then return false
+        return true
+    end for
+    return false
+end function
+
+sub OnPaintPoll()
+    m.paintPollCount = m.paintPollCount + 1
+    painted = FirstVisibleCardPainted()
+    chop = 0.0
+    if m.cardsHost <> invalid then chop = m.cardsHost.opacity
+    CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
+    if painted then
+        MarkPaintedReady(false)
+        return
+    end if
+    if m.paintPollCount >= 120 then
+        CwPerfInstant("row paint poll TIMEOUT — forcing paintedReady")
+        MarkPaintedReady(true)
+        return
+    end if
+    StartPaintPoll()
+end sub
+
+sub MarkPaintedReady(forced as boolean)
+    if m.paintTimer <> invalid then m.paintTimer.control = "stop"
+    detail = "polls=" + Str(m.paintPollCount) + " forced=" + CwPerfBool(forced)
+    CwPerfMark(m.cwPerfSpan, "row paintedReady TRUE", detail)
+    if m.top.paintedReady <> true then m.top.paintedReady = true
 end sub
 
 sub OnRevealSafety()
@@ -299,6 +375,7 @@ sub OnCardMediaLoaded(event = invalid as object)
         if node <> invalid and node.hasField("loaded") then node.unobserveField("loaded")
     end if
     if m.pendingMediaLoads > 0 then m.pendingMediaLoads = m.pendingMediaLoads - 1
+    CwPerfMark(m.cwPerfSpan, "row media loaded", "remaining=" + Str(m.pendingMediaLoads))
     MaybeReveal()
 end sub
 
@@ -391,6 +468,7 @@ end sub
 sub ClearCards()
     if m.cardTimer <> invalid then m.cardTimer.control = "stop"
     if m.revealTimer <> invalid then m.revealTimer.control = "stop"
+    if m.paintTimer <> invalid then m.paintTimer.control = "stop"
     for each card in m.cards
         CardDetachMediaObservers(card)
     end for
@@ -413,4 +491,5 @@ sub ClearCards()
     end for
     m.top.cardCount = 0
     m.top.mediaReady = false
+    m.top.paintedReady = false
 end sub

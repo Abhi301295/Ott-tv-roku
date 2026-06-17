@@ -124,6 +124,19 @@ sub init()
     m.top.appendChild(m.rowsSkeletonTimeout)
     m.rowsSkeletonTimeout.observeField("fire", "OnRowsSkeletonTimeout")
     m.firstRowWatch = invalid
+    m.rowWarmupTimer = CreateObject("roSGNode", "Timer")
+    m.rowWarmupTimer.duration = 0.6
+    m.rowWarmupTimer.repeat = false
+    m.top.appendChild(m.rowWarmupTimer)
+    m.rowWarmupTimer.observeField("fire", "OnRowWarmupTimer")
+    m.rowsForceHideTimer = CreateObject("roSGNode", "Timer")
+    m.rowsForceHideTimer.duration = 4.0
+    m.rowsForceHideTimer.repeat = false
+    m.top.appendChild(m.rowsForceHideTimer)
+    m.rowsForceHideTimer.observeField("fire", "OnRowsForceHideTimer")
+    m.cwShimmerSpan = invalid
+    m.cwRowBuildSpan = invalid
+    m.cwRevealAtMs = -1
 
     SetupHeader()
     EnterHeader()
@@ -161,7 +174,9 @@ sub TryStartHomeBoot()
     ' lands (hero on poster paint, rows when CW + categories are ready).
     ShowHeroSkeleton(true)
     ShowRowsSkeleton(true)
-    if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
+    m.cwShimmerSpan = CreateObject("roTimespan")
+    CwPerfMark(m.cwShimmerSpan, "shimmer ON (boot)")
+    ' Rows timeout starts when BuildContentRows begins, not at boot (hero gate can take 3.5s+).
     ' Wall-clock from mount → hero poster painted = perceived first-content latency.
     m.bootSpan = CreateObject("roTimespan")
     StartBootSequence()
@@ -185,6 +200,8 @@ sub OnDispose()
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
     if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
+    if m.rowWarmupTimer <> invalid then m.rowWarmupTimer.control = "stop"
+    if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
     if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
 
     ' Kill every in-flight HTTP listener. The shared pool may still finish the request,
@@ -394,6 +411,7 @@ sub EnterHeader()
     m.header.headerActive = true
     row = CurrentRow()
     if row <> invalid then row.cardFocusIndex = -1
+    ApplyAllRowFocusStates()
 end sub
 
 sub ExitHeaderToRows()
@@ -490,6 +508,7 @@ sub EnterHero(target as string)
     end for
     m.heroFocus = NormalizeHeroTarget(target)
     ApplyHeroFocus()
+    ApplyAllRowFocusStates()
     UpdateRowsScrim()
 end sub
 
@@ -930,17 +949,28 @@ sub OnSkeletonTimeout()
 end sub
 
 sub OnRowsSkeletonTimeout()
-    print "[HOME] rows skeleton timeout -> hide rows shimmer"
-    ShowRowsSkeleton(false)
-    m.rowsRevealed = true
-    UpdateRowsScrim()
-    MaybeLandContentFocus()
+    print "[HOME] rows skeleton timeout -> force first row reveal (shimmer stays until painted)"
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then
+        row0 = m.rowWidgets[0]
+        if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
+    end if
+    ' Last resort: never strand the shimmer forever if paint ack never lands.
+    if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "start"
 end sub
 
 sub DetachFirstRowWatch()
     if m.firstRowWatch = invalid then return
-    m.firstRowWatch.unobserveField("mediaReady")
+    if m.firstRowWatch.hasField("paintedReady") then m.firstRowWatch.unobserveField("paintedReady")
+    if m.firstRowWatch.hasField("mediaReady") then m.firstRowWatch.unobserveField("mediaReady")
     m.firstRowWatch = invalid
+end sub
+
+sub OnRowsForceHideTimer()
+    print "[HOME] rows force-hide safety -> drop shimmer"
+    if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
+    if m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+        PrepareFirstRowReveal()
+    end if
 end sub
 
 sub ShowHeroSkeleton(show as boolean)
@@ -952,14 +982,28 @@ end sub
 
 sub ShowRowsSkeleton(show as boolean)
     if m.homeSkeleton = invalid then return
+    if show then
+        if m.cwShimmerSpan = invalid then m.cwShimmerSpan = CreateObject("roTimespan")
+        CwPerfMark(m.cwShimmerSpan, "shimmer ON")
+    else
+        shimmerMs = CwPerfMs(m.cwShimmerSpan)
+        bootMs = -1
+        if m.bootSpan <> invalid then bootMs = m.bootSpan.TotalMilliseconds()
+        gapMs = -1
+        if m.cwRevealAtMs >= 0 and shimmerMs >= 0 then gapMs = shimmerMs - m.cwRevealAtMs
+        detail = "shimmerVisible=" + Str(shimmerMs) + "ms"
+        if bootMs >= 0 then detail = detail + " boot=" + Str(bootMs) + "ms"
+        if gapMs >= 0 then detail = detail + " revealToShimmerOff=" + Str(gapMs) + "ms"
+        CwPerfMark(m.cwShimmerSpan, "shimmer OFF", detail)
+        m.cwShimmerSpan = invalid
+    end if
     print "[HOME] ShowRowsSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
     m.homeSkeleton.rowsRunning = show
     if m.rowsSkeletonTimeout <> invalid then
-        if show then
-            m.rowsSkeletonTimeout.control = "start"
-        else
+        if not show then
             m.rowsSkeletonTimeout.control = "stop"
+            if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
         end if
     end if
 end sub
@@ -982,12 +1026,14 @@ sub BuildContentRows()
     ' Render-build instrumentation: measure render-thread cost so optimization (e.g. lazy
     ' row building) is driven by data, not guesswork. [PERF] tags are greppable.
     m.rowBuildSpan = CreateObject("roTimespan")
+    m.cwRowBuildSpan = CreateObject("roTimespan")
     m.rowBuildCostMs = 0
-    print "[HOME] BuildContentRows rows="; m.contentRowCats.Count()
+    CwPerfMark(m.cwRowBuildSpan, "BuildContentRows start", "rows=" + Str(m.contentRowCats.Count()))
 
     ' Skeleton visibility is owned by OnHeroPosterReady / OnSkeletonTimeout, so we don't
     ' toggle it here — rows build underneath and the shimmer drops once the hero paints.
     if m.contentRowCats.Count() > 0 then
+        if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
         m.rowBuildTimer.control = "start"
     end if
 end sub
@@ -1007,9 +1053,9 @@ sub OnRowBuildTick()
     span = CreateObject("roTimespan")
     row = m.rowsHost.createChild("ContentRow")
     ApplyThemeToRow(row)
-    ' Rows 0–1 (CW + next) materialize immediately; deeper rows are shell-only until the
-    ' user scrolls near them or the first row finishes loading (background warm-up).
-    if m.rowBuildIndex <= 1 then
+    ' Only row 0 builds immediately — row 1+ are shells until CW has painted, so their
+    ' card nodes cannot steal the render thread from the first visible strip.
+    if m.rowBuildIndex = 0 then
         row.categoryData = cat
     else
         row.callFunc("PrepareShell", cat)
@@ -1021,14 +1067,15 @@ sub OnRowBuildTick()
     m.rowBuildCostMs = m.rowBuildCostMs + rowMs
     print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
 
-    ' Keep the rows shimmer up until the FIRST row has actually loaded its thumbnails.
+    ' Keep the rows shimmer up until the FIRST row has painted its thumbnails.
     if m.rowBuildIndex = 0 then
-        if row.cardCount = 0 or row.built = true then
-            OnFirstRowBuilt()
+        row.rowPeekVisible = true
+        if row.cardCount = 0 then
+            OnFirstRowPainted()
         else
             DetachFirstRowWatch()
             m.firstRowWatch = row
-            row.observeField("mediaReady", "OnFirstRowBuilt")
+            row.observeField("paintedReady", "OnFirstRowPainted")
         end if
     end if
 
@@ -1044,29 +1091,68 @@ sub OnRowBuildTick()
         wall = 0
         if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
         print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
-        ApplyHomeFocus()
-        MaybeLandContentFocus()
+        ' Do not materialize row 1 or run focus scroll until CW has painted — that work
+        ' was starving the render thread and caused the post-shimmer black gap.
+        if m.rowsRevealed then
+            ApplyHomeFocus()
+            MaybeLandContentFocus()
+        end if
     end if
 end sub
 
-' The Continue Watching row finished loading thumbnails — drop the shimmer so the shimmer
-' hands straight off to real cards (not static grey card placeholders).
-sub OnFirstRowBuilt()
+' The Continue Watching row finished painting — drop the shimmer over real cards.
+sub OnFirstRowPainted()
     row = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
-    if row <> invalid and row.hasField("mediaReady") and row.mediaReady <> true then return
+    if row <> invalid and row.hasField("paintedReady") and row.paintedReady <> true then return
     DetachFirstRowWatch()
-    print "[HOME] first row media ready -> hide rows shimmer + reveal hero behind cards"
-    ShowRowsSkeleton(false)
-    ' CW content has painted — drop the dark scrim so the hero bleeds behind the cards.
-    m.rowsRevealed = true
-    UpdateRowsScrim()
-    MaybeLandContentFocus()
-    ' Warm the next row in the background while the user is still on CW.
-    if m.rowWidgets.Count() > 1 then
-        row1 = m.rowWidgets[1]
-        if row1 <> invalid then row1.callFunc("Materialize", invalid)
+    m.cwRevealAtMs = CwPerfMs(m.cwShimmerSpan)
+    LogCwRowState("paintedReady -> pre-hide")
+    PrepareFirstRowReveal()
+end sub
+
+sub LogCwRowState(tag as string)
+    row = invalid
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
+    if row = invalid then
+        CwPerfInstant(tag, "row=missing")
+        return
     end if
+    chop = -1.0
+    host = row.findNode("cardsHost")
+    if host <> invalid then chop = host.opacity
+    pulseVis = false
+    if m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning <> invalid then
+        pulseVis = m.homeSkeleton.rowsRunning
+    end if
+    detail = "rowOp=" + Str(row.opacity) + " cardsHostOp=" + Str(chop)
+    detail = detail + " peek=" + CwPerfBool(row.rowPeekVisible) + " focused=" + CwPerfBool(row.rowFocused)
+    detail = detail + " shimmerRunning=" + CwPerfBool(pulseVis) + " zone=" + m.focusZone
+    CwPerfInstant(tag, detail)
+end sub
+
+' Make row 0 visible, then cut the shimmer instantly once cards are on screen.
+sub PrepareFirstRowReveal()
+    MaybeLandContentFocus()
+    m.rowsRevealed = true
+    ApplyHomeFocus()
+    ApplyAllRowFocusStates()
+    LogCwRowState("focus applied -> hide shimmer")
+    ShowRowsSkeleton(false)
+    UpdateRowsScrim()
+    LogCwRowState("shimmer hidden")
+    ScheduleSecondRowWarmup()
+end sub
+
+sub ScheduleSecondRowWarmup()
+    if m.rowWidgets = invalid or m.rowWidgets.Count() < 2 then return
+    if m.rowWarmupTimer <> invalid then m.rowWarmupTimer.control = "start"
+end sub
+
+sub OnRowWarmupTimer()
+    if m.rowWidgets = invalid or m.rowWidgets.Count() < 2 then return
+    row1 = m.rowWidgets[1]
+    if row1 <> invalid then row1.callFunc("Materialize", invalid)
 end sub
 
 sub ClearContentRows()
@@ -1135,12 +1221,22 @@ sub ApplyRowFocusState(i as integer)
     if row = invalid then return
     row.rowFocused = (m.focusZone = "rows" and i = m.rowIndex)
     row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
+    peek = false
+    if m.rowsRevealed and i = 0 and (m.focusZone = "header" or m.focusZone = "hero") then peek = true
+    if row.hasField("rowPeekVisible") then row.rowPeekVisible = peek
     if m.focusZone = "rows" and i = m.rowIndex then
         ClampCardIndex()
         row.cardFocusIndex = m.cardIndex
     else
         row.cardFocusIndex = -1
     end if
+end sub
+
+sub ApplyAllRowFocusStates()
+    if m.rowWidgets = invalid then return
+    for i = 0 to m.rowWidgets.Count() - 1
+        ApplyRowFocusState(i)
+    end for
 end sub
 
 ' Keep the row backdrop transparent in both loading and loaded states. The row shimmer owns

@@ -48,7 +48,16 @@ end sub
 sub ReportLoaded()
     if not m.dataApplied then return
     if m.reported then return
+    if m.skeleton <> invalid and m.skeleton.visible = true then
+        print "[CW_PERF] card loaded BLOCKED — skeleton still visible"
+        return
+    end if
     m.reported = true
+    st = ""
+    if m.thumb <> invalid then st = m.thumb.loadStatus
+    skVis = false
+    if m.skeleton <> invalid then skVis = m.skeleton.visible
+    print "[CW_PERF] card loaded thumbSt="; st; " skelVis="; skVis
     m.top.loaded = true
 end sub
 
@@ -57,10 +66,17 @@ sub ApplyAll()
     if uri <> invalid and uri <> "" then
         m.thumb.uri = uri
         m.thumb.visible = true
-        m.skeleton.visible = true
-        m.skeleton.running = true
         status = m.thumb.loadStatus
-        if status = "ready" or status = "failed" then ReportLoaded()
+        ready = (status = "ready" or status = "failed")
+        if ready then
+            m.skeleton.visible = false
+            m.skeleton.running = false
+            CardOnPosterLoad(m.thumb, m.skeleton)
+            ReportLoaded()
+        else
+            m.skeleton.visible = true
+            m.skeleton.running = true
+        end if
     else
         m.thumb.visible = false
         m.skeleton.visible = true

@@ -8,11 +8,16 @@
     <field id="cardFocusIndex" type="integer" value="0" onChange="OnCardFocusChanged" />
     <field id="rowFocused" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <field id="rowDimmed" type="boolean" value="false" onChange="OnRowVisualChanged" />
+    <!-- Row stays visible below the hero when header/hero has focus (parity: netflixContent row 0). -->
+    <field id="rowPeekVisible" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <field id="cardCount" type="integer" value="0" />
     <!-- Fires true once every card node for this row has been created, so the screen can
          drop the loading shimmer and reveal a fully-populated row in one shot. -->
     <field id="built" type="boolean" value="false" alwaysNotify="true" />
     <field id="mediaReady" type="boolean" value="false" alwaysNotify="true" />
+    <!-- Fires after RevealNow + a short paint window so Home can drop the rows shimmer only
+         once real card pixels are on screen (loadStatus=ready is not enough). -->
+    <field id="paintedReady" type="boolean" value="false" alwaysNotify="true" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
     <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
     <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
@@ -27,9 +32,11 @@
          creation on the single render thread (called by HomeScreen on key activity). -->
     <function name="PauseBuild" />
     <function name="ResumeBuild" />
+    <function name="ForceReveal" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/ContentRow.brs" />
