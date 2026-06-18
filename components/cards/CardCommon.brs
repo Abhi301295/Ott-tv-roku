@@ -26,9 +26,9 @@ end function
 ' the hot path; the frame is created once on first focus and reused thereafter. Appearance is
 ' identical to the previous XML-declared frame.
 function CardEnsureFocusFrame(card as object, existing as object, offX as float, offY as float, w as float, h as float, color as string) as object
-    if existing <> invalid then return existing
     if card = invalid then return invalid
-    frame = card.createChild("FocusFrame")
+    frame = existing
+    if frame = invalid then frame = card.createChild("FocusFrame")
     frame.translation = [offX, offY]
     frame.boxWidth = w
     frame.boxHeight = h
@@ -103,6 +103,20 @@ sub CardOnPosterLoad(poster as object, skeleton as object)
         end if
         if status = "failed" and poster <> invalid then poster.visible = false
     end if
+end sub
+
+' object-cover parity — decode at native aspect, zoom-crop into w×h (never set both load dims).
+sub CardApplyPosterCover(poster as object, clip as object, w as integer, h as integer)
+    if poster = invalid then return
+    if clip <> invalid then
+        clip.clippingRect = [0, 0, w, h]
+        clip.clippingRectClipsChildren = true
+    end if
+    poster.width = w
+    poster.height = h
+    poster.loadDisplayMode = "scaleToZoom"
+    poster.loadWidth = 0
+    poster.loadHeight = 0
 end sub
 
 sub CardInjectTheme(card as object, primary500 as string, primary600 as string, primary700 as string, neutral50 as string, neutral800 as string, neutral700 = "" as string)

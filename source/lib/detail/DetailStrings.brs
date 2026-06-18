@@ -24,6 +24,14 @@ function CopyRemoveWatchlist() as string
     return "Remove from Watch List"
 end function
 
+function CopyAddingWatchlist() as string
+    return "Adding..."
+end function
+
+function CopyRemovingWatchlist() as string
+    return "Removing..."
+end function
+
 function CopyMoreLikeThis() as string
     return "More Like This"
 end function
