@@ -10,8 +10,13 @@
     <!-- Independent toggles for the two regions. -->
     <field id="heroRunning" type="boolean" value="false" onChange="OnRunningChanged" />
     <field id="rowsRunning" type="boolean" value="false" onChange="OnRunningChanged" />
+    <!-- Layout-driven geometry — set by HomeScreen from ThemeConfig (cases 1–6). -->
+    <field id="layoutMode" type="string" value="netflix" onChange="OnLayoutChanged" />
+    <field id="anchorY" type="integer" value="702" onChange="OnLayoutChanged" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/HomeSkeleton.brs" />
 
   <children>
@@ -62,12 +67,6 @@
       <FloatFieldInterpolator id="rowsInterp2" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine2.opacity" />
       <FloatFieldInterpolator id="rowsInterp3" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine3.opacity" />
       <FloatFieldInterpolator id="rowsInterp4" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 1.0, 0.0]" fieldToInterp="rowShine4.opacity" />
-    </Animation>
-
-    <!-- Dissolve the rows shimmer out (instead of a hard cut) so the heavy first-draw of
-         the real cards underneath can never show up as a stutter in the pulse. -->
-    <Animation id="rowsFade" duration="0.35" repeat="false" easeFunction="outQuad">
-      <FloatFieldInterpolator id="rowsFadeInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="rowsPulse.opacity" />
     </Animation>
   </children>
 </component>

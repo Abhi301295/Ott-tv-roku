@@ -61,12 +61,10 @@ function HC_HomeSkeletonMaxSec() as float
     return 5.0
 end function
 
-' Hard ceiling for the on-home select-profile step. The retry loop already bounds the
-' common 401/404 case, but a request that never posts a response (hung socket) would
-' otherwise strand the user on an endless shimmer — when this fires we surface an error
-' and return to the profile picker. Sized above the worst-case retry budget.
+' Hard ceiling for a single select-profile attempt. Reset on every retry/request so a
+' hung socket retries instead of failing the whole flow after one slow response.
 function HC_SelectWatchdogSec() as float
-    return 12.0
+    return 20.0
 end function
 
 ' How long row building may wait for the hero trailer to go live before it builds
@@ -77,7 +75,33 @@ function HC_RowBuildGateSec() as float
     return 3.5
 end function
 
+' OTT has no hero trailer — do not hold row build for the cinematic preview gate.
+function HC_RowBuildGateSecForLayout(homeLayout as string) as float
+    if homeLayout = HC_HomeLayoutOtt() then return 0.0
+    return HC_RowBuildGateSec()
+end function
+
+' Max wait for continue-watching before rows may build (OTT builds on categories;
+' Netflix waits for both APIs but this caps a hung CW endpoint).
+function HC_ContinueBootMaxSec() as float
+    return 4.0
+end function
+
 ' Safety net for the rows shimmer — mirror HC_HomeSkeletonMaxSec for the hero.
 function HC_RowsSkeletonMaxSec() as float
     return 8.0
+end function
+
+function HC_RowsSkeletonMaxSecForLayout(homeLayout as string) as float
+    if homeLayout = HC_HomeLayoutOtt() then return 5.0
+    return HC_RowsSkeletonMaxSec()
+end function
+
+function HC_RowsForceHideSec() as float
+    return 2.0
+end function
+
+' OTT hero banner: do not block boot on a slow CDN poster — fire posterReady after this.
+function HC_OttPosterReadyMaxSec() as float
+    return 2.0
 end function

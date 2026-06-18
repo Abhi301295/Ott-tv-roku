@@ -1,5 +1,25 @@
 ' Shared focus ring + poster load handling for home card widgets.
 
+' CW progress track + card placeholder — parity with continueWatchCard.tsx bg-neutral-950 /
+' bg-neutral-700. React's Tailwind neutral-950 is NOT overridden by API tertiary (stays
+' #0a0a0a). Roku must not use theme neutral-900/950 here: those are shades of
+' portalTertiaryColor (red sidebar → red progress track / red card fill).
+function CardProgressTrackColor() as string
+    return "0x0a0a0aff"
+end function
+
+function CardThumbPlaceholderBg() as string
+    return "0x404040ff"
+end function
+
+function CardSkeletonBaseColor() as string
+    return "0x404040ff"
+end function
+
+function CardSkeletonHighlightColor() as string
+    return "0x262626ff"
+end function
+
 ' Lazily create a card's focus frame only when it is first needed (i.e. the card becomes
 ' focused), instead of building all 9 frame nodes for every card up-front. During a row's
 ' build burst no card is focused, so this removes the single biggest per-card node cost from

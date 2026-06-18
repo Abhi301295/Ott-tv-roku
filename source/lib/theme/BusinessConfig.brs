@@ -165,5 +165,18 @@ end function
 function IsFeatureEnabled(resolved as object, featureName as string) as boolean
     if resolved = invalid or resolved.features = invalid then return false
     if resolved.features[featureName] = invalid then return false
-    return (resolved.features[featureName] = true)
+    return CoerceFeatureFlag(resolved.features[featureName])
+end function
+
+' API JSON may return true/1/"true" — strict = true misses those (React treats them as on).
+function CoerceFeatureFlag(value as dynamic) as boolean
+    if value = invalid then return false
+    t = type(value)
+    if t = "roBoolean" or t = "Boolean" then return value
+    if t = "roInteger" or t = "Integer" or t = "roFloat" or t = "Float" then return (value <> 0)
+    if t = "roString" or t = "String" then
+        s = LCase(value)
+        return (s = "true" or s = "1" or s = "yes")
+    end if
+    return false
 end function

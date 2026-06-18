@@ -56,6 +56,9 @@ sub init()
     m.trailerCache = {}
     m.detailTask = invalid
 
+    m.viewportW = 1920
+    ApplyViewportLayout()
+
     m.swipeTimer.duration = HC_HeroSwipeMs() / 1000.0
     m.fadeAnim.duration = HC_HeroCrossfadeSec()
     m.zoomAnim.duration = HC_HeroZoomSec()
@@ -69,6 +72,31 @@ sub init()
     m.top.observeField("visible", "OnVisibleChanged")
     if m.activePoster <> invalid then m.activePoster.observeField("loadStatus", "OnActivePosterLoad")
     if m.nextPoster <> invalid then m.nextPoster.observeField("loadStatus", "OnNextPosterLoad")
+end sub
+
+sub OnContentWidthChanged()
+    ApplyViewportLayout()
+end sub
+
+' Reposition right-edge controls for the usable width after a left sidebar inset.
+sub ApplyViewportLayout()
+    w = m.top.contentWidth
+    if w = invalid or w < 400 then w = 1920
+    m.viewportW = w
+
+    m.top.clippingRect = [0, 0, w, 1080]
+    m.top.clippingRectClipsChildren = true
+
+    heroBg = m.top.findNode("heroBg")
+    if heroBg <> invalid then heroBg.width = w
+
+    bottomVig = m.top.findNode("bottomVignette")
+    if bottomVig <> invalid then bottomVig.width = w
+
+    if m.prevArrow <> invalid then m.prevArrow.translation = [10, 435]
+    if m.nextArrow <> invalid then m.nextArrow.translation = [w - 58, 435]
+    if m.muteBtn <> invalid then m.muteBtn.translation = [w - 80, 520]
+    if m.counterHost <> invalid then m.counterHost.translation = [w - 220, 600]
 end sub
 
 sub OnVisibleChanged()

@@ -1,0 +1,322 @@
+sub init()
+    m.spec = ProfileUiSpec()
+    m.cardScaler = m.top.findNode("cardScaler")
+    m.scaler = m.cardScaler
+    m.cardStack = m.top.findNode("cardStack")
+    m.cardInner = m.top.findNode("cardInner")
+    m.outerBorder = m.top.findNode("outerBorder")
+    m.cardBacking = m.top.findNode("cardBacking")
+    m.cardBottom = m.top.findNode("cardBottom")
+    m.cardTopRamp = m.top.findNode("cardTopRamp")
+    m.innerBottom = m.top.findNode("innerBottom")
+    m.innerRamp = m.top.findNode("innerRamp")
+    m.progressTrack = m.top.findNode("progressTrack")
+    m.progressArc = m.top.findNode("progressArc")
+    m.cardClip = m.top.findNode("cardClip")
+    m.initialsLabel = m.top.findNode("initialsLabel")
+    m.initialsFont = m.initialsLabel.findNode("font")
+    m.lockBadge = m.top.findNode("lockBadge")
+    m.lockBadgeBg = m.top.findNode("lockBadgeBg")
+    m.nameLabel = m.top.findNode("nameLabel")
+    m.hintLabel = m.top.findNode("hintLabel")
+    m.sizeAnimTimer = m.top.findNode("sizeAnimTimer")
+
+    m.CARD = m.spec.cardSize
+    m.ARC_FRAMES = 151
+    m.FOCUS_SCALE = m.spec.outerFocusScale * m.spec.innerFocusScale
+    m.REST_SCALE = 1.0
+    m.FOCUS_OFFSET_X = m.spec.focusOffsetX
+    m.REST_OFFSET_X = 0.0
+    m.SIZE_ANIM_STEPS = 24
+    m.visualScale = m.REST_SCALE
+
+    m.top.focusable = true
+    m.top.drawFocusFeedback = false
+    if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.observeField("fire", "OnSizeAnimTick")
+
+    ApplyLayoutFromSpec()
+    OnColorsChanged()
+    OnDataChanged()
+    OnHintChanged()
+    OnFocusChanged()
+end sub
+
+sub ApplyLayoutFromSpec()
+    ApplyLabelLayout()
+end sub
+
+' Name and hint sit below the scaled card foot so rows never overlap when focused.
+sub ApplyLabelLayout()
+    scale = m.visualScale
+    if scale < 1.0 then scale = 1.0
+    cardH = Int(m.CARD * scale + 0.5)
+    nameY = cardH + m.spec.cardMarginBottom
+
+    if m.nameLabel <> invalid then
+        m.nameLabel.translation = [0, nameY]
+        nameFont = m.nameLabel.findNode("font")
+        if nameFont <> invalid then nameFont.size = m.spec.nameFont
+        m.nameLabel.width = 320
+        m.nameLabel.horizAlign = "left"
+        m.nameLabel.height = m.spec.nameFont + 4
+    end if
+    showHint = false
+    if m.hintLabel <> invalid then
+        hintW = m.spec.hintRowWidth
+        if hintW = invalid or hintW < 1 then hintW = 1760
+        m.hintLabel.translation = [0, nameY + m.spec.nameFont + 4]
+        hintFont = m.hintLabel.findNode("font")
+        if hintFont <> invalid then hintFont.size = m.spec.hintFont
+        m.hintLabel.width = hintW
+        m.hintLabel.horizAlign = "center"
+        m.hintLabel.height = m.spec.hintFont + 4
+        showHint = m.hintLabel.visible
+    end if
+    UpdateLayoutHeight(showHint)
+end sub
+
+sub UpdateLayoutHeight(showHint as boolean)
+    focused = (m.top.focusedState = true)
+    h = ProfileSquareRowContentHeight(focused, showHint)
+    if h < 1 then h = ProfileSquareRowContentHeight(false, false)
+    m.top.layoutHeight = h
+end sub
+
+sub OnColorsChanged()
+    if m.cardBacking <> invalid then m.cardBacking.color = m.top.cardBackingColor
+    if m.cardBottom <> invalid then m.cardBottom.color = m.top.cardBottomColor
+    if m.cardTopRamp <> invalid then m.cardTopRamp.blendColor = m.top.cardTopColor
+    if m.innerBottom <> invalid then m.innerBottom.color = m.top.cardBottomColor
+    if m.innerRamp <> invalid then m.innerRamp.blendColor = m.top.cardTopColor
+    if m.outerBorder <> invalid then m.outerBorder.blendColor = m.top.borderColor
+    if m.lockBadgeBg <> invalid then m.lockBadgeBg.blendColor = m.top.cardBottomColor
+    if m.nameLabel <> invalid then
+        m.nameLabel.color = m.top.nameColor
+        m.nameLabel.opacity = 1.0
+    end if
+    if m.hintLabel <> invalid then m.hintLabel.color = m.top.hintColor
+    ProfileUiLogColors(m.top.cardTopColor, m.top.cardBottomColor, m.top.borderColor, m.top.nameColor)
+end sub
+
+sub OnDataChanged()
+    if m.initialsLabel <> invalid then m.initialsLabel.text = m.top.initials
+    if m.nameLabel <> invalid then
+        m.nameLabel.text = m.top.profileName
+        m.nameLabel.color = m.top.nameColor
+    end if
+end sub
+
+sub OnHintChanged()
+    if m.hintLabel = invalid then return
+    txt = m.top.hintText
+    m.hintLabel.text = txt
+    m.hintLabel.visible = (m.top.focusedState and txt <> "")
+    ApplyLabelLayout()
+end sub
+
+sub OnFocusChanged()
+    focused = m.top.focusedState
+    if focused <> true then focused = false
+    locked = (m.top.parentalLock = true)
+    progress = m.top.progress
+    if progress < 0 then progress = 0
+    if progress > 1 then progress = 1
+
+    ApplyCardChrome(focused)
+
+    if m.outerBorder <> invalid then m.outerBorder.visible = focused
+
+    showTrack = (focused and not locked)
+    showArc = (showTrack and progress > 0)
+
+    if m.progressTrack <> invalid then m.progressTrack.visible = showTrack
+    if m.progressArc <> invalid then
+        m.progressArc.visible = showArc
+        if showArc then m.progressArc.uri = SquareArcFrameUri(progress)
+    end if
+    if m.lockBadge <> invalid then m.lockBadge.visible = (focused and locked)
+
+    OnHintChanged()
+    ApplyLabelLayout()
+    AnimateScale(focused)
+    ProfileUiLogRow(m.top.rowIndex, focused, progress, m.visualScale, 1.0, m.lastOffsetX)
+end sub
+
+sub ApplyCardChrome(focused as boolean)
+    scale = m.visualScale
+    if scale <= 0 then scale = m.REST_SCALE
+
+    inset = 0.0
+    inner = m.CARD * scale
+    if focused then
+        inset = m.spec.ringInset * scale
+        inner = m.spec.innerContentSize * scale
+    end if
+
+    faceInset = m.spec.innerFaceInset * scale
+    faceSize = m.spec.innerFaceSize * scale
+
+    if m.cardInner <> invalid then m.cardInner.visible = focused
+    if focused and m.cardInner <> invalid then
+        m.cardInner.maskOffset = [faceInset, faceInset]
+        m.cardInner.maskSize = [faceSize, faceSize]
+    end if
+    if m.innerBottom <> invalid then
+        m.innerBottom.width = faceSize
+        m.innerBottom.height = faceSize
+    end if
+    if m.innerRamp <> invalid then
+        m.innerRamp.width = faceSize
+        m.innerRamp.height = faceSize
+    end if
+
+    if m.initialsLabel <> invalid then
+        m.initialsLabel.translation = [inset, inset]
+        m.initialsLabel.width = inner
+        m.initialsLabel.height = inner
+    end if
+    if m.initialsFont <> invalid then
+        m.initialsFont.size = Int(m.spec.initialsFont * scale + 0.5)
+    end if
+    if m.lockBadge <> invalid then
+        badge = 32 * scale
+        badgeX = inset + Int((inner - badge) / 2)
+        badgeY = inset + inner - (16 * scale)
+        m.lockBadge.translation = [badgeX, badgeY]
+        if m.lockBadgeBg <> invalid then
+            m.lockBadgeBg.width = badge
+            m.lockBadgeBg.height = badge
+        end if
+        lockIcon = m.top.findNode("lockIcon")
+        if lockIcon <> invalid then
+            li = 16 * scale
+            lockIcon.translation = [8 * scale, 8 * scale]
+            lockIcon.width = li
+            lockIcon.height = li
+        end if
+    end if
+end sub
+
+sub AnimateScale(focused as boolean)
+    target = m.REST_SCALE
+    targetX = m.REST_OFFSET_X
+    if focused then
+        target = m.FOCUS_SCALE
+        targetX = m.FOCUS_OFFSET_X
+    end if
+
+    if m.lastScale = invalid then
+        ApplyScales(target, targetX)
+        m.lastScale = target
+        m.lastOffsetX = targetX
+        ProfileUiLogDerived(m.top.rowIndex, focused, target, 1.0)
+        return
+    end if
+
+    if m.lastScale = target and m.lastOffsetX = targetX then return
+
+    m.animFromScale = m.lastScale
+    m.animToScale = target
+    m.animFromX = m.lastOffsetX
+    m.animToX = targetX
+    m.animStep = 0
+    if m.sizeAnimTimer <> invalid then
+        m.sizeAnimTimer.control = "stop"
+        m.sizeAnimTimer.control = "start"
+    else
+        ApplyScales(target, targetX)
+    end if
+    m.lastScale = target
+    m.lastOffsetX = targetX
+    ProfileUiLogDerived(m.top.rowIndex, focused, target, 1.0)
+end sub
+
+sub OnSizeAnimTick()
+    m.animStep = m.animStep + 1
+    t = m.animStep / m.SIZE_ANIM_STEPS
+    if t > 1.0 then t = 1.0
+
+    inv = 1.0 - t
+    eased = 1.0 - (inv * inv * inv)
+    scale = m.animFromScale + ((m.animToScale - m.animFromScale) * eased)
+    x = m.animFromX + ((m.animToX - m.animFromX) * eased)
+    ApplyScales(scale, x)
+
+    if t >= 1.0 and m.sizeAnimTimer <> invalid then
+        m.sizeAnimTimer.control = "stop"
+    end if
+    showHint = (m.hintLabel <> invalid and m.hintLabel.visible)
+    UpdateLayoutHeight(showHint)
+end sub
+
+sub ApplyScales(scale as float, offsetX as float)
+    m.visualScale = scale
+    ApplyCardSize(scale)
+    ApplyCardChrome(m.top.focusedState)
+
+    if m.cardScaler <> invalid then
+        m.cardScaler.scale = [1.0, 1.0]
+        m.cardScaler.translation = [offsetX, ScaleOffsetY(scale)]
+    end if
+    ApplyLabelLayout()
+end sub
+
+sub ApplyCardSize(scale as float)
+    card = m.CARD * scale
+    faceInset = m.spec.innerFaceInset * scale
+    faceSize = m.spec.innerFaceSize * scale
+
+    if m.cardClip <> invalid then
+        m.cardClip.maskSize = [card, card]
+        m.cardClip.maskOffset = [0, 0]
+    end if
+    for each node in [m.cardBacking, m.cardBottom, m.cardTopRamp]
+        if node <> invalid then
+            node.width = card
+            node.height = card
+        end if
+    end for
+
+    if m.outerBorder <> invalid then
+        m.outerBorder.width = card
+        m.outerBorder.height = card
+        m.outerBorder.translation = [0, 0]
+    end if
+
+    if m.cardInner <> invalid then
+        m.cardInner.maskSize = [faceSize, faceSize]
+        m.cardInner.maskOffset = [faceInset, faceInset]
+    end if
+    for each node in [m.innerBottom, m.innerRamp]
+        if node <> invalid then
+            node.width = faceSize
+            node.height = faceSize
+        end if
+    end for
+
+    for each node in [m.progressTrack, m.progressArc]
+        if node <> invalid then
+            node.width = card
+            node.height = card
+        end if
+    end for
+end sub
+
+function ScaleOffsetY(scale as float) as float
+    ' Grow from top-left — avoids negative Y pushing the top border under the row above.
+    return 0.0
+end function
+
+function SquareArcFrameUri(progress as float) as string
+    last = m.ARC_FRAMES - 1
+    idx = Int(progress * last + 0.5)
+    if idx < 0 then idx = 0
+    if idx > last then idx = last
+    suffix = idx.ToStr()
+    if idx < 10 then
+        suffix = "00" + suffix
+    else if idx < 100 then
+        suffix = "0" + suffix
+    end if
+    return "pkg:/images/ui/profile_sq_arc_" + suffix + ".png"
+end function

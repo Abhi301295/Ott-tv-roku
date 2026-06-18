@@ -17,6 +17,25 @@ function HC_SeeAllThreshold() as integer
     return 10
 end function
 
+' Exact type match only — parity with helper.ts getCardImgByType (no first-thumb fallback).
+function GetCardImgByTypeExact(cardType as string, thumbnails as object) as string
+    if thumbnails = invalid or cardType = "" then return ""
+    for each thumb in thumbnails
+        if thumb <> invalid and thumb.type = cardType and thumb.path <> invalid and thumb.path <> "" then
+            return thumb.path
+        end if
+    end for
+    return ""
+end function
+
+' OTT Banner (components/banner/index.tsx): HORIZONTAL from thumbnails only.
+' React convertToBannerItem copies thumbnails→banners then picks HORIZONTAL — it never
+' uses the API banners[] field or a VERTICAL / first-thumb fallback for the hero poster.
+function GetOttBannerImage(item as object) as string
+    if item = invalid then return ""
+    return GetCardImgByTypeExact(HC_CardTypeHorizontal(), item.thumbnails)
+end function
+
 ' Pick the thumbnail URL whose type matches the card orientation.
 function GetCardImgByType(cardType as string, thumbnails as object) as string
     if thumbnails = invalid then return ""
@@ -89,9 +108,60 @@ function HC_RowPitch() as integer
     return 430
 end function
 
-' Anchor focused row at ~65vh on a 1080p canvas.
+' Anchor focused row at ~65vh on a 1080p canvas (netflixContent.tsx).
 function HC_NetflixAnchorY() as integer
     return 702
+end function
+
+' OTT layout row pitch (content.tsx scroll step ~280px).
+function HC_OttRowPitch() as integer
+    return 280
+end function
+
+' OTT rows overlap the banner (marginTop -55vh ≈ 594px on 1080p canvas).
+function HC_OttAnchorY() as integer
+    return 594
+end function
+
+function HC_RowPitchForLayout(homeLayout as string) as integer
+    if homeLayout = HC_HomeLayoutOtt() then return HC_OttRowPitch()
+    return HC_RowPitch()
+end function
+
+function HC_AnchorYForLayout(homeLayout as string) as integer
+    if homeLayout = HC_HomeLayoutOtt() then return HC_OttAnchorY()
+    return HC_NetflixAnchorY()
+end function
+
+' ContentRow.tsx: title + cards strip + m-b-75 between rows.
+function HC_RowCardsTop() as integer
+    return 55
+end function
+
+function HC_RowMarginBottom() as integer
+    return 75
+end function
+
+function HC_CardHeight(compName as string) as integer
+    if compName = "ContinueWatchCard" then return 286
+    if compName = "HorizontalCard" then return 312
+    if compName = "VerticalCard" then return 300
+    if compName = "NumberedVerticalCard" then return 260
+    if compName = "BannerCard" then return 400
+    if compName = "SeeAllCard" then return 305
+    return 286
+end function
+
+' Full vertical slot for one OTT home row (parity with content.tsx row title + ContentRow).
+function HC_ContentRowLayoutHeight(cat as object) as integer
+    if cat = invalid then return HC_OttRowPitch()
+    rowType = ""
+    if cat.type <> invalid then rowType = cat.type
+    cardType = HC_CardTypeVertical()
+    if cat.cardType <> invalid and cat.cardType <> "" then cardType = cat.cardType
+    compName = CardComponentForRow(rowType, cardType)
+    if compName = "BannerCard" and rowType <> HC_PromotionalCard() then return HC_OttRowPitch()
+    return HC_RowCardsTop() + HC_CardHeight(compName) + HC_RowMarginBottom()
 end function
 
 function CardComponentWidth(compName as string, orientation = "" as string) as integer
@@ -145,6 +215,29 @@ function ExtractBannerItems(categories as object) as object
         end if
     end if
     return []
+end function
+
+' First content card for OTT focus-reactive banner (parity with Content.tsx activeItem).
+function ExtractOttActiveItem(categories as object) as object
+    contentRows = FilterContentRows(categories)
+    for each cat in contentRows
+        if cat = invalid then continue for
+        items = cat.result
+        if items <> invalid and items.Count() > 0 then return items[0]
+    end for
+    banner = ExtractBannerItems(categories)
+    if banner.Count() > 0 then return banner[0]
+    return invalid
+end function
+
+function ItemAtRowCard(categories as object, rowIndex as integer, cardIndex as integer) as object
+    if categories = invalid then return invalid
+    contentRows = FilterContentRows(categories)
+    if rowIndex < 0 or rowIndex >= contentRows.Count() then return invalid
+    cat = contentRows[rowIndex]
+    if cat = invalid or cat.result = invalid then return invalid
+    if cardIndex < 0 or cardIndex >= cat.result.Count() then return invalid
+    return cat.result[cardIndex]
 end function
 
 function TruncateHeroText(text as string, maxLen as integer) as string

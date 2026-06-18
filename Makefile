@@ -17,9 +17,17 @@ ROKU_DEV_PASSWORD ?= rokudev
 ROKU_SIM_HOST     ?= 127.0.0.1
 ROKU_SIM_PORT     ?= 8080
 
-.PHONY: build zip validate install sim clean
+.PHONY: build zip validate install sim clean icons
 
 build: zip
+
+icons:
+	@python3 scripts/gen_menu_icons.py
+	@echo "Regenerated images/ui/menu_*.png"
+
+profile-square:
+	@python3 scripts/gen_profile_square_arc.py
+	@echo "Regenerated images/ui/profile_sq_*.png"
 
 validate:
 	@bsc --project bsconfig.json

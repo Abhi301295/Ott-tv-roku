@@ -9,9 +9,11 @@
     <function name="NavigatePush" />
     <function name="NavigateReplace" />
     <function name="NavigatePop" />
+    <function name="NavigateClearAndReplace" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileSelectTrace.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/ViewManager.brs" />

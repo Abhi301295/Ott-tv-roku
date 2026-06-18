@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Square profile — React userProfile.tsx Original branch (cases 4/6). -->
+<component name="ProfileAvatarSquare" extends="Group">
+  <interface>
+    <field id="initials" type="string" value="" onChange="OnDataChanged" />
+    <field id="profileName" type="string" value="" onChange="OnDataChanged" />
+    <field id="parentalLock" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="focusedState" type="boolean" value="false" alwaysNotify="true" onChange="OnFocusChanged" />
+    <field id="progress" type="float" value="0.0" alwaysNotify="true" onChange="OnFocusChanged" />
+    <field id="hintText" type="string" value="" onChange="OnHintChanged" />
+    <field id="cardTopColor" type="string" value="0x3d3d3dff" onChange="OnColorsChanged" />
+    <field id="cardBottomColor" type="string" value="0x121212ff" onChange="OnColorsChanged" />
+    <field id="cardBackingColor" type="string" value="0x141414ff" onChange="OnColorsChanged" />
+    <field id="borderColor" type="string" value="0x04478bff" onChange="OnColorsChanged" />
+    <field id="nameColor" type="string" value="0xf8f8f8ff" onChange="OnColorsChanged" />
+    <field id="hintColor" type="string" value="0xc8c8c8ff" onChange="OnColorsChanged" />
+    <field id="rowIndex" type="integer" value="0" />
+    <field id="layoutHeight" type="integer" value="0" alwaysNotify="true" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiDebug.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/ProfileAvatarSquare.brs" />
+
+  <children>
+    <!-- Card only — labels are siblings so a scaled card cannot paint over the name. -->
+    <Group id="cardScaler" translation="[0, 0]">
+      <Group id="cardStack" translation="[0, 0]">
+        <MaskGroup id="cardClip" maskUri="pkg:/images/ui/profile_sq_mask.png"
+          maskSize="[150, 150]" maskOffset="[0, 0]">
+          <Rectangle id="cardBacking" width="150" height="150" color="0x141414ff" />
+          <Rectangle id="cardBottom" width="150" height="150" color="0x121212ff" />
+          <Poster id="cardTopRamp" width="150" height="150"
+            uri="pkg:/images/ui/profile_sq_ramp.png" blendColor="0x3d3d3dff" />
+          <MaskGroup id="cardInner" maskUri="pkg:/images/ui/profile_sq_inner_mask.png"
+            maskSize="[138, 138]" maskOffset="[6, 6]" visible="false">
+            <Rectangle id="innerBottom" width="138" height="138" color="0x121212ff" />
+            <Poster id="innerRamp" width="138" height="138"
+              uri="pkg:/images/ui/profile_sq_ramp.png" blendColor="0x3d3d3dff" />
+          </MaskGroup>
+          <Label id="initialsLabel" translation="[0, 0]" width="150" height="150"
+            horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
+            <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="30" />
+          </Label>
+          <Group id="lockBadge" translation="[59, 134]" visible="false">
+            <Poster id="lockBadgeBg" width="32" height="32"
+              uri="pkg:/images/ui/profile_sq_inner_mask.png" blendColor="0x121212ff" />
+            <Poster id="lockIcon" translation="[8, 8]" width="16" height="16"
+              uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" />
+          </Group>
+        </MaskGroup>
+        <Poster id="outerBorder" width="150" height="150"
+          uri="pkg:/images/ui/profile_sq_border.png" visible="false" />
+        <Poster id="progressTrack" width="150" height="150"
+          uri="pkg:/images/ui/profile_sq_track.png" visible="false" />
+        <Poster id="progressArc" width="150" height="150"
+          uri="pkg:/images/ui/profile_sq_arc_000.png" visible="false" />
+      </Group>
+    </Group>
+
+    <Label id="nameLabel" translation="[0, 170]" width="320" height="20"
+      horizAlign="left" vertAlign="top" color="0xffffffff">
+      <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="16" />
+    </Label>
+    <Label id="hintLabel" translation="[0, 190]" width="1760" height="14"
+      horizAlign="center" vertAlign="top" color="0xc8c8c8ff" visible="false">
+      <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="12" />
+    </Label>
+
+    <Timer id="sizeAnimTimer" duration="0.012" repeat="true" />
+  </children>
+</component>

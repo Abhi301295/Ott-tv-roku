@@ -1,9 +1,17 @@
 sub init()
     m.hero = m.top.findNode("hero")
-    m.header = m.top.findNode("homeHeader")
+    m.headerNetflix = m.top.findNode("homeHeaderNetflix")
+    m.headerSidebar = m.top.findNode("homeHeaderSidebar")
+    ApplyActiveHeader()
     m.rowsHost = m.top.findNode("rowsHost")
     m.rowsAnim = m.top.findNode("rowsAnim")
     m.rowsInterp = m.top.findNode("rowsInterp")
+    m.layoutAnim = m.top.findNode("layoutAnim")
+    m.heroLayoutInterp = m.top.findNode("heroLayoutInterp")
+    m.rowsLayoutInterp = m.top.findNode("rowsLayoutInterp")
+    m.scrimGradLayoutInterp = m.top.findNode("scrimGradLayoutInterp")
+    m.scrimLayoutInterp = m.top.findNode("scrimLayoutInterp")
+    m.skeletonLayoutInterp = m.top.findNode("skeletonLayoutInterp")
     m.homeSkeleton = m.top.findNode("homeSkeleton")
     m.rowsScrim = m.top.findNode("rowsScrim")
     m.rowsScrimGrad = m.top.findNode("rowsScrimGrad")
@@ -25,10 +33,19 @@ sub init()
     m.pendingContentFocus = true
     m.menuItems = []
     m.menuIndex = 0
+    m.headerReturnZone = "rows"
+    m.headerReturnRowIndex = 0
+    m.headerReturnCardIndex = 0
+    m.headerReturnHeroFocus = "next"
+    m.layoutOffsetX = 0
+    m.pendingLayoutOffX = 0
+    m.pendingLayoutViewportW = 1920
 
     m.contentRowCats = []
     m.rowBuildIndex = 0
     m.rowBuildY = 0
+    m.rowTops = []
+    m.rowContentHeight = 0
     m.rowBuildTimer = CreateObject("roSGNode", "Timer")
     m.rowBuildTimer.duration = 0.03
     m.rowBuildTimer.repeat = true
@@ -39,6 +56,7 @@ sub init()
     m.hasMore = true
     m.homeLayout = HomeLayoutMode()
     m.showUpdate = false
+    ApplyLayoutGeometry()
 
     m.initialLoading = true
     m.continueLoading = true
@@ -55,10 +73,15 @@ sub init()
     m.rowGateStarted = false
     m.rowGateElapsed = false
     m.rowBuildGate = CreateObject("roSGNode", "Timer")
-    m.rowBuildGate.duration = HC_RowBuildGateSec()
+    m.rowBuildGate.duration = HC_RowBuildGateSecForLayout(m.homeLayout)
     m.rowBuildGate.repeat = false
     m.top.appendChild(m.rowBuildGate)
     m.rowBuildGate.observeField("fire", "OnRowBuildGate")
+    m.continueBootTimeout = CreateObject("roSGNode", "Timer")
+    m.continueBootTimeout.duration = HC_ContinueBootMaxSec()
+    m.continueBootTimeout.repeat = false
+    m.top.appendChild(m.continueBootTimeout)
+    m.continueBootTimeout.observeField("fire", "OnContinueBootTimeout")
 
     m.vm = FindViewManager(m.top)
 
@@ -69,7 +92,9 @@ sub init()
     m.pendingSelectId = ""
     m.pendingSelectAvatar = ""
     m.bootStarted = false
+    m.contentBootStarted = false
     m.selectInFlight = false
+    m.selectAwaitingApiResult = false
     m.selectRetriesLeft = 0
     m.SELECT_MAX_RETRIES = 8
     m.selectRetryTimer = CreateObject("roSGNode", "Timer")
@@ -87,8 +112,9 @@ sub init()
     m.top.observeField("navState", "OnNavStateReady")
 
     LoadThemeTokens()
-    if m.global <> invalid and m.global.hasField("businessResolved") then
+    if m.global <> invalid then
         m.global.observeField("businessResolved", "OnBusinessResolved")
+        if m.global.businessResolved <> invalid then OnBusinessResolved()
     end if
 
     m.top.observeField("keyEvent", "OnKey")
@@ -119,7 +145,7 @@ sub init()
     m.top.appendChild(m.skeletonTimeout)
     m.skeletonTimeout.observeField("fire", "OnSkeletonTimeout")
     m.rowsSkeletonTimeout = CreateObject("roSGNode", "Timer")
-    m.rowsSkeletonTimeout.duration = HC_RowsSkeletonMaxSec()
+    m.rowsSkeletonTimeout.duration = HC_RowsSkeletonMaxSecForLayout(m.homeLayout)
     m.rowsSkeletonTimeout.repeat = false
     m.top.appendChild(m.rowsSkeletonTimeout)
     m.rowsSkeletonTimeout.observeField("fire", "OnRowsSkeletonTimeout")
@@ -138,8 +164,14 @@ sub init()
     m.cwRowBuildSpan = invalid
     m.cwRevealAtMs = -1
 
+    if m.layoutAnim <> invalid then m.layoutAnim.observeField("state", "OnLayoutAnimState")
+
     SetupHeader()
-    EnterHeader()
+    if ThemeIsSidebarHeader() then
+        EnterSidebarHomeDefault(false)
+    else
+        EnterHeader(false)
+    end if
     ' Boot (redirect check, shimmer, API calls) waits for navState — see OnNavStateReady.
 end sub
 
@@ -166,19 +198,26 @@ sub TryStartHomeBoot()
     ' A pending select (from the profile screen) sets the profile id itself once it
     ' succeeds, so don't bounce back to the picker just because it isn't persisted yet.
     if GetProfileId() = "" and m.pendingSelectId = "" then
+        ProfileSelectLogNode("HOME_BOOT", "no profile id -> RedirectToProfiles", m.top)
         RedirectToProfiles()
         return
     end if
 
-    ' Both regions shimmer immediately on mount; they reveal independently as their data
-    ' lands (hero on poster paint, rows when CW + categories are ready).
-    ShowHeroSkeleton(true)
+    ' Shimmer regions follow layout; Netflix shows hero metadata placeholders, OTT relies on
+    ' the banner fallback and only needs the row strip (parity: React Spinner until rows).
+    ApplySkeletonLayout()
+    if ThemeIsNetflixHome() then
+        ShowHeroSkeleton(true)
+    else
+        ShowHeroSkeleton(false)
+    end if
     ShowRowsSkeleton(true)
     m.cwShimmerSpan = CreateObject("roTimespan")
     CwPerfMark(m.cwShimmerSpan, "shimmer ON (boot)")
     ' Rows timeout starts when BuildContentRows begins, not at boot (hero gate can take 3.5s+).
     ' Wall-clock from mount → hero poster painted = perceived first-content latency.
     m.bootSpan = CreateObject("roTimespan")
+    HomeBootLog(m.bootSpan, "boot start", "layout=" + m.homeLayout + " ott=" + CwPerfBool(ThemeIsOttHome()))
     StartBootSequence()
 end sub
 
@@ -186,7 +225,7 @@ end sub
 ' can't leave its hero carousel/trailer/build timers running in the background.
 sub OnDispose()
     if not m.top.dispose then return
-    print "[HOME] dispose -> stopping hero + timers + in-flight tasks"
+    CancelHomeSelect("dispose")
     ' Setting the hero invisible runs its OnVisibleChanged cleanup (swipe timer, trailer,
     ' video, pending detail fetch all stop).
     if m.hero <> invalid then m.hero.visible = false
@@ -194,6 +233,7 @@ sub OnDispose()
     ' Stop every timer that ticks on this screen.
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
     if m.rowBuildGate <> invalid then m.rowBuildGate.control = "stop"
+    if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "stop"
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     DetachFirstRowWatch()
@@ -259,6 +299,36 @@ sub OnHomeVisibleChanged()
         if m.hero <> invalid then m.hero.visible = false
         if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
         if m.interactIdle <> invalid then m.interactIdle.control = "stop"
+        CancelHomeSelect("covered")
+    end if
+end sub
+
+' True when this HomeScreen is the top, visible screen (not covered/disposed).
+function IsHomeForeground() as boolean
+    if m.top.dispose = true then return false
+    if m.top.visible = false then return false
+    if m.vm = invalid then return false
+    host = m.vm.findNode("screenHost")
+    if host = invalid then return false
+    count = host.getChildCount()
+    if count < 1 then return false
+    active = host.getChild(count - 1)
+    if active = invalid then return false
+    return active.isSameNode(m.top)
+end function
+
+' Stop select-profile retries/watchdog when Home is covered, disposed, or giving up.
+sub CancelHomeSelect(reason as string)
+    wasInFlight = m.selectInFlight
+    pending = m.pendingSelectId
+    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
+    KillTask(m.selectTask)
+    m.selectTask = invalid
+    m.selectInFlight = false
+    m.selectAwaitingApiResult = false
+    if wasInFlight or pending <> "" then
+        ProfileSelectLogNode("HOME_SELECT_CANCEL", reason + " pendingId=" + pending, m.top)
     end if
 end sub
 
@@ -275,7 +345,9 @@ sub LoadThemeTokens()
     m.cPrimary600 = TokenColor(tokens, "primary-600", "#459adb")
     m.cPrimary700 = TokenColor(tokens, "primary-700", "#80bbe9")
     m.cNeutral50 = TokenColor(tokens, "neutral-50", "#ffffff")
+    m.cNeutral100 = TokenColor(tokens, "neutral-100", "#f8f8f8")
     m.cNeutral200 = TokenColor(tokens, "neutral-200", "#e5e5e5")
+    m.cNeutral400 = TokenColor(tokens, "neutral-400", "#c8c8c8")
     m.cNeutral700 = TokenColor(tokens, "neutral-700", "#181818")
     m.cNeutral800 = TokenColor(tokens, "neutral-800", "#121212")
     m.cNeutral950 = TokenColor(tokens, "neutral-900", "#0a0a0a")
@@ -317,6 +389,149 @@ sub ApplyThemeToRow(row as object)
     row.cNeutral700 = m.cNeutral700
 end sub
 
+sub ApplyActiveHeader()
+    if ThemeIsSidebarHeader() then
+        m.header = m.headerSidebar
+        if m.headerNetflix <> invalid then m.headerNetflix.visible = false
+        if m.headerSidebar <> invalid then m.headerSidebar.visible = true
+    else
+        m.header = m.headerNetflix
+        if m.headerNetflix <> invalid then m.headerNetflix.visible = true
+        if m.headerSidebar <> invalid then m.headerSidebar.visible = false
+    end if
+end sub
+
+sub ApplyLayoutGeometry(animate = false as boolean)
+    m.layoutRowPitch = HC_RowPitchForLayout(m.homeLayout)
+    m.layoutAnchorY = HC_AnchorYForLayout(m.homeLayout)
+
+    if not ThemeIsSidebarHeader() then
+        m.layoutOffsetX = 0
+        ApplyContentLayout(0, 1920)
+    else
+        expanded = false
+        if m.header <> invalid and m.header.headerActive = true then expanded = true
+        offX = ThemeSidebarOffset(expanded)
+        viewportW = 1920 - offX
+
+        doAnimate = animate and ShouldAnimateSidebarLayout()
+        if doAnimate and m.layoutAnim <> invalid then
+            StartLayoutOffsetAnim(offX, viewportW)
+        else
+            m.layoutOffsetX = offX
+            ApplyContentLayout(offX, viewportW)
+        end if
+    end if
+
+    NormalizeOttRowsHostY()
+    ApplySkeletonLayout()
+end sub
+
+' Drive HomeSkeleton placeholder positions from the active layout case.
+sub ApplySkeletonLayout()
+    if m.homeSkeleton = invalid then return
+    mode = "netflix"
+    if ThemeIsOttHome() then mode = "ott"
+    m.homeSkeleton.layoutMode = mode
+    m.homeSkeleton.anchorY = m.layoutAnchorY
+end sub
+
+' OTT rows default to y=702 in XML (Netflix anchor); snap to OTT anchor unless scrolled down.
+sub NormalizeOttRowsHostY()
+    if not ThemeIsOttHome() then return
+    if m.rowsHost = invalid then return
+    if m.focusZone = "rows" and m.rowIndex > 0 then return
+    offX = 0
+    if m.layoutOffsetX <> invalid then offX = m.layoutOffsetX
+    m.rowsHost.translation = [offX, m.layoutAnchorY]
+end sub
+
+function ShouldAnimateSidebarLayout() as boolean
+    if m.pendingContentFocus then return false
+    if not m.rowsRevealed then return false
+    return true
+end function
+
+sub ApplyContentLayout(offX as integer, viewportW as integer)
+    if m.hero <> invalid then
+        m.hero.translation = [offX, 0]
+        if m.hero.hasField("contentWidth") then m.hero.contentWidth = viewportW
+    end if
+    if m.rowsScrimGrad <> invalid then
+        y = m.rowsScrimGrad.translation[1]
+        m.rowsScrimGrad.translation = [offX, y]
+        m.rowsScrimGrad.width = viewportW
+    end if
+    if m.rowsScrim <> invalid then
+        y = m.rowsScrim.translation[1]
+        m.rowsScrim.translation = [offX, y]
+        m.rowsScrim.width = viewportW
+    end if
+    if m.rowsHost <> invalid then
+        curY = m.rowsHost.translation[1]
+        m.rowsHost.translation = [offX, curY]
+    end if
+    if m.homeSkeleton <> invalid then m.homeSkeleton.translation = [offX, 0]
+end sub
+
+sub StartLayoutOffsetAnim(targetOffX as integer, targetViewportW as integer)
+    fromOffX = 0
+    if m.layoutOffsetX <> invalid then fromOffX = m.layoutOffsetX
+    if fromOffX = targetOffX then
+        m.layoutOffsetX = targetOffX
+        ApplyContentLayout(targetOffX, targetViewportW)
+        return
+    end if
+
+    m.pendingLayoutOffX = targetOffX
+    m.pendingLayoutViewportW = targetViewportW
+
+    if m.heroLayoutInterp <> invalid and m.hero <> invalid then
+        fromT = m.hero.translation
+        m.heroLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.rowsLayoutInterp <> invalid and m.rowsHost <> invalid then
+        fromT = m.rowsHost.translation
+        m.rowsLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.scrimGradLayoutInterp <> invalid and m.rowsScrimGrad <> invalid then
+        fromT = m.rowsScrimGrad.translation
+        m.scrimGradLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.scrimLayoutInterp <> invalid and m.rowsScrim <> invalid then
+        fromT = m.rowsScrim.translation
+        m.scrimLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+    if m.skeletonLayoutInterp <> invalid and m.homeSkeleton <> invalid then
+        fromT = m.homeSkeleton.translation
+        m.skeletonLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    end if
+
+    ' Width snaps at end of slide; hero clips continuously via contentWidth.
+    if m.hero <> invalid and m.hero.hasField("contentWidth") then
+        m.hero.contentWidth = targetViewportW
+    end if
+    if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.width = targetViewportW
+    if m.rowsScrim <> invalid then m.rowsScrim.width = targetViewportW
+
+    m.layoutAnim.control = "start"
+end sub
+
+sub OnLayoutAnimState()
+    if m.layoutAnim = invalid then return
+    if m.layoutAnim.state <> "stopped" then return
+    m.layoutOffsetX = m.pendingLayoutOffX
+    ApplyContentLayout(m.pendingLayoutOffX, m.pendingLayoutViewportW)
+end sub
+
+sub UpdateOttHeroFromFocus()
+    if not ThemeIsOttHome() then return
+    if m.hero = invalid then return
+    item = ItemAtRowCard(m.contentRowCats, m.rowIndex, m.cardIndex)
+    if item = invalid then item = ExtractOttActiveItem(m.categories)
+    if item <> invalid then m.hero.activeItem = item
+end sub
+
 sub ApplyThemeToHero()
     if m.hero = invalid then return
     m.hero.cNeutral50 = m.cNeutral50
@@ -326,10 +541,12 @@ end sub
 sub UpdateHeroBanner()
     if m.hero = invalid then return
     items = ExtractBannerItems(m.categories)
-    print "[HOME] UpdateHeroBanner bannerItems="; items.Count()
     ApplyThemeToHero()
     m.hero.bannerItems = items
-    m.hero.visible = (items.Count() > 0)
+    m.hero.visible = (items.Count() > 0 or ThemeIsOttHome())
+    if ThemeIsOttHome() then
+        m.hero.activeItem = ExtractOttActiveItem(m.categories)
+    end if
 end sub
 
 ' ── Header (parity with ottHeader.tsx NetflixHeader) ─────────────────────────
@@ -340,17 +557,22 @@ sub SetupHeader()
     reels = false
     resolved = invalid
     if m.global <> invalid then resolved = m.global.businessResolved
-    if resolved <> invalid and resolved.features <> invalid then
-        reels = (resolved.features.reelsEnabled = true)
+    if resolved <> invalid then reels = IsFeatureEnabled(resolved, "reelsEnabled")
+    if not reels then
+        tm = m.top.getScene().findNode("themeManager")
+        if tm <> invalid and tm.reelsEnabled = true then reels = true
     end if
 
     m.menuItems = HeaderMenuItems(reels)
-    texts = []
-    for each it in m.menuItems
-        texts.Push(it.text)
-    end for
-
-    m.header.menuTexts = texts
+    if ThemeIsSidebarHeader() then
+        m.header.menuItems = SidebarMenuItems(reels)
+    else
+        texts = []
+        for each it in m.menuItems
+            texts.Push(it.text)
+        end for
+        m.header.menuTexts = texts
+    end if
     m.header.selectedIndex = HeaderSelectedIndex(m.menuItems, RouteHome())
     if m.focusZone <> "header" then m.menuIndex = m.header.selectedIndex
 
@@ -366,6 +588,9 @@ sub ApplyHeaderTheme()
     m.header.cNeutral200 = m.cNeutral200
     m.header.cNeutral800 = m.cNeutral800
     m.header.cNeutral950 = m.cNeutral950
+    if m.header.hasField("cPrimary700") then m.header.cPrimary700 = m.cPrimary700
+    if m.header.hasField("cNeutral100") then m.header.cNeutral100 = m.cNeutral100
+    if m.header.hasField("cNeutral700") then m.header.cNeutral700 = m.cNeutral700
 end sub
 
 sub ApplyHeaderBranding()
@@ -379,7 +604,10 @@ sub ApplyHeaderBranding()
     resolved = invalid
     if m.global <> invalid then resolved = m.global.businessResolved
     if resolved = invalid then return
-    if resolved.brandingLogo <> invalid then m.header.logoUri = resolved.brandingLogo
+    if resolved.brandingLogo <> invalid then
+        m.header.logoUri = resolved.brandingLogo
+        if m.header.hasField("logoCroppedUri") then m.header.logoCroppedUri = resolved.brandingLogo
+    end if
     if resolved.appName <> invalid then m.header.appName = resolved.appName
 end sub
 
@@ -391,24 +619,19 @@ end sub
 
 sub UpdateHeaderScrimForHero()
     if m.header = invalid then return
-    playing = (m.hero <> invalid and m.hero.trailerPlaying = true)
     ' Home hero media must sit visually behind the header/nav like LG. Do not restore a
     ' black header band for the static poster either, otherwise the media appears to start
     ' below the header (the red-line issue).
     m.header.scrimOpacity = 0.0
-    if playing then
-        print "[HEROVID] trailer playing -> transparent header scrim"
-    else
-        print "[HEROVID] trailer idle -> transparent header scrim"
-    end if
 end sub
 
-sub EnterHeader()
+sub EnterHeader(animateLayout = true as boolean)
     if m.header = invalid then return
     m.focusZone = "header"
     m.menuIndex = m.header.selectedIndex
     m.header.focusedIndex = m.menuIndex
     m.header.headerActive = true
+    if ThemeIsSidebarHeader() then ApplyLayoutGeometry(animateLayout)
     row = CurrentRow()
     if row <> invalid then row.cardFocusIndex = -1
     ApplyAllRowFocusStates()
@@ -416,7 +639,57 @@ end sub
 
 sub ExitHeaderToRows()
     if m.header <> invalid then m.header.headerActive = false
+    if ThemeIsSidebarHeader() then ApplyLayoutGeometry(true)
     m.focusZone = "rows"
+    ApplyHomeFocus()
+end sub
+
+' Sidebar header (cases 4/6): expanded menu on Home — focus in menu, not rows.
+sub EnterSidebarHomeDefault(animateLayout = true as boolean)
+    if m.header = invalid then return
+    idx = HeaderSelectedIndex(m.menuItems, RouteHome())
+    if idx < 0 then idx = 0
+    m.menuIndex = idx
+    m.header.selectedIndex = idx
+    m.header.focusedIndex = idx
+    EnterHeader(animateLayout)
+end sub
+
+' Sidebar (case 4/6): remember where focus was before opening the expanded menu.
+sub RememberHeaderReturnZone()
+    if m.focusZone = "hero" then
+        m.headerReturnZone = "hero"
+        m.headerReturnHeroFocus = m.heroFocus
+    else if m.focusZone = "rows" then
+        m.headerReturnZone = "rows"
+        m.headerReturnRowIndex = m.rowIndex
+        m.headerReturnCardIndex = m.cardIndex
+    end if
+end sub
+
+' Case 4 parity: LEFT from hero/rows opens sidebar (case 1 uses UP for top header).
+sub EnterHeaderFromContent()
+    RememberHeaderReturnZone()
+    EnterHeader()
+end sub
+
+' RIGHT leaves sidebar — collapse to icons and restore hero or row focus.
+sub ExitHeaderToPrevious()
+    if m.header <> invalid then m.header.headerActive = false
+    if ThemeIsSidebarHeader() then ApplyLayoutGeometry(true)
+
+    zone = m.headerReturnZone
+    if zone = "hero" and HeroAvailable() then
+        target = m.headerReturnHeroFocus
+        if target = invalid or target = "" then target = "next"
+        EnterHero(target)
+        return
+    end if
+
+    m.focusZone = "rows"
+    if m.headerReturnRowIndex <> invalid then m.rowIndex = m.headerReturnRowIndex
+    if m.headerReturnCardIndex <> invalid then m.cardIndex = m.headerReturnCardIndex
+    ClampCardIndex()
     ApplyHomeFocus()
 end sub
 
@@ -425,10 +698,35 @@ sub MaybeLandContentFocus()
     if not m.pendingContentFocus then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
     m.pendingContentFocus = false
+    if ThemeIsSidebarHeader() then
+        EnterSidebarHomeDefault(false)
+        return
+    end if
     if m.focusZone = "header" then ExitHeaderToRows()
 end sub
 
 sub HandleHeaderKey(key as string)
+    if ThemeIsSidebarHeader() then
+        if key = "up" then
+            if m.menuIndex > 0 then
+                m.menuIndex = m.menuIndex - 1
+                m.header.focusedIndex = m.menuIndex
+            end if
+        else if key = "down" then
+            if m.menuIndex < m.menuItems.Count() - 1 then
+                m.menuIndex = m.menuIndex + 1
+                m.header.focusedIndex = m.menuIndex
+            else
+                EnterHeroFromHeader()
+            end if
+        else if key = "right" then
+            ExitHeaderToPrevious()
+        else if key = "OK" or key = "ok" then
+            SelectHeaderItem()
+        end if
+        return
+    end if
+
     if key = "left" then
         if m.menuIndex > 0 then
             m.menuIndex = m.menuIndex - 1
@@ -450,6 +748,7 @@ end sub
 ' Vertical flow:  HEADER ↕ HERO (prev/next/mute) ↕ CONTINUE WATCHING.
 
 function HeroAvailable() as boolean
+    if ThemeIsOttHome() then return false
     if m.hero = invalid or m.hero.visible <> true then return false
     items = m.hero.bannerItems
     if items = invalid or items.Count() = 0 then return false
@@ -478,7 +777,11 @@ end function
 
 sub EnterHeroOrHeader()
     if not HeroAvailable() then
-        EnterHeader()
+        if ThemeIsSidebarHeader() then
+            EnterHeaderFromContent()
+        else
+            EnterHeader()
+        end if
         return
     end if
     target = "next"
@@ -529,12 +832,31 @@ sub EnterRowsFromHero()
     UpdateRowsScrim()
 end sub
 
+function HeroIsPageFlip() as boolean
+    return ThemeHeroBannerStyle() = TC_HeroPageFlip()
+end function
+
+function HeroIsParallaxSlide() as boolean
+    return ThemeHeroBannerStyle() = TC_HeroParallaxSlide()
+end function
+
+function HeroUsesFrostNav() as boolean
+    return HeroIsPageFlip() or HeroIsParallaxSlide()
+end function
+
 sub HandleHeroKey(key as string)
     multi = HeroMultiSlide()
     playing = (m.hero <> invalid and m.hero.trailerPlaying = true)
+    frostNav = HeroUsesFrostNav()
 
     if key = "up" then
-        if m.heroFocus = "mute" then
+        if ThemeIsSidebarHeader() then
+            ' Vertical hero controls only — sidebar is opened with LEFT, not UP.
+            if m.heroFocus = "mute" then
+                m.heroFocus = "next"
+                ApplyHeroFocus()
+            end if
+        else if m.heroFocus = "mute" then
             m.heroFocus = "next"
             ApplyHeroFocus()
         else
@@ -542,35 +864,44 @@ sub HandleHeroKey(key as string)
             EnterHeader()
         end if
     else if key = "down" then
-        if m.heroFocus = "next" and playing then
+        if m.heroFocus = "next" and playing and not frostNav then
             m.heroFocus = "mute"
             ApplyHeroFocus()
         else
             EnterRowsFromHero()
         end if
     else if key = "left" then
-        if m.heroFocus = "next" and multi then
+        if frostNav and multi then
+            if m.hero <> invalid then m.hero.callFunc("HeroGoPrev", invalid)
+        else if ThemeIsSidebarHeader() then
+            if m.heroFocus = "next" and multi then
+                m.heroFocus = "prev"
+                ApplyHeroFocus()
+            else if m.heroFocus = "mute" then
+                EnterRowsFromHero()
+            else
+                EnterHeaderFromContent()
+            end if
+        else if m.heroFocus = "next" and multi then
             m.heroFocus = "prev"
             ApplyHeroFocus()
         else if m.heroFocus = "mute" then
             EnterRowsFromHero()
         end if
     else if key = "right" then
-        if m.heroFocus = "prev" and multi then
+        if frostNav and multi then
+            if m.hero <> invalid then m.hero.callFunc("HeroGoNext", invalid)
+        else if m.heroFocus = "prev" and multi then
             m.heroFocus = "next"
             ApplyHeroFocus()
         end if
     else if key = "OK" or key = "ok" then
-        print "[KEYDBG] HandleHeroKey OK branch heroFocus='"; m.heroFocus; "' heroInvalid="; (m.hero = invalid)
         if m.hero = invalid then return
-        if m.heroFocus = "prev" then
-            print "[KEYDBG] calling HeroGoPrev"
-            m.hero.callFunc("HeroGoPrev", invalid)
-        else if m.heroFocus = "next" then
-            print "[KEYDBG] calling HeroGoNext"
+        if frostNav or m.heroFocus = "next" then
             m.hero.callFunc("HeroGoNext", invalid)
+        else if m.heroFocus = "prev" then
+            m.hero.callFunc("HeroGoPrev", invalid)
         else if m.heroFocus = "mute" then
-            print "[KEYDBG] calling HeroToggleMute"
             m.hero.callFunc("HeroToggleMute", invalid)
         end if
     end if
@@ -583,7 +914,9 @@ sub SelectHeaderItem()
     SetValueByKey(SK_SelectedItem(), item.text, "app")
 
     if item.route = RouteHome() then
-        if m.rowWidgets.Count() > 0 then
+        if ThemeIsSidebarHeader() then
+            EnterSidebarHomeDefault(true)
+        else if m.rowWidgets.Count() > 0 then
             ExitHeaderToRows()
         else
             EnterHeader()
@@ -599,10 +932,24 @@ end sub
 ' ── Boot sequence (parity with features/home/index.tsx) ──────────────────────
 
 sub StartBootSequence()
-    ' If the profile screen handed us a pending profile, establish the session first
-    ' (select-profile, behind the shimmer). Content boot only fires once the token lands.
     if m.pendingSelectId <> "" then
-        print "[HOME] pending select-profile -> running behind shimmer"
+        if m.pendingSelectId = GetProfileId() and GetRefreshToken() <> "" then
+            HomeBootLog(m.bootSpan, "select skipped", "profile already active id=" + m.pendingSelectId)
+            if m.header <> invalid and m.pendingSelectAvatar <> invalid and m.pendingSelectAvatar <> "" then
+                m.header.avatarUri = m.pendingSelectAvatar
+            end if
+            m.pendingSelectId = ""
+            m.pendingSelectAvatar = ""
+            BootHomeContent()
+            return
+        end if
+        HomeBootLog(m.bootSpan, "select-profile queued", "id=" + m.pendingSelectId)
+        ' Session tokens from login may already be valid — fetch home content in parallel
+        ' so the rows shimmer is not held hostage to a slow select-profile round-trip.
+        if GetAccessToken() <> "" or GetRefreshToken() <> "" then
+            HomeBootLog(m.bootSpan, "parallel content boot", "while select runs")
+            BootHomeContent()
+        end if
         DoHomeSelect()
         return
     end if
@@ -610,6 +957,9 @@ sub StartBootSequence()
 end sub
 
 sub BootHomeContent()
+    if m.contentBootStarted then return
+    m.contentBootStarted = true
+    HomeBootLog(m.bootSpan, "content boot", "fetch CW + categories parallel")
     ' The profile was just selected on the previous screen, so the active profile
     ' identity is already persisted — only re-fetch profiles if it is somehow missing
     ' (parity intent: avoid a redundant GET_LOGIN_PROFILES on every home mount).
@@ -623,6 +973,14 @@ sub BootHomeContent()
     FetchContinueWatching()
     FetchHomeCategories(m.page)
     FetchLatestVersion()
+    if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "start"
+end sub
+
+sub OnContinueBootTimeout()
+    if m.continueLoading <> true then return
+    HomeBootLog(m.bootSpan, "CW boot timeout", "proceed without continue-watching")
+    m.continueLoading = false
+    MaybeBuildRows()
 end sub
 
 ' ── Select-profile (runs on Home so the profile screen can navigate here instantly) ──
@@ -632,7 +990,9 @@ end sub
 ' transient failure (only a real 403 session-expiry, handled by HandleSessionExpiry, does).
 sub DoHomeSelect()
     m.selectInFlight = true
+    m.selectAwaitingApiResult = false
     m.selectRetriesLeft = m.SELECT_MAX_RETRIES
+    ProfileSelectLogNode("HOME_SELECT_START", "profileId=" + m.pendingSelectId + " retries=" + ProfileSelectFmt(m.SELECT_MAX_RETRIES), m.top)
     if m.selectWatchdog <> invalid then
         m.selectWatchdog.control = "stop"
         m.selectWatchdog.control = "start"
@@ -647,46 +1007,79 @@ end sub
 
 sub FireHomeSelectRequest()
     path = SelectProfilePath()
+    ProfileSelectLogNode("HOME_SELECT_REQUEST", "pendingId=" + m.pendingSelectId + " retriesLeft=" + ProfileSelectFmt(m.selectRetriesLeft), m.top)
+    m.selectAwaitingApiResult = true
     m.selectTask = ApiPost(path, SelectProfilePayload(m.pendingSelectId))
     m.selectTask.observeField("apiResult", "OnHomeSelectResponse")
     StartHttpTask(m.selectTask)
+    ' Per-attempt ceiling — reset whenever we fire (initial + retries + watchdog retries).
+    if m.selectWatchdog <> invalid and m.selectInFlight then
+        m.selectWatchdog.control = "stop"
+        m.selectWatchdog.control = "start"
+    end if
 end sub
 
-sub OnHomeSelectRetry()
-    if m.top.dispose = true then return
-    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
-    print "[HOME] retrying select-profile (retriesLeft="; m.selectRetriesLeft; ")"
-    FireHomeSelectRequest()
-end sub
-
-sub OnHomeSelectResponse()
+sub OnHomeSelectResponse(event as object)
     ' A late apiResult after the screen left the tree must not mutate auth/navigation.
     if m.top.dispose = true then return
-    if m.selectTask = invalid then return
-    api = m.selectTask.apiResult
+    if not m.selectInFlight then return
+
+    task = invalid
+    if event <> invalid then task = event.getRoSGNode()
+    if task = invalid then task = m.selectTask
+    if task = invalid then return
+
+    api = task.apiResult
     if api = invalid then return
+
+    m.selectAwaitingApiResult = false
+    if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
+
+    if not IsHomeForeground() then
+        ProfileSelectLogNode("HOME_SELECT_RESPONSE", "ignored (not foreground)", m.top)
+        CancelHomeSelect("response-not-foreground")
+        return
+    end if
     if HandleSessionExpiry(m.top, api) then return
 
     if api.ok and ApplySelectProfileTokens(api.result) then
         PersistSelectedProfile(m.pendingSelectId, m.pendingSelectAvatar)
-        ' The header avatar was populated during init() from the previously-stored
-        ' (first) profile; now that the chosen profile's avatar is persisted, refresh
-        ' the header so it shows the SELECTED profile rather than the stale one.
         if m.header <> invalid and m.pendingSelectAvatar <> invalid and m.pendingSelectAvatar <> "" then
             m.header.avatarUri = m.pendingSelectAvatar
         end if
         m.pendingSelectId = ""
         m.pendingSelectAvatar = ""
         m.selectInFlight = false
-        if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
-        print "[HOME] select-profile ok -> boot home content"
+        ProfileSelectLogNode("HOME_SELECT_OK", "profileId persisted -> boot content", m.top)
+        HomeBootLog(m.bootSpan, "select-profile ok", "boot content")
         BootHomeContent()
+        return
+    end if
+
+    ' Duplicate select — session is already valid; do not retry a 21s 404 loop.
+    if api.httpStatus = 404 and m.pendingSelectId <> "" and (GetRefreshToken() <> "" or GetAccessToken() <> "") then
+        HomeBootLog(m.bootSpan, "select 404 ignored", "session valid -> boot content")
+        PersistSelectedProfile(m.pendingSelectId, m.pendingSelectAvatar)
+        if m.header <> invalid and m.pendingSelectAvatar <> invalid and m.pendingSelectAvatar <> "" then
+            m.header.avatarUri = m.pendingSelectAvatar
+        end if
+        m.pendingSelectId = ""
+        m.pendingSelectAvatar = ""
+        m.selectInFlight = false
+        BootHomeContent()
+        return
+    end if
+
+    HomeBootLog(m.bootSpan, "select-profile fail", "http=" + ProfileSelectFmt(api.httpStatus))
+
+    ' A superseded attempt failed after a newer one was already fired — ignore it.
+    if m.selectTask <> invalid and not task.isSameNode(m.selectTask) then
+        ProfileSelectLogNode("HOME_SELECT_RESPONSE", "ignored stale httpStatus=" + ProfileSelectFmt(api.httpStatus), m.top)
         return
     end if
 
     if SelectProfileRetriable(api.httpStatus) and m.selectRetriesLeft > 0 then
         m.selectRetriesLeft = m.selectRetriesLeft - 1
-        print "[HOME] select-profile failed (httpStatus="; api.httpStatus; ") -> retry, left="; m.selectRetriesLeft
         if m.selectRetryTimer <> invalid then
             m.selectRetryTimer.control = "stop"
             m.selectRetryTimer.control = "start"
@@ -696,13 +1089,29 @@ sub OnHomeSelectResponse()
         return
     end if
 
-    print "[HOME] select-profile giving up (httpStatus="; api.httpStatus; ") -> back to profiles"
-    SelectFailedToProfiles()
+    SelectFailedToProfiles("api-fail httpStatus=" + ProfileSelectFmt(api.httpStatus))
+end sub
+
+sub OnHomeSelectRetry()
+    if m.top.dispose = true then return
+    if not IsHomeForeground() then
+        ProfileSelectLogNode("HOME_SELECT_RETRY", "ignored (not foreground)", m.top)
+        CancelHomeSelect("retry-not-foreground")
+        return
+    end if
+    if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    FireHomeSelectRequest()
 end sub
 
 ' Transient/exhausted select failure: keep the user logged in, tell them, and send them
 ' back to the profile picker so they can retry. (Auth is only cleared on a real 403.)
-sub SelectFailedToProfiles()
+sub SelectFailedToProfiles(reason as string)
+    ProfileSelectLogNode("HOME_SELECT_FAIL", reason + " pendingId=" + m.pendingSelectId, m.top)
+    if not IsHomeForeground() then
+        ProfileSelectLog("HOME_SELECT_FAIL", "suppressed (not foreground) reason=" + reason)
+        CancelHomeSelect("fail-suppressed")
+        return
+    end if
     m.selectInFlight = false
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
     if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
@@ -714,8 +1123,30 @@ end sub
 sub OnSelectWatchdog()
     if m.top.dispose = true then return
     if not m.selectInFlight then return
-    print "[HOME] select-profile watchdog fired -> back to profiles"
-    SelectFailedToProfiles()
+    if not IsHomeForeground() then
+        ProfileSelectLogNode("HOME_SELECT_WATCHDOG", "ignored (not foreground)", m.top)
+        CancelHomeSelect("watchdog-not-foreground")
+        return
+    end if
+    ' HTTP may have finished on the worker thread while apiResult is still queued on the
+    ' render thread — never stack a parallel POST on top of an in-flight attempt.
+    if m.selectAwaitingApiResult then
+        ProfileSelectLogNode("HOME_SELECT_WATCHDOG", "awaiting apiResult -> extend", m.top)
+        if m.selectWatchdog <> invalid then
+            m.selectWatchdog.control = "stop"
+            m.selectWatchdog.control = "start"
+        end if
+        return
+    end if
+    ' apiResult never arrived (hung socket / rendezvous timeout) — treat like a retriable
+    ' transport failure and keep trying until the retry budget is exhausted.
+    if m.selectRetriesLeft > 0 then
+        m.selectRetriesLeft = m.selectRetriesLeft - 1
+        ProfileSelectLogNode("HOME_SELECT_WATCHDOG", "no response -> retry left=" + ProfileSelectFmt(m.selectRetriesLeft), m.top)
+        FireHomeSelectRequest()
+        return
+    end if
+    SelectFailedToProfiles("watchdog-exhausted")
 end sub
 
 ' Subscription/badge flags the home tree reads are static placeholders (same values
@@ -770,21 +1201,24 @@ sub OnContinueWatchingResponse()
     if api = invalid then return
     if HandleSessionExpiry(m.top, api) then return
 
+    cwCount = 0
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
-        print "[HOME] continue-watching response ok, rows="; listing.Count()
+        cwCount = listing.Count()
         if listing.Count() > 0 then
             tagged = TagContinueWatchingRows(listing)
             m.categories = PrependCategories(m.categories, tagged)
+            MaybeInsertLateContinueWatchingRow()
         end if
     else
-        print "[HOME] continue-watching response failed/empty"
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
         end if
     end if
 
+    if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "stop"
     m.continueLoading = false
+    HomeBootLog(m.bootSpan, "CW response", "ok=" + CwPerfBool(api.ok) + " rows=" + Str(cwCount) + " rowsBuilt=" + CwPerfBool(m.rowsBuilt))
     MaybeBuildRows()
 end sub
 
@@ -807,27 +1241,22 @@ sub OnHomeCategoriesResponse()
     if api = invalid then return
     if HandleSessionExpiry(m.top, api) then return
 
+    catCount = 0
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
-        print "[HOME] home categories response ok, categories="; listing.Count()
+        catCount = listing.Count()
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
         end if
     else
-        print "[HOME] home categories response failed/empty"
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
         end if
     end if
 
-    ' PARITY: the active LG layout (NetflixContent) renders this single param-less response
-    ' and never paginates (loadMore is only wired into the non-Netflix Content layout). So
-    ' there is no "next page" — disable infinite scroll so we show exactly LG's row set.
     m.hasMore = false
-
     m.initialLoading = false
-    ' Categories (and thus the hero banner) are ready — render the hero NOW, independent
-    ' of Continue Watching. Rows still wait for CW so its shimmer can keep showing.
+    HomeBootLog(m.bootSpan, "categories response", "listing=" + Str(catCount) + " totalCats=" + Str(m.categories.Count()))
     MaybeBuildHero()
     MaybeBuildRows()
 end sub
@@ -859,6 +1288,12 @@ function AnyBootLoading() as boolean
     return m.initialLoading or m.continueLoading
 end function
 
+' Row build gate — OTT only needs categories (CW may arrive late); Netflix waits for both.
+function RowsBootLoading() as boolean
+    if ThemeIsOttHome() then return m.initialLoading
+    return AnyBootLoading()
+end function
+
 ' ── Hero (independent of Continue Watching) ──────────────────────────────────
 ' Built as soon as categories land. Hero shimmer stays until the poster actually
 ' paints (OnHeroPosterReady) or the safety timeout fires.
@@ -866,7 +1301,6 @@ sub MaybeBuildHero()
     if m.heroBuilt then return
     m.heroBuilt = true
     items = ExtractBannerItems(m.categories)
-    print "[HOME] MaybeBuildHero bannerItems="; items.Count()
     if items.Count() = 0 then
         ' Nothing to show in the hero — drop its shimmer immediately.
         ShowHeroSkeleton(false)
@@ -885,43 +1319,37 @@ end sub
 ' has resolved AND categories are in, so the hero can be live above a still-loading row.
 sub MaybeBuildRows()
     if m.rowsBuilt then return
-    if AnyBootLoading() then
-        print "[HOME] MaybeBuildRows waiting (initialLoading="; m.initialLoading; " continueLoading="; m.continueLoading; ")"
+    if RowsBootLoading() then
+        HomeBootLog(m.bootSpan, "rows waiting", "initial=" + CwPerfBool(m.initialLoading) + " continue=" + CwPerfBool(m.continueLoading) + " ott=" + CwPerfBool(ThemeIsOttHome()))
         return
     end if
-    ' Data is in. Don't build yet — hand the render thread to the hero preview first and
-    ' let the gate (trailer-live or timeout) kick off the build (see MaybeStartRowBuild).
     m.rowsDataReady = true
-    print "[HOME] MaybeBuildRows -> data ready, waiting for hero trailer / gate"
+    HomeBootLog(m.bootSpan, "rows data ready", "cats=" + Str(FilterContentRows(m.categories).Count()))
     MaybeStartRowBuild()
 end sub
 
-' Build the rows once data is ready AND either the hero trailer is live or the safety gate
-' elapsed. Holding the build off the render thread until the preview is up stops the rows
-' from starving the trailer (the preview video would otherwise never paint until CW built).
 sub MaybeStartRowBuild()
     if m.rowsBuilt then return
     if not m.rowsDataReady then return
+
+    if ThemeIsOttHome() then m.rowGateElapsed = true
 
     heroLive = (m.hero <> invalid and m.hero.trailerPlaying = true)
     if heroLive or m.rowGateElapsed then
         m.rowsBuilt = true
         if heroLive then
-            print "[HOME] row gate open (trailer live) -> build rows"
+            HomeBootLog(m.bootSpan, "row gate open", "trailer live")
         else
-            print "[HOME] row gate open (timeout) -> build rows"
+            HomeBootLog(m.bootSpan, "row gate open", "timeout/skip ott=" + CwPerfBool(ThemeIsOttHome()))
         end if
-        ' Rows build progressively; the rows shimmer is dropped in OnRowBuildTick once the
-        ' first real row exists, so the shimmer hands straight off to content (no black gap).
         BuildContentRows()
         return
     end if
 
-    ' Arm the safety gate once so rows still appear even if this slide has no trailer.
     if not m.rowGateStarted then
         m.rowGateStarted = true
         m.rowBuildGate.control = "start"
-        print "[HOME] row build held for hero preview (gate armed)"
+        HomeBootLog(m.bootSpan, "row gate armed", "sec=" + Str(HC_RowBuildGateSecForLayout(m.homeLayout)))
     end if
 end sub
 
@@ -934,27 +1362,25 @@ end sub
 ' Hero poster has painted — drop the hero shimmer (rows shimmer is untouched).
 sub OnHeroPosterReady()
     if m.hero = invalid or m.hero.posterReady <> true then return
-    bootMs = 0
-    if m.bootSpan <> invalid then bootMs = m.bootSpan.TotalMilliseconds()
-    print "[PERF] hero poster painted: "; bootMs; "ms from mount (perceived first-content latency)"
-    print "[HOME] hero poster ready -> hide hero shimmer"
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     ShowHeroSkeleton(false)
 end sub
 
 ' Safety net: never let the hero shimmer outlive the wait.
 sub OnSkeletonTimeout()
-    print "[HOME] hero skeleton timeout -> hide shimmer"
     ShowHeroSkeleton(false)
 end sub
 
 sub OnRowsSkeletonTimeout()
-    print "[HOME] rows skeleton timeout -> force first row reveal (shimmer stays until painted)"
+    HomeBootLog(m.bootSpan, "rows skeleton timeout", "force reveal")
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then
         row0 = m.rowWidgets[0]
         if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
     end if
-    ' Last resort: never strand the shimmer forever if paint ack never lands.
+    if ThemeIsOttHome() and m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+        PrepareFirstRowReveal()
+        return
+    end if
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "start"
 end sub
 
@@ -966,16 +1392,21 @@ sub DetachFirstRowWatch()
 end sub
 
 sub OnRowsForceHideTimer()
-    print "[HOME] rows force-hide safety -> drop shimmer"
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
-    if m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+    row0 = invalid
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
+    painted = false
+    if row0 <> invalid and row0.hasField("paintedReady") then painted = row0.paintedReady
+    if painted and m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+        CwPerfInstant("force-hide", "paintedReady=true -> reveal")
         PrepareFirstRowReveal()
+    else
+        CwPerfInstant("force-hide skipped", "paintedReady=" + CwPerfBool(painted) + " shimmer=" + CwPerfBool(m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true))
     end if
 end sub
 
 sub ShowHeroSkeleton(show as boolean)
     if m.homeSkeleton = invalid then return
-    print "[HOME] ShowHeroSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
     m.homeSkeleton.heroRunning = show
 end sub
@@ -997,7 +1428,6 @@ sub ShowRowsSkeleton(show as boolean)
         CwPerfMark(m.cwShimmerSpan, "shimmer OFF", detail)
         m.cwShimmerSpan = invalid
     end if
-    print "[HOME] ShowRowsSkeleton("; show; ")"
     m.homeSkeleton.boxColor = m.cNeutral800
     m.homeSkeleton.rowsRunning = show
     if m.rowsSkeletonTimeout <> invalid then
@@ -1010,6 +1440,24 @@ end sub
 
 ' ── Content rows (parity with netflixContent.tsx row list) ───────────────────
 
+' OTT may build rows before CW lands; prepend CW into the visible list when it arrives late.
+sub MaybeInsertLateContinueWatchingRow()
+    if not m.rowsBuilt then return
+    cats = FilterContentRows(m.categories)
+    if cats.Count() = 0 then return
+    first = cats[0]
+    if first = invalid or first.type <> HC_TypeContinueWatching() then return
+    if m.contentRowCats <> invalid and m.contentRowCats.Count() > 0 then
+        cur = m.contentRowCats[0]
+        if cur <> invalid and cur.type = HC_TypeContinueWatching() then return
+    end if
+    HomeBootLog(m.bootSpan, "late CW merge", "rebuild row list")
+    m.rowsBuilt = false
+    m.rowsDataReady = true
+    m.rowGateElapsed = true
+    MaybeStartRowBuild()
+end sub
+
 ' Building every card up-front blocks the render thread for several seconds, so the
 ' rows are created one per timer tick: the hero/header/background paint immediately
 ' and rows pop in top-to-bottom while the thread stays responsive.
@@ -1020,15 +1468,17 @@ sub BuildContentRows()
     m.contentRowCats = FilterContentRows(m.categories)
     m.rowBuildIndex = 0
     m.rowBuildY = 0
+    m.rowTops = []
+    m.rowContentHeight = 0
     m.rowIndex = 0
     m.cardIndex = 0
     m.rowsHost.visible = (m.contentRowCats.Count() > 0)
-    ' Render-build instrumentation: measure render-thread cost so optimization (e.g. lazy
-    ' row building) is driven by data, not guesswork. [PERF] tags are greppable.
+    ' Row build timing (CwPerfMark/HomeBootLog are no-ops unless re-enabled in HomePerf.brs).
     m.rowBuildSpan = CreateObject("roTimespan")
     m.cwRowBuildSpan = CreateObject("roTimespan")
     m.rowBuildCostMs = 0
     CwPerfMark(m.cwRowBuildSpan, "BuildContentRows start", "rows=" + Str(m.contentRowCats.Count()))
+    HomeBootLog(m.bootSpan, "BuildContentRows", "rows=" + Str(m.contentRowCats.Count()))
 
     ' Skeleton visibility is owned by OnHeroPosterReady / OnSkeletonTimeout, so we don't
     ' toggle it here — rows build underneath and the shimmer drops once the hero paints.
@@ -1061,11 +1511,16 @@ sub OnRowBuildTick()
         row.callFunc("PrepareShell", cat)
     end if
     row.translation = [0, m.rowBuildY]
+    if ThemeIsOttHome() then
+        m.rowTops.Push(m.rowBuildY)
+        m.rowBuildY = m.rowBuildY + HC_ContentRowLayoutHeight(cat)
+    else
+        m.rowBuildY = m.rowBuildY + m.layoutRowPitch
+    end if
     m.rowWidgets.Push(row)
     rowMs = span.TotalMilliseconds()
     if m.rowBuildCostMs = invalid then m.rowBuildCostMs = 0
     m.rowBuildCostMs = m.rowBuildCostMs + rowMs
-    print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
 
     ' Keep the rows shimmer up until the FIRST row has painted its thumbnails.
     if m.rowBuildIndex = 0 then
@@ -1079,7 +1534,6 @@ sub OnRowBuildTick()
         end if
     end if
 
-    m.rowBuildY = m.rowBuildY + HC_RowPitch()
     m.rowBuildIndex = m.rowBuildIndex + 1
 
     ' Touch only the row we just built — the full ApplyHomeFocus (which also drives the
@@ -1088,9 +1542,9 @@ sub OnRowBuildTick()
 
     if m.rowBuildIndex >= m.contentRowCats.Count() then
         m.rowBuildTimer.control = "stop"
+        m.rowContentHeight = m.rowBuildY
         wall = 0
         if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
-        print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
         ' Do not materialize row 1 or run focus scroll until CW has painted — that work
         ' was starving the render thread and caused the post-shimmer black gap.
         if m.rowsRevealed then
@@ -1131,17 +1585,34 @@ sub LogCwRowState(tag as string)
     CwPerfInstant(tag, detail)
 end sub
 
-' Make row 0 visible, then cut the shimmer instantly once cards are on screen.
+' Make row 0 visible, cut shimmer, then move focus (sidebar / rows) so layout
+' animation cannot open a gap between shimmer-off and card-populate.
 sub PrepareFirstRowReveal()
-    MaybeLandContentFocus()
+    EnsureFirstRowVisibleUnderShimmer()
     m.rowsRevealed = true
-    ApplyHomeFocus()
     ApplyAllRowFocusStates()
-    LogCwRowState("focus applied -> hide shimmer")
+    HomeBootLog(m.bootSpan, "rows revealed", "shimmer off")
+    LogCwRowState("cards painted -> hide shimmer")
     ShowRowsSkeleton(false)
     UpdateRowsScrim()
     LogCwRowState("shimmer hidden")
+    MaybeLandContentFocus()
+    ApplyHomeFocus()
+    LogCwRowState("post-focus")
     ScheduleSecondRowWarmup()
+end sub
+
+sub EnsureFirstRowVisibleUnderShimmer()
+    if m.rowsHost <> invalid then m.rowsHost.visible = true
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    row0 = m.rowWidgets[0]
+    if row0 = invalid then return
+    if row0.hasField("rowPeekVisible") then row0.rowPeekVisible = true
+    row0.opacity = 1.0
+    host = row0.findNode("cardsHost")
+    if host <> invalid and host.opacity < 1.0 then host.opacity = 1.0
+    title = row0.findNode("rowTitle")
+    if title <> invalid and title.opacity < 1.0 then title.opacity = 1.0
 end sub
 
 sub ScheduleSecondRowWarmup()
@@ -1165,17 +1636,51 @@ sub ClearContentRows()
     end for
 end sub
 
+function OttRowsContentHeight() as integer
+    if m.rowContentHeight <> invalid and m.rowContentHeight > 0 then return m.rowContentHeight
+    if m.rowTops = invalid or m.rowTops.Count() = 0 then return 0
+    if m.contentRowCats = invalid or m.contentRowCats.Count() = 0 then return 0
+    lastIdx = m.rowTops.Count() - 1
+    if lastIdx < 0 or lastIdx >= m.contentRowCats.Count() then return 0
+    cat = m.contentRowCats[lastIdx]
+    if cat = invalid then return 0
+    return m.rowTops[lastIdx] + HC_ContentRowLayoutHeight(cat)
+end function
+
+sub ResumeFocusedRowBuild()
+    if m.rowWidgets = invalid or m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return
+    row = m.rowWidgets[m.rowIndex]
+    if row <> invalid then row.callFunc("ResumeBuild", invalid)
+end sub
+
 sub ApplyHomeFocus()
     if m.rowsHost = invalid then return
 
-    ' Only materialize the rows that are actually on screen (the focused row + the one peeking
-    ' in at the bottom). In steady-state navigation these were already built by the idle
-    ' prefetch, so this is a no-op; the off-screen look-ahead build is deferred to OnInteractIdle
-    ' so node creation never competes with the 0.4s scroll animation (that contention was the
-    ' source of the row-switch stutter).
-    if m.focusZone = "rows" then MaterializeVisibleRows()
+    if m.focusZone = "rows" then
+        MaterializeVisibleRows()
+        if ThemeIsOttHome() then ResumeFocusedRowBuild()
+    end if
 
-    anchorY = HC_NetflixAnchorY() - (m.rowIndex * HC_RowPitch())
+    pitch = m.layoutRowPitch
+    if pitch = invalid or pitch <= 0 then pitch = HC_RowPitchForLayout(m.homeLayout)
+    ' Pin focused row at anchor. OTT uses cumulative rowTops (mixed card heights).
+    if m.focusZone = "rows" then
+        if ThemeIsOttHome() and m.rowTops <> invalid and m.rowIndex >= 0 and m.rowIndex < m.rowTops.Count() then
+            anchorY = m.layoutAnchorY - m.rowTops[m.rowIndex]
+            contentH = OttRowsContentHeight()
+            viewH = 1080 - m.layoutAnchorY + 80
+            maxScroll = contentH - viewH
+            if maxScroll > 0 then
+                minAnchor = m.layoutAnchorY - maxScroll
+                if anchorY < minAnchor then anchorY = minAnchor
+            end if
+        else
+            anchorY = m.layoutAnchorY - (m.rowIndex * pitch)
+        end if
+    else
+        anchorY = m.layoutAnchorY
+    end if
+    if anchorY > m.layoutAnchorY then anchorY = m.layoutAnchorY
     AnimateRowsHost(anchorY)
 
     for i = 0 to m.rowWidgets.Count() - 1
@@ -1183,6 +1688,7 @@ sub ApplyHomeFocus()
     end for
 
     UpdateRowsScrim()
+    UpdateOttHeroFromFocus()
 end sub
 
 ' Materialize only the rows currently visible on screen: the focused row pinned at the anchor
@@ -1192,7 +1698,10 @@ end sub
 sub MaterializeVisibleRows()
     if not m.rowsRevealed then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
-    for i = m.rowIndex to m.rowIndex + 1
+    lo = m.rowIndex
+    hi = m.rowIndex + 1
+    if ThemeIsOttHome() and m.rowIndex > 0 then lo = m.rowIndex - 1
+    for i = lo to hi
         if i >= 0 and i < m.rowWidgets.Count() then
             row = m.rowWidgets[i]
             if row <> invalid then row.callFunc("Materialize", invalid)
@@ -1222,13 +1731,25 @@ sub ApplyRowFocusState(i as integer)
     row = m.rowWidgets[i]
     if row = invalid then return
     row.rowFocused = (m.focusZone = "rows" and i = m.rowIndex)
-    row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
+    ' Netflix netflixContent.tsx dims rows below focus to 0.4; OTT content.tsx does not.
+    if ThemeIsOttHome() then
+        row.rowDimmed = false
+    else
+        row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
+    end if
     peek = false
     if i = 0 and not m.rowsRevealed then
         peek = true
     else if m.rowsRevealed and i = 0 and (m.focusZone = "header" or m.focusZone = "hero") then
         peek = true
     end if
+    suppressed = false
+    if m.focusZone = "rows" then
+        suppressed = (i < m.rowIndex)
+    else if not peek then
+        suppressed = true
+    end if
+    if row.hasField("rowSuppressed") then row.rowSuppressed = suppressed
     if row.hasField("rowPeekVisible") then row.rowPeekVisible = peek
     if m.focusZone = "rows" and i = m.rowIndex then
         ClampCardIndex()
@@ -1255,15 +1776,17 @@ end sub
 ' Smooth row pinning (parity with netflixContent.tsx 400ms translate).
 sub AnimateRowsHost(targetY as integer)
     if m.rowsHost = invalid then return
+    offX = 0
+    if m.layoutOffsetX <> invalid then offX = m.layoutOffsetX
     fromY = m.rowsHost.translation[1]
     if m.rowsAnim = invalid or m.rowsInterp = invalid or fromY = targetY then
-        m.rowsHost.translation = [0, targetY]
+        m.rowsHost.translation = [offX, targetY]
         ' No animation in flight (initial land, or left/right within a row) — safe to build the
         ' off-screen look-ahead now so it's ready before the next animated row switch.
         if m.focusZone = "rows" then MaterializeNearbyRows()
         return
     end if
-    m.rowsInterp.keyValue = [[0, fromY], [0, targetY]]
+    m.rowsInterp.keyValue = [[offX, fromY], [offX, targetY]]
     m.rowsAnim.control = "start"
 end sub
 
@@ -1292,8 +1815,9 @@ function LastRowIndex() as integer
 end function
 
 sub ClearAuthAndGoLogin()
+    ProfileSelectLogNode("HOME_AUTH_CLEAR", "session expired -> login", m.top)
     ClearStorage()
-    if m.vm <> invalid then m.vm.callFunc("NavigateReplace", RouteLogin(), {})
+    if m.vm <> invalid then m.vm.callFunc("NavigateClearAndReplace", RouteLogin(), {})
 end sub
 
 sub RedirectToProfiles()
@@ -1310,7 +1834,6 @@ sub OnKey()
     key = ev.key
     ' Give the render thread to this interaction: suspend any in-progress background build.
     BeginInteraction()
-    print "[KEYDBG] OnKey key='"; key; "' zone='"; m.focusZone; "' heroFocus='"; m.heroFocus; "'"
 
     if m.focusZone = "header" then
         HandleHeaderKey(key)
@@ -1330,7 +1853,9 @@ sub OnKey()
     end if
 
     if key = "left" then
-        if m.cardIndex > 0 then
+        if ThemeIsSidebarHeader() and m.cardIndex = 0 then
+            EnterHeaderFromContent()
+        else if m.cardIndex > 0 then
             m.cardIndex = m.cardIndex - 1
             ApplyHomeFocus()
         end if
@@ -1438,7 +1963,11 @@ sub OnLoadMoreResponse()
             ' Append-only: keep existing row nodes and build only the new categories.
             if m.contentRowCats.Count() > prevCatCount then
                 m.rowBuildIndex = prevCatCount
-                m.rowBuildY = prevCatCount * HC_RowPitch()
+                if ThemeIsOttHome() and m.rowContentHeight <> invalid and m.rowContentHeight > 0 then
+                    m.rowBuildY = m.rowContentHeight
+                else
+                    m.rowBuildY = prevCatCount * m.layoutRowPitch
+                end if
                 m.rowsHost.visible = true
                 m.rowBuildTimer.control = "start"
             end if

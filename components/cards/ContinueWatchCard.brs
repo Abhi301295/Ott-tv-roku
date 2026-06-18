@@ -49,15 +49,10 @@ sub ReportLoaded()
     if not m.dataApplied then return
     if m.reported then return
     if m.skeleton <> invalid and m.skeleton.visible = true then
-        print "[CW_PERF] card loaded BLOCKED — skeleton still visible"
+        CwPerfInstant("card loaded BLOCKED", "skeleton still visible")
         return
     end if
     m.reported = true
-    st = ""
-    if m.thumb <> invalid then st = m.thumb.loadStatus
-    skVis = false
-    if m.skeleton <> invalid then skVis = m.skeleton.visible
-    print "[CW_PERF] card loaded thumbSt="; st; " skelVis="; skVis
     m.top.loaded = true
 end sub
 
@@ -83,9 +78,9 @@ sub ApplyAll()
         m.skeleton.running = true
         if m.dataApplied then ReportLoaded()
     end if
-    CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
-    if m.cardBg <> invalid then m.cardBg.color = m.top.cNeutral700
-    m.progressTrack.color = m.top.cNeutral950
+    CardApplySkeleton(m.skeleton, CardSkeletonBaseColor(), CardSkeletonHighlightColor())
+    if m.cardBg <> invalid then m.cardBg.color = CardThumbPlaceholderBg()
+    m.progressTrack.color = CardProgressTrackColor()
     ApplyProgressFill()
 
     ApplyFocusVisual()

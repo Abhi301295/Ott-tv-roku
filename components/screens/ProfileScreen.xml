@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Profile selection — parity with src/features/profile/profile.tsx (NETFLIX style):
-     circular avatars in a left column, name reveal on focus, logout button bottom-right,
-     shimmer skeletons while loading, a rounded loader during select/logout, and the
-     logout-confirm + parental-PIN overlays. -->
+<!-- Profile selection — parity with src/features/profile/profile.tsx.
+     Avatar style follows layout headerStyle (React HEADER_STYLE):
+       NETFLIX header (cases 1–3, 5) → circular NetComponent-style ProfileAvatar
+       SIDEBAR header (cases 4, 6)     → square "original" ProfileAvatarSquare -->
 <component name="ProfileScreen" extends="Group">
   <interface>
     <field id="navState" type="assocarray" />
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
@@ -18,10 +19,14 @@
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiDebug.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileSelectTrace.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/ProfileScreen.brs" />
 
   <children>
@@ -33,21 +38,9 @@
          sits over a near-solid dark area (so the corner-mask circle trick still reads). -->
     <Poster id="bgOverlay" width="1920" height="1080" uri="pkg:/images/ui/profile_bg_overlay.png"
       opacity="0.0" />
-    <Poster id="logoPoster" translation="[120, 48]" width="280" height="68" loadDisplayMode="scaleToFit" visible="false" />
-    <Label id="logoLabel" text="OTT Accelerator" translation="[120, 64]" width="400"
-      color="0x0b75e0ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="30" />
-    </Label>
 
-    <Label id="title" text="Who's Watching?" translation="[150, 150]" width="900" color="0xf8f1f7ff">
-      <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="34" />
-    </Label>
-    <Label id="errorLabel" text="" translation="[150, 212]" width="900" color="0x0b75e0ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
-    </Label>
-
-    <!-- Loading shimmer (3 rows): rounded avatar box + name strip (parity with SkeletonBox) -->
-    <Group id="skeletonGroup" translation="[156, 240]" visible="false">
+    <!-- Profile list layer (behind header chrome — scroll must never paint over the title). -->
+    <Group id="skeletonGroup" translation="[64, 265]" visible="false">
       <Skeleton id="sk0a" translation="[0, 0]" boxWidth="150" boxHeight="150" />
       <Skeleton id="sk0b" translation="[170, 66]" boxWidth="150" boxHeight="16" />
       <Skeleton id="sk1a" translation="[0, 210]" boxWidth="150" boxHeight="150" />
@@ -56,8 +49,29 @@
       <Skeleton id="sk2b" translation="[170, 486]" boxWidth="150" boxHeight="16" />
     </Group>
 
-    <!-- Avatars added dynamically -->
-    <Group id="profilesContainer" translation="[150, 240]" />
+    <Group id="profilesScrollHost" translation="[64, 0]">
+      <MaskGroup id="profilesViewport" maskUri="pkg:/images/ui/profile_list_viewport_mask.png"
+        maskSize="[1760, 689]" maskOffset="[0, 265]">
+        <Group id="profilesContainer" />
+      </MaskGroup>
+    </Group>
+
+    <!-- Transparent header chrome — higher z-order; cards scroll underneath. -->
+    <Group id="profileHeaderChrome" translation="[0, 0]">
+      <Rectangle id="headerTextBackdrop" translation="[48, 36]" width="928" height="180"
+        color="0x000000ff" opacity="0.32" />
+      <Poster id="logoPoster" translation="[120, 48]" width="280" height="68" loadDisplayMode="scaleToFit" visible="false" />
+      <Label id="logoLabel" text="OTT Accelerator" translation="[120, 64]" width="400"
+        color="0x0b75e0ff" visible="false">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="30" />
+      </Label>
+      <Label id="title" text="Who's Watching?" translation="[64, 152]" width="900" color="0xf8f1f7ff">
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="41" />
+      </Label>
+      <Label id="errorLabel" text="" translation="[64, 214]" width="900" color="0x0b75e0ff" visible="false">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+    </Group>
 
     <LoginTabButton id="logoutBtn" label="Logout" translation="[1656, 970]"
       buttonWidth="200" buttonHeight="65"
@@ -66,6 +80,18 @@
 
     <ConfirmPopup id="confirmPopup" visible="false" />
     <OtpPopup id="otpPopup" visible="false" />
+
+    <!-- Full-screen feedback while select-profile API runs before Home loads. -->
+    <Group id="selectingOverlay" visible="false">
+      <Rectangle width="1920" height="1080" color="0x141414cc" />
+      <BusySpinner id="selectSpinner" translation="[932, 490]" visible="true">
+        <Poster role="poster" uri="pkg:/images/ui/spinner.png" width="56" height="56" />
+      </BusySpinner>
+      <Label id="selectingLabel" text="Setting up your profile..." translation="[710, 570]" width="500" height="44"
+        horizAlign="center" vertAlign="top" color="0x0b75e0ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="26" />
+      </Label>
+    </Group>
 
     <Timer id="autoSelectTimer" duration="0.1" repeat="true" />
   </children>
