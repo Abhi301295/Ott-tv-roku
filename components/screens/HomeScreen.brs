@@ -221,14 +221,34 @@ sub TryStartHomeBoot()
     StartBootSequence()
 end sub
 
+' Stop every ContentRow timer on this screen (render-thread hygiene on dispose).
+sub AbortAllRowBuilds()
+    if m.rowWidgets = invalid then return
+    for each row in m.rowWidgets
+        if row <> invalid then row.callFunc("AbortBuild", invalid)
+    end for
+end sub
+
 ' Stop everything that ticks before this screen is torn down, so a removed HomeScreen
 ' can't leave its hero carousel/trailer/build timers running in the background.
 sub OnDispose()
     if not m.top.dispose then return
+    print "[HOME] dispose -> stopping hero + timers + in-flight tasks"
+    m.heroBuilt = true
+    m.rowsBuilt = true
+    m.rowsDataReady = false
+    m.initialLoading = false
+    m.continueLoading = false
+    m.loadingMore = false
     CancelHomeSelect("dispose")
+    AbortAllRowBuilds()
     ' Setting the hero invisible runs its OnVisibleChanged cleanup (swipe timer, trailer,
     ' video, pending detail fetch all stop).
-    if m.hero <> invalid then m.hero.visible = false
+    if m.hero <> invalid then
+        m.hero.unobserveField("posterReady")
+        m.hero.unobserveField("trailerPlaying")
+        m.hero.visible = false
+    end if
 
     ' Stop every timer that ticks on this screen.
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
@@ -268,6 +288,9 @@ sub OnDispose()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")
     end if
+    m.top.unobserveField("keyEvent")
+    m.top.unobserveField("visible")
+    m.top.unobserveField("navState")
 end sub
 
 ' Stop a finished/in-flight HTTP task and detach its result listener.
@@ -541,6 +564,7 @@ end sub
 sub UpdateHeroBanner()
     if m.hero = invalid then return
     items = ExtractBannerItems(m.categories)
+    print "[HOME] UpdateHeroBanner bannerItems="; items.Count(); " layout="; m.homeLayout
     ApplyThemeToHero()
     m.hero.bannerItems = items
     m.hero.visible = (items.Count() > 0 or ThemeIsOttHome())
@@ -925,7 +949,10 @@ sub SelectHeaderItem()
     end if
 
     if m.vm <> invalid then
-        m.vm.callFunc("NavigateReplace", item.route, { type: item.type, selectedID: item.text })
+        state = { type: item.type, selectedID: item.text }
+        BrowseDbg("header_nav", "route=" + item.route + " text=" + item.text + " type=" + BrowseDbgStr(item.type))
+        BrowseDbgState("header_nav_state", state)
+        m.vm.callFunc("NavigateReplace", item.route, state)
     end if
 end sub
 
@@ -944,6 +971,7 @@ sub StartBootSequence()
             return
         end if
         HomeBootLog(m.bootSpan, "select-profile queued", "id=" + m.pendingSelectId)
+        print "[HOME] pending select-profile -> running behind shimmer"
         ' Session tokens from login may already be valid — fetch home content in parallel
         ' so the rows shimmer is not held hostage to a slow select-profile round-trip.
         if GetAccessToken() <> "" or GetRefreshToken() <> "" then
@@ -1052,6 +1080,7 @@ sub OnHomeSelectResponse(event as object)
         m.selectInFlight = false
         ProfileSelectLogNode("HOME_SELECT_OK", "profileId persisted -> boot content", m.top)
         HomeBootLog(m.bootSpan, "select-profile ok", "boot content")
+        print "[HOME] select-profile ok -> boot home content"
         BootHomeContent()
         return
     end if
@@ -1080,6 +1109,7 @@ sub OnHomeSelectResponse(event as object)
 
     if SelectProfileRetriable(api.httpStatus) and m.selectRetriesLeft > 0 then
         m.selectRetriesLeft = m.selectRetriesLeft - 1
+        print "[HOME] select-profile failed (httpStatus="; api.httpStatus; ") -> retry, left="; m.selectRetriesLeft
         if m.selectRetryTimer <> invalid then
             m.selectRetryTimer.control = "stop"
             m.selectRetryTimer.control = "start"
@@ -1089,6 +1119,7 @@ sub OnHomeSelectResponse(event as object)
         return
     end if
 
+    print "[HOME] select-profile giving up (httpStatus="; api.httpStatus; ") -> back to profiles"
     SelectFailedToProfiles("api-fail httpStatus=" + ProfileSelectFmt(api.httpStatus))
 end sub
 
@@ -1100,6 +1131,7 @@ sub OnHomeSelectRetry()
         return
     end if
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
+    print "[HOME] retrying select-profile (retriesLeft="; m.selectRetriesLeft; ")"
     FireHomeSelectRequest()
 end sub
 
@@ -1143,9 +1175,11 @@ sub OnSelectWatchdog()
     if m.selectRetriesLeft > 0 then
         m.selectRetriesLeft = m.selectRetriesLeft - 1
         ProfileSelectLogNode("HOME_SELECT_WATCHDOG", "no response -> retry left=" + ProfileSelectFmt(m.selectRetriesLeft), m.top)
+        print "[HOME] select-profile watchdog -> retry, left="; m.selectRetriesLeft
         FireHomeSelectRequest()
         return
     end if
+    print "[HOME] select-profile watchdog fired -> back to profiles"
     SelectFailedToProfiles("watchdog-exhausted")
 end sub
 
@@ -1205,12 +1239,14 @@ sub OnContinueWatchingResponse()
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
         cwCount = listing.Count()
+        print "[HOME] continue-watching response ok, rows="; cwCount
         if listing.Count() > 0 then
             tagged = TagContinueWatchingRows(listing)
             m.categories = PrependCategories(m.categories, tagged)
             MaybeInsertLateContinueWatchingRow()
         end if
     else
+        print "[HOME] continue-watching response failed/empty"
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
         end if
@@ -1245,10 +1281,12 @@ sub OnHomeCategoriesResponse()
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
         catCount = listing.Count()
+        print "[HOME] home categories response ok, categories="; catCount
         if listing.Count() > 0 then
             m.categories = AppendCategories(m.categories, listing)
         end if
     else
+        print "[HOME] home categories response failed/empty"
         if api.message <> invalid and api.message <> "" then
             ShowAlert(m.top, 2, api.message)
         end if
@@ -1301,6 +1339,7 @@ sub MaybeBuildHero()
     if m.heroBuilt then return
     m.heroBuilt = true
     items = ExtractBannerItems(m.categories)
+    print "[HOME] MaybeBuildHero bannerItems="; items.Count()
     if items.Count() = 0 then
         ' Nothing to show in the hero — drop its shimmer immediately.
         ShowHeroSkeleton(false)
@@ -1321,10 +1360,12 @@ sub MaybeBuildRows()
     if m.rowsBuilt then return
     if RowsBootLoading() then
         HomeBootLog(m.bootSpan, "rows waiting", "initial=" + CwPerfBool(m.initialLoading) + " continue=" + CwPerfBool(m.continueLoading) + " ott=" + CwPerfBool(ThemeIsOttHome()))
+        print "[HOME] MaybeBuildRows waiting (initialLoading="; m.initialLoading; " continueLoading="; m.continueLoading; ")"
         return
     end if
     m.rowsDataReady = true
     HomeBootLog(m.bootSpan, "rows data ready", "cats=" + Str(FilterContentRows(m.categories).Count()))
+    print "[HOME] MaybeBuildRows -> data ready, waiting for hero trailer / gate"
     MaybeStartRowBuild()
 end sub
 
@@ -1339,8 +1380,10 @@ sub MaybeStartRowBuild()
         m.rowsBuilt = true
         if heroLive then
             HomeBootLog(m.bootSpan, "row gate open", "trailer live")
+            print "[HOME] row gate open (trailer live) -> build rows"
         else
             HomeBootLog(m.bootSpan, "row gate open", "timeout/skip ott=" + CwPerfBool(ThemeIsOttHome()))
+            print "[HOME] row gate open (timeout) -> build rows"
         end if
         BuildContentRows()
         return
@@ -1350,6 +1393,7 @@ sub MaybeStartRowBuild()
         m.rowGateStarted = true
         m.rowBuildGate.control = "start"
         HomeBootLog(m.bootSpan, "row gate armed", "sec=" + Str(HC_RowBuildGateSecForLayout(m.homeLayout)))
+        print "[HOME] row build held for hero preview (gate armed)"
     end if
 end sub
 
@@ -1368,10 +1412,12 @@ end sub
 
 ' Safety net: never let the hero shimmer outlive the wait.
 sub OnSkeletonTimeout()
+    print "[HOME] hero skeleton timeout -> hide shimmer"
     ShowHeroSkeleton(false)
 end sub
 
 sub OnRowsSkeletonTimeout()
+    print "[HOME] rows skeleton timeout -> force first row reveal"
     HomeBootLog(m.bootSpan, "rows skeleton timeout", "force reveal")
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then
         row0 = m.rowWidgets[0]
@@ -1392,6 +1438,7 @@ sub DetachFirstRowWatch()
 end sub
 
 sub OnRowsForceHideTimer()
+    print "[HOME] rows force-hide safety -> drop shimmer"
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
     row0 = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
@@ -1489,6 +1536,10 @@ sub BuildContentRows()
 end sub
 
 sub OnRowBuildTick()
+    if m.top.dispose = true then
+        if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+        return
+    end if
     if m.rowBuildIndex >= m.contentRowCats.Count() then
         m.rowBuildTimer.control = "stop"
         return
@@ -1521,6 +1572,7 @@ sub OnRowBuildTick()
     rowMs = span.TotalMilliseconds()
     if m.rowBuildCostMs = invalid then m.rowBuildCostMs = 0
     m.rowBuildCostMs = m.rowBuildCostMs + rowMs
+    print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
 
     ' Keep the rows shimmer up until the FIRST row has painted its thumbnails.
     if m.rowBuildIndex = 0 then
@@ -1545,6 +1597,7 @@ sub OnRowBuildTick()
         m.rowContentHeight = m.rowBuildY
         wall = 0
         if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
+        print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
         ' Do not materialize row 1 or run focus scroll until CW has painted — that work
         ' was starving the render thread and caused the post-shimmer black gap.
         if m.rowsRevealed then
@@ -1834,6 +1887,7 @@ sub OnKey()
     key = ev.key
     ' Give the render thread to this interaction: suspend any in-progress background build.
     BeginInteraction()
+    print "[KEYDBG] OnKey key='"; key; "' zone='"; m.focusZone; "' heroFocus='"; m.heroFocus; "'"
 
     if m.focusZone = "header" then
         HandleHeaderKey(key)

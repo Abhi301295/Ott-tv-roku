@@ -22,11 +22,13 @@ function NavigateClearAndReplace(route as string, state = {} as object) as void
     while m.stack.Count() > 0
         entry = m.stack[m.stack.Count() - 1]
         if entry.screen <> invalid then
+            if entry.screen.hasField("visible") then entry.screen.visible = false
             if entry.screen.hasField("dispose") then entry.screen.dispose = true
             m.screenHost.removeChild(entry.screen)
         end if
         m.stack.Pop()
     end while
+    DrainHttpQueueForNavigation()
     ShowRoute(route, state, false)
 end function
 
@@ -62,13 +64,7 @@ sub ShowRoute(route as string, state as object, replace as boolean)
     ProfileSelectLog("NAV", mode + " route=" + route + " stackDepth=" + ProfileSelectFmt(m.stack.Count()))
     if replace and m.stack.Count() > 0 then
         entry = m.stack[m.stack.Count() - 1]
-        if entry.screen <> invalid then
-            ' Let the screen tear down its timers/video before it leaves the tree —
-            ' removeChild alone doesn't stop child Timers, which would keep an orphaned
-            ' HomeScreen's hero auto-rotating (stacked instances) after navigation.
-            if entry.screen.hasField("dispose") then entry.screen.dispose = true
-            m.screenHost.removeChild(entry.screen)
-        end if
+        TeardownReplacedScreen(entry.screen)
         m.stack.Pop()
     else if not replace and m.stack.Count() > 0 then
         ' Push: pause the screen being covered so its timers/video/hero stop ticking in
@@ -91,7 +87,21 @@ sub ShowRoute(route as string, state as object, replace as boolean)
     screen.setFocus(true)
 end sub
 
+' Replace navigation: pause the outgoing screen, dispose it, and drop any HTTP jobs
+' still waiting in the pool queue so Movies (or any new route) is not starved by Home
+' boot fetches the user abandoned mid-load.
+sub TeardownReplacedScreen(screen as object)
+    if screen = invalid then return
+    BrowseDbg("nav_teardown", "replace — pause dispose drain-http-queue")
+    if screen.hasField("visible") then screen.visible = false
+    if screen.hasField("dispose") then screen.dispose = true
+    DrainHttpQueueForNavigation()
+    m.screenHost.removeChild(screen)
+end sub
+
 function CreateScreenForRoute(route as string, state as object) as object
+    BrowseDbg("create_screen", "route=" + route)
+    BrowseDbgState("create_screen_state", state)
     if route = RouteLogin() then
         screen = CreateObject("roSGNode", "LoginScreen")
         screen.navState = state
@@ -122,7 +132,14 @@ function CreateScreenForRoute(route as string, state as object) as object
         screen.navState = state
         return screen
     end if
-    if route = RouteSeries() or route = RouteGenere() or route = RouteNewRelease() then
+    if route = RouteGenere() then
+        BrowseDbg("create_screen", "component=GenreListScreen")
+        screen = CreateObject("roSGNode", "GenreListScreen")
+        screen.navState = state
+        return screen
+    end if
+    if route = RouteSeries() or route = RouteNewRelease() then
+        BrowseDbg("create_screen", "component=SeriesScreen")
         screen = CreateObject("roSGNode", "SeriesScreen")
         screen.navState = state
         return screen

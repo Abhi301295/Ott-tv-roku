@@ -43,6 +43,16 @@ function WarmAll(path as string) as void
     Pump()
 end function
 
+' Drop every job still waiting for a worker (in-flight requests are left alone).
+function ClearQueue(dummy = invalid as dynamic) as integer
+    dropped = m.queue.Count()
+    if dropped > 0 then
+        print "[HTTP] queue cleared, dropped="; dropped
+        m.queue = []
+    end if
+    return dropped
+end function
+
 sub OnWorkerCompleted()
     Pump()
 end sub

@@ -40,3 +40,11 @@ end function
 function BS_ListEmptyCopy() as string
     return "We are sorry, we can not find the content"
 end function
+
+function GL_CataloguePageLimit() as integer
+    return 10
+end function
+
+function GL_RowAnchorY() as integer
+    return HC_OttAnchorY()
+end function

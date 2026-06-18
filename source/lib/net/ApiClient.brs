@@ -18,6 +18,13 @@ function StartHttpTask(task as object) as void
     if client <> invalid then client.callFunc("Submit", task)
 end function
 
+' Called when a screen is replaced (not pushed) so queued boot fetches from the
+' outgoing screen do not block the new screen's first requests.
+function DrainHttpQueueForNavigation() as void
+    client = GetHttpClient()
+    if client <> invalid then client.callFunc("ClearQueue", invalid)
+end function
+
 ' Returns the app-wide HTTP pool, creating it on first use if MainScene has not yet
 ' (so requests fired during early boot still resolve to a single shared pool).
 function GetHttpClient() as object
