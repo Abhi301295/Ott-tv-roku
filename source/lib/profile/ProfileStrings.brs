@@ -16,7 +16,16 @@ function CopyLoggingOutBtn() as string: return "Logging Out": end function
 function CopyParentalLock() as string: return "Parental Lock": end function
 function CopyUseThisPin() as string: return "Use this 6 digit PIN to access all adult profiles": end function
 function CopyContinue() as string: return "Continue": end function
-function CopyEnterPinHint() as string: return "Press OK to enter PIN": end function
+function CopyEnterPinHint() as string: return "Enter PIN to access": end function
+
+function CopyAutoSelectingIn(secs as integer) as string
+    if secs < 0 then secs = 0
+    return "Auto-selecting in " + secs.ToStr() + "s"
+end function
+
+function CopySelecting() as string
+    return "Setting up your profile..."
+end function
 
 ' Toast / inline messages (parity with messages.ts)
 function MsgFailedSelectProfile() as string: return "Failed to select profile. Please try again.": end function

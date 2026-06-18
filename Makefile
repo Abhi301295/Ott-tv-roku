@@ -25,6 +25,10 @@ icons:
 	@python3 scripts/gen_menu_icons.py
 	@echo "Regenerated images/ui/menu_*.png"
 
+profile-square:
+	@python3 scripts/gen_profile_square_arc.py
+	@echo "Regenerated images/ui/profile_sq_*.png"
+
 validate:
 	@bsc --project bsconfig.json
 

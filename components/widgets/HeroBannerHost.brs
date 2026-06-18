@@ -21,7 +21,6 @@ sub ApplyHeroSelection()
     end if
     if m.activeHero <> invalid then
         m.activeHero.visible = true
-        print "[LAYOUT] hero="; ThemeHeroBannerStyle(); " home="; ThemeHomeLayout()
     end if
     SyncToActiveHero()
 end sub

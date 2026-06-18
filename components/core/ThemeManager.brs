@@ -3,6 +3,11 @@ sub init()
     m.top.ready = false
     m.top.error = ""
 
+    ' Seed early so screens can observe before the HTTP response lands.
+    if m.global <> invalid and not m.global.hasField("businessResolved") then
+        m.global.addFields({ businessResolved: EmptyResolved() })
+    end if
+
     FetchBusinessConfig()
 end sub
 
@@ -32,10 +37,16 @@ sub OnConfigResponse()
     ApplyResolvedTheme(m.top, resolved)
 
     if m.global <> invalid then
-        m.global.addFields({
-            businessResolved: resolved
-            businessConfigRaw: cfg
-        })
+        if not m.global.hasField("businessResolved") then
+            m.global.addFields({ businessResolved: resolved })
+        else
+            m.global.businessResolved = resolved
+        end if
+        if not m.global.hasField("businessConfigRaw") then
+            m.global.addFields({ businessConfigRaw: cfg })
+        else
+            m.global.businessConfigRaw = cfg
+        end if
     end if
 
     m.top.loading = false
@@ -58,6 +69,10 @@ sub ApplyFallbackTheme()
     ApplyResolvedTheme(m.top, resolved)
 
     if m.global <> invalid then
-        m.global.addFields({ businessResolved: resolved })
+        if not m.global.hasField("businessResolved") then
+            m.global.addFields({ businessResolved: resolved })
+        else
+            m.global.businessResolved = resolved
+        end if
     end if
 end sub

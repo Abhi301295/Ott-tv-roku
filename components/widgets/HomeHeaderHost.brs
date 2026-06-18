@@ -17,7 +17,6 @@ sub ApplyHeaderSelection()
 
     if m.activeHeader <> invalid then
         m.activeHeader.visible = true
-        print "[LAYOUT] header="; ThemeHeaderStyle()
     end if
     SyncToActiveHeader()
 end sub

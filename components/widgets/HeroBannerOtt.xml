@@ -9,6 +9,7 @@
     <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeChanged" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
     <field id="focusTarget" type="string" value="" />
+    <field id="contentWidth" type="integer" value="1920" onChange="OnContentWidthChanged" />
     <function name="HeroGoNext" />
     <function name="HeroGoPrev" />
     <function name="HeroToggleMute" />

@@ -78,9 +78,9 @@ sub ApplyAll()
         m.skeleton.running = true
         if m.dataApplied then ReportLoaded()
     end if
-    CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
-    if m.cardBg <> invalid then m.cardBg.color = m.top.cNeutral700
-    m.progressTrack.color = m.top.cNeutral950
+    CardApplySkeleton(m.skeleton, CardSkeletonBaseColor(), CardSkeletonHighlightColor())
+    if m.cardBg <> invalid then m.cardBg.color = CardThumbPlaceholderBg()
+    m.progressTrack.color = CardProgressTrackColor()
     ApplyProgressFill()
 
     ApplyFocusVisual()

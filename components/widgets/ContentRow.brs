@@ -58,14 +58,17 @@ sub OnCardFocusChanged()
 end sub
 
 sub OnRowVisualChanged()
+    ' netflixContent.tsx: focused=1, above focus=0, below focus=0.4 (OTT below stays 1.0).
     if m.top.rowFocused = true then
         m.top.opacity = 1.0
-    else if m.top.rowDimmed = true then
-        m.top.opacity = 0.4
     else if m.top.rowPeekVisible = true then
         m.top.opacity = 1.0
-    else
+    else if m.top.rowSuppressed = true then
         m.top.opacity = 0.0
+    else if m.top.rowDimmed = true then
+        m.top.opacity = 0.4
+    else
+        m.top.opacity = 1.0
     end if
 end sub
 
@@ -322,6 +325,11 @@ sub RevealNow()
     m.top.built = true
     if m.top.mediaReady <> true then m.top.mediaReady = true
     CwPerfMark(m.cwPerfSpan, "row RevealNow", "pendingLoads=0 cards=" + Str(m.cards.Count()))
+    ' OTT: media is loaded — skip the paint-poll loop (simulator often never passes it).
+    if ThemeIsOttHome() then
+        MarkPaintedReady(false)
+        return
+    end if
     m.paintPollCount = 0
     m.paintStableCount = 0
     StartPaintPoll()
@@ -366,7 +374,10 @@ sub OnPaintPoll()
         CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " stable=" + Str(m.paintStableCount) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
     end if
     ' Two consecutive painted frames — avoids cutting shimmer before compositor shows cards.
-    if m.paintStableCount >= 2 then
+    ' OTT home: one stable frame is enough (faster handoff off the rows shimmer).
+    needStable = 2
+    if ThemeIsOttHome() then needStable = 1
+    if m.paintStableCount >= needStable then
         MarkPaintedReady(false)
         return
     end if
@@ -407,8 +418,6 @@ sub ConfigureCard(card as object, compName as string, item as object, cardType a
     if compName = "ContinueWatchCard" then
         card.thumbnailUri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
         card.progress = GetContinueProgressPercent(item)
-        if card.hasField("cNeutral950") then card.cNeutral950 = m.top.cNeutral950
-        if card.hasField("cNeutral700") then card.cNeutral700 = m.top.cNeutral700
     else if compName = "NumberedVerticalCard" then
         ' PARITY: contentRow.tsx selects the TOP_CONTENTS thumbnail with the category's own
         ' cardType (getCardImgByType(cardType, thumbnails)) — NOT a hardcoded VERTICAL. Using

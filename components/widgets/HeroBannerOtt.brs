@@ -1,5 +1,11 @@
 sub init()
     m.bannerPoster = m.top.findNode("bannerPoster")
+    m.heroBg = m.top.findNode("heroBg")
+    m.imageHost = m.top.findNode("imageHost")
+    m.imageFallback = m.top.findNode("imageFallback")
+    m.gradLeft = m.top.findNode("gradLeft")
+    m.gradTop = m.top.findNode("gradTop")
+    m.gradBottom = m.top.findNode("gradBottom")
     m.titleLabel = m.top.findNode("titleLabel")
     m.ratingHost = m.top.findNode("ratingHost")
     m.ratingLabel = m.top.findNode("ratingLabel")
@@ -17,6 +23,35 @@ sub init()
     m.fallbackItems = []
     m.posterReadyFired = false
     if m.bannerPoster <> invalid then m.bannerPoster.observeField("loadStatus", "OnPosterLoad")
+    m.posterReadyTimer = CreateObject("roSGNode", "Timer")
+    m.posterReadyTimer.duration = HC_OttPosterReadyMaxSec()
+    m.posterReadyTimer.repeat = false
+    m.top.appendChild(m.posterReadyTimer)
+    m.posterReadyTimer.observeField("fire", "OnPosterReadyTimeout")
+    ApplyViewportLayout()
+end sub
+
+sub OnContentWidthChanged()
+    ApplyViewportLayout()
+end sub
+
+' Clip hero to the content area right of the sidebar (parity with HeroBannerCinematic).
+sub ApplyViewportLayout()
+    w = m.top.contentWidth
+    if w = invalid or w < 400 then w = 1920
+
+    m.top.clippingRect = [0, 0, w, 1080]
+    m.top.clippingRectClipsChildren = true
+
+    if m.heroBg <> invalid then m.heroBg.width = w
+    if m.imageHost <> invalid then
+        m.imageHost.clippingRect = [0, 0, w, 1080]
+        m.imageHost.clippingRectClipsChildren = true
+    end if
+    if m.imageFallback <> invalid then m.imageFallback.width = w
+    if m.bannerPoster <> invalid then m.bannerPoster.width = w
+    if m.gradTop <> invalid then m.gradTop.width = w
+    if m.gradBottom <> invalid then m.gradBottom.width = w
 end sub
 
 sub OnThemeChanged()
@@ -45,7 +80,7 @@ sub OnActiveItemChanged()
     item = m.top.activeItem
     if item = invalid and m.fallbackItems.Count() > 0 then item = m.fallbackItems[0]
     ApplyMeta(item)
-    uri = GetHeroBannerImage(item)
+    uri = GetOttBannerImage(item)
     m.posterReadyFired = false
     if m.top.posterReady = true then m.top.posterReady = false
     if m.bannerPoster = invalid then return
@@ -54,7 +89,12 @@ sub OnActiveItemChanged()
         m.bannerPoster.visible = true
         BeginFadeIn()
         st = m.bannerPoster.loadStatus
-        if st = "ready" or st = "failed" then MarkPosterReady()
+        if st = "ready" or st = "failed" then
+            MarkPosterReady()
+        else if m.posterReadyTimer <> invalid then
+            m.posterReadyTimer.control = "stop"
+            m.posterReadyTimer.control = "start"
+        end if
     else
         m.bannerPoster.visible = false
         MarkPosterReady()
@@ -95,7 +135,15 @@ end sub
 sub OnPosterLoad()
     if m.bannerPoster = invalid then return
     st = m.bannerPoster.loadStatus
-    if st = "ready" or st = "failed" then MarkPosterReady()
+    if st = "ready" or st = "failed" then
+        if m.posterReadyTimer <> invalid then m.posterReadyTimer.control = "stop"
+        MarkPosterReady()
+    end if
+end sub
+
+sub OnPosterReadyTimeout()
+    if m.posterReadyFired then return
+    MarkPosterReady()
 end sub
 
 sub MarkPosterReady()

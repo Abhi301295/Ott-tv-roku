@@ -20,6 +20,10 @@ sub init()
     m.PAD_L = 14
     m.LABEL_GAP = 20
     m.PAD_R = 6
+    m.LOGO_Y = 100
+    m.LOGO_EXPANDED_W = 160
+    m.LOGO_EXPANDED_H = 52
+    m.LOGO_COLLAPSED_SIZE = 44
     m.COLLAPSED = ThemeSidebarCollapsedWidth()
     m.EXPANDED = ThemeSidebarExpandedWidth()
     m.currentWidth = m.COLLAPSED
@@ -289,17 +293,18 @@ sub OnLogoChanged()
             m.logoPoster.visible = true
             m.logoPoster.loadDisplayMode = "scaleToFit"
             if expanded then
-                m.logoPoster.translation = [20, 100]
-                m.logoPoster.width = 80
-                m.logoPoster.height = 80
-                m.logoPoster.loadWidth = 160
-                m.logoPoster.loadHeight = 160
+                ' Wide horizontal wordmark — parity with header.tsx expanded (max-w-40, pl-14).
+                m.logoPoster.translation = [m.PAD_L, m.LOGO_Y]
+                m.logoPoster.width = m.LOGO_EXPANDED_W
+                m.logoPoster.height = m.LOGO_EXPANDED_H
+                m.logoPoster.loadWidth = m.LOGO_EXPANDED_W * 2
+                m.logoPoster.loadHeight = m.LOGO_EXPANDED_H * 2
             else
-                m.logoPoster.translation = [Int((m.COLLAPSED - 44) / 2), 100]
-                m.logoPoster.width = 44
-                m.logoPoster.height = 44
-                m.logoPoster.loadWidth = 88
-                m.logoPoster.loadHeight = 88
+                m.logoPoster.translation = [Int((m.COLLAPSED - m.LOGO_COLLAPSED_SIZE) / 2), m.LOGO_Y]
+                m.logoPoster.width = m.LOGO_COLLAPSED_SIZE
+                m.logoPoster.height = m.LOGO_COLLAPSED_SIZE
+                m.logoPoster.loadWidth = m.LOGO_COLLAPSED_SIZE * 2
+                m.logoPoster.loadHeight = m.LOGO_COLLAPSED_SIZE * 2
             end if
             if m.logoLabel <> invalid then m.logoLabel.visible = false
         else
@@ -307,7 +312,15 @@ sub OnLogoChanged()
             if m.logoLabel <> invalid then
                 m.logoLabel.text = name
                 m.logoLabel.visible = (name <> "")
-                m.logoLabel.translation = [8, 100]
+                if expanded then
+                    m.logoLabel.translation = [m.PAD_L, m.LOGO_Y]
+                    m.logoLabel.width = m.LOGO_EXPANDED_W
+                    m.logoLabel.horizAlign = "left"
+                else
+                    m.logoLabel.translation = [8, m.LOGO_Y]
+                    m.logoLabel.width = m.COLLAPSED - 16
+                    m.logoLabel.horizAlign = "center"
+                end if
             end if
         end if
     end if

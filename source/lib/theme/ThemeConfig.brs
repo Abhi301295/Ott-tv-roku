@@ -53,7 +53,7 @@ function TC_HomeLayoutNetflix() as string
     return "NETFLIX"
 end function
 
-' ── HeaderType (header.tsx HEADER_STYLE) ─────────────────────────────────────
+' ── HeaderType (header.tsx HEADER_STYLE / theme.config.ts headerStyle) ─────
 function TC_HeaderSidebar() as string
     return "SIDEBAR"
 end function
@@ -62,7 +62,7 @@ function TC_HeaderNetflix() as string
     return "NETFLIX"
 end function
 
-' ── HeroBannerStyle (heroBannerSwitch.tsx) ───────────────────────────────────
+' ── HeroBannerStyle (heroBannerSwitch.tsx / theme.config.ts heroBannerStyle) ─
 function TC_HeroPageFlip() as string
     return "PAGE_FLIP"
 end function
@@ -76,56 +76,42 @@ function TC_HeroParallaxSlide() as string
 end function
 
 ' ═══════════════════════════════════════════════════════════════════════════════
-' Layout test cases — parity with src/config/layoutTest.config.ts (cases 1–6).
-' Change LT_CaseId() return value (1–6), rebuild, reload Home.
-' ═══════════════════════════════════════════════════════════════════════════════
-function LT_CaseId() as integer
-  ' ← CHANGE THIS NUMBER (1–6) to match React ACTIVE_LAYOUT_TEST_CASE
-    return 4
-end function
-
-function LT_HomeLayout(caseId as integer) as string
-    if caseId = 5 or caseId = 6 then return TC_HomeLayoutOtt()
-    return TC_HomeLayoutNetflix()
-end function
-
-function LT_HeaderStyle(caseId as integer) as string
-    if caseId = 4 or caseId = 6 then return TC_HeaderSidebar()
-    return TC_HeaderNetflix()
-end function
-
-function LT_HeroStyle(caseId as integer) as string
-    if caseId = 2 then return TC_HeroPageFlip()
-    if caseId = 3 then return TC_HeroParallaxSlide()
-    return TC_HeroCinematicZoom()
-end function
-
-function LT_CaseLabel(caseId as integer) as string
-    if caseId = 1 then return "Baseline Netflix + top bar + cinematic"
-    if caseId = 2 then return "Netflix + top bar + page-flip hero"
-    if caseId = 3 then return "Netflix + top bar + parallax hero"
-    if caseId = 4 then return "Netflix + sidebar + cinematic"
-    if caseId = 5 then return "OTT focus-reactive banner + top bar"
-    if caseId = 6 then return "OTT focus-reactive banner + sidebar"
-    return "unknown"
-end function
-
-function LT_PrintChecks(caseId as integer) as string
-    if caseId = 1 then return "top bar|auto hero ~15s|rows slide at 65vh"
-    if caseId = 2 then return "page-flip hero ~5s|up-next chip right|dot indicators"
-    if caseId = 3 then return "vertical parallax ~5.5s|frost strip bottom|staggered meta"
-    if caseId = 4 then return "left sidebar LEFT/RIGHT|content offset right|auto hero"
-    if caseId = 5 then return "LEFT/RIGHT changes banner|no auto-rotate|row overlap"
-    if caseId = 6 then return "sidebar + OTT banner follows card focus"
-    return ""
-end function
-
-function ThemeActiveLayoutTestCase() as integer
-    return LT_CaseId()
-end function
-
-' ═══════════════════════════════════════════════════════════════════════════════
-' Active config — driven by LT_CaseId() above (mirrors layoutTest.config.ts).
+' Active layout config — change the return values below (mirrors theme.config.ts).
+' headerStyle also controls Profile UI: NETFLIX → circular avatars, SIDEBAR → square cards.
+'
+' Layout presets (change ThemeHomeLayout / ThemeHeaderStyle / ThemeHeroBannerStyle):
+'
+'   Case 1 — Baseline Netflix home + top bar + cinematic hero
+'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
+'     ThemeHeaderStyle()     → TC_HeaderNetflix()
+'     ThemeHeroBannerStyle() → TC_HeroCinematicZoom()
+'
+'   Case 2 — Netflix home + top bar + page-flip hero
+'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
+'     ThemeHeaderStyle()     → TC_HeaderNetflix()
+'     ThemeHeroBannerStyle() → TC_HeroPageFlip()
+'
+'   Case 3 — Netflix home + top bar + parallax hero
+'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
+'     ThemeHeaderStyle()     → TC_HeaderNetflix()
+'     ThemeHeroBannerStyle() → TC_HeroParallaxSlide()
+'
+'   Case 4 — Netflix home + sidebar + cinematic hero (Profile: square avatars)
+'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
+'     ThemeHeaderStyle()     → TC_HeaderSidebar()
+'     ThemeHeroBannerStyle() → TC_HeroCinematicZoom()
+'
+'   Case 5 — OTT home + top bar (hero style ignored; banner follows row focus)
+'     ThemeHomeLayout()      → TC_HomeLayoutOtt()
+'     ThemeHeaderStyle()     → TC_HeaderNetflix()
+'     ThemeHeroBannerStyle() → (any — not used for OTT home)
+'
+'   Case 6 — OTT home + sidebar (Profile: square avatars)
+'     ThemeHomeLayout()      → TC_HomeLayoutOtt()
+'     ThemeHeaderStyle()     → TC_HeaderSidebar()
+'     ThemeHeroBannerStyle() → (any — not used for OTT home)
+'
+' After editing: make sim
 ' ═══════════════════════════════════════════════════════════════════════════════
 function ThemeAppTheme() as string
     return TC_AppThemeDark()
@@ -140,15 +126,15 @@ function ThemeDeviceSize() as string
 end function
 
 function ThemeHomeLayout() as string
-    return LT_HomeLayout(ThemeActiveLayoutTestCase())
+    return TC_HomeLayoutNetflix()
 end function
 
 function ThemeHeaderStyle() as string
-    return LT_HeaderStyle(ThemeActiveLayoutTestCase())
+    return TC_HeaderNetflix()
 end function
 
 function ThemeHeroBannerStyle() as string
-    return LT_HeroStyle(ThemeActiveLayoutTestCase())
+    return TC_HeroCinematicZoom()
 end function
 
 ' ── Predicates ───────────────────────────────────────────────────────────────
@@ -162,10 +148,6 @@ end function
 
 function ThemeIsSidebarHeader() as boolean
     return ThemeHeaderStyle() = TC_HeaderSidebar()
-end function
-
-function ThemeIsLayoutCase4() as boolean
-    return ThemeActiveLayoutTestCase() = 4
 end function
 
 function ThemeIsNetflixHeader() as boolean
@@ -190,13 +172,4 @@ end function
 
 function ThemeContentOffsetX() as integer
     return ThemeSidebarOffset(false)
-end function
-
-function ThemeLayoutSummary() as string
-    c = ThemeActiveLayoutTestCase()
-    return "[LAYOUT TEST] case " + c.ToStr() + ": " + LT_CaseLabel(c) + " | home=" + ThemeHomeLayout() + " header=" + ThemeHeaderStyle() + " hero=" + ThemeHeroBannerStyle()
-end function
-
-function ThemeLayoutChecklist() as string
-    return LT_PrintChecks(ThemeActiveLayoutTestCase())
 end function

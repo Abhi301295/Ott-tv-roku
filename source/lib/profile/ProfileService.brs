@@ -70,7 +70,12 @@ end function
 ' transient and worth retrying before surfacing an error. Single source of truth shared by
 ' the profile screen (PIN path) and the home boot select.
 function SelectProfileRetriable(httpStatus as integer) as boolean
-    return (httpStatus = 401 or httpStatus = 404 or httpStatus <= 0)
+    return (httpStatus = 401 or httpStatus <= 0)
+end function
+
+' GET profiles uses the same transient-failure rules as select-profile.
+function ProfileFetchRetriable(httpStatus as integer) as boolean
+    return SelectProfileRetriable(httpStatus)
 end function
 
 ' Persist the active profile identity after a successful select-profile. SaveProfilesMeta

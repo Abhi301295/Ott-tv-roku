@@ -10,8 +10,13 @@
     <!-- Independent toggles for the two regions. -->
     <field id="heroRunning" type="boolean" value="false" onChange="OnRunningChanged" />
     <field id="rowsRunning" type="boolean" value="false" onChange="OnRunningChanged" />
+    <!-- Layout-driven geometry — set by HomeScreen from ThemeConfig (cases 1–6). -->
+    <field id="layoutMode" type="string" value="netflix" onChange="OnLayoutChanged" />
+    <field id="anchorY" type="integer" value="702" onChange="OnLayoutChanged" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/HomeSkeleton.brs" />
 
   <children>

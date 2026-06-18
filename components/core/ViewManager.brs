@@ -15,6 +15,21 @@ function NavigateReplace(route as string, state = {} as object) as void
     ShowRoute(route, state, true)
 end function
 
+' Tear down every screen in the stack and show a fresh route (logout / session reset).
+function NavigateClearAndReplace(route as string, state = {} as object) as void
+    depth = m.stack.Count()
+    ProfileSelectLog("NAV_CLEAR", "route=" + route + " stackDepth=" + ProfileSelectFmt(depth))
+    while m.stack.Count() > 0
+        entry = m.stack[m.stack.Count() - 1]
+        if entry.screen <> invalid then
+            if entry.screen.hasField("dispose") then entry.screen.dispose = true
+            m.screenHost.removeChild(entry.screen)
+        end if
+        m.stack.Pop()
+    end while
+    ShowRoute(route, state, false)
+end function
+
 ' Pop the top screen and reveal the one beneath it (true if a pop happened). Returning
 ' to a live instance avoids stacking fresh screens (e.g. a second HomeScreen whose hero
 ' would keep auto-rotating underneath).
@@ -42,6 +57,9 @@ function NavigatePop() as boolean
 end function
 
 sub ShowRoute(route as string, state as object, replace as boolean)
+    mode = "push"
+    if replace then mode = "replace"
+    ProfileSelectLog("NAV", mode + " route=" + route + " stackDepth=" + ProfileSelectFmt(m.stack.Count()))
     if replace and m.stack.Count() > 0 then
         entry = m.stack[m.stack.Count() - 1]
         if entry.screen <> invalid then

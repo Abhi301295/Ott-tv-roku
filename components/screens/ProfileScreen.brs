@@ -2,10 +2,24 @@ sub init()
     m.title = m.top.findNode("title")
     m.errorLabel = m.top.findNode("errorLabel")
     m.skeletonGroup = m.top.findNode("skeletonGroup")
+    m.profilesScrollHost = m.top.findNode("profilesScrollHost")
+    m.profilesViewport = m.top.findNode("profilesViewport")
     m.profilesContainer = m.top.findNode("profilesContainer")
+    m.headerTextBackdrop = m.top.findNode("headerTextBackdrop")
+    m.listContentPadY = ProfileListTopY()
+    m.listScrollY = 0
+    m.listScrollTarget = 0
+    m.LIST_SCROLL_ANIM_STEPS = 18
+    m.listScrollAnimTimer = CreateObject("roSGNode", "Timer")
+    m.listScrollAnimTimer.duration = 0.016
+    m.listScrollAnimTimer.repeat = true
+    m.top.appendChild(m.listScrollAnimTimer)
+    m.listScrollAnimTimer.observeField("fire", "OnListScrollAnimTick")
     m.logoutBtn = m.top.findNode("logoutBtn")
     m.confirmPopup = m.top.findNode("confirmPopup")
     m.otpPopup = m.top.findNode("otpPopup")
+    m.selectingOverlay = m.top.findNode("selectingOverlay")
+    m.selectingLabel = m.top.findNode("selectingLabel")
     m.autoSelectTimer = m.top.findNode("autoSelectTimer")
     m.bgImage = m.top.findNode("bgImage")
     m.bgOverlay = m.top.findNode("bgOverlay")
@@ -34,11 +48,19 @@ sub init()
     m.autoClock = CreateObject("roTimespan")
     m.autoStartMs = 0
     m.autoArmedIndex = -1
+    m.PROFILE_FETCH_MAX_RETRIES = 3
+    m.profileFetchRetriesLeft = 0
+    m.profileFetchRefreshTried = false
+    m.profileFetchAwaiting = false
 
     m.title.text = CopyChooseProfile()
     m.logoutBtn.label = CopyLogout()
 
     LoadProfileTokens()
+    m.uiSpec = ProfileUiSpec()
+    m.useSquareAvatars = ProfileUsesSquareAvatars()
+    ApplyProfileLayoutFromSpec()
+    ApplyProfileSkeletonLayout()
     ApplyProfileColors()
     ApplyProfileBranding()
 
@@ -67,6 +89,37 @@ sub init()
     ' MUST use a Bearer path (same auth as select-profile). CHECK_UPDATE uses Basic auth
     ' and poisons the pooled connection — select-profile then 404s until app reload.
     WarmHttpConnections(Endpoints().PROFILE.GET_LOGIN_PROFILES)
+    ProfileSelectLog("PROFILE_INIT", "mounted")
+end sub
+
+' Tear down timers/tasks when ViewManager removes this screen (prevents orphaned
+' auto-select ticks and late apiResult handlers after logout/navigation).
+sub OnDispose()
+    if not m.top.dispose then return
+    ProfileSelectLogNode("PROFILE_DISPOSE", "stopping timers + tasks", m.top)
+    if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
+    KillProfileTask(m.profilesTask)
+    KillProfileTask(m.logoutTask)
+    KillProfileTask(m.verifyTask)
+    KillProfileTask(m.refreshTask)
+    KillProfileTask(m.selectTask)
+    if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
+    if m.listScrollAnimTimer <> invalid then m.listScrollAnimTimer.control = "stop"
+    m.profilesTask = invalid
+    m.selectTask = invalid
+    m.logoutTask = invalid
+    m.verifyTask = invalid
+    m.refreshTask = invalid
+    m.selecting = false
+    m.loggingOut = false
+    if m.global <> invalid and m.global.hasField("businessResolved") then
+        m.global.unobserveField("businessResolved")
+    end if
+end sub
+
+sub KillProfileTask(task as object)
+    if task = invalid then return
+    task.unobserveField("apiResult")
 end sub
 
 ' ── Theme ────────────────────────────────────────────────────────────────────
@@ -80,10 +133,13 @@ sub LoadProfileTokens()
     m.cPrimary600 = TC("primary-600", "#0760bb")
     m.cPrimary700 = TC("primary-700", "#04478b")
     m.cNeutral50 = TC("neutral-50", "#ffffff")
+    m.cNeutral100 = TC("neutral-100", "#f8f8f8")
     m.cNeutral300 = TC("neutral-300", "#d6d6d6")
-    m.cNeutral400 = TC("neutral-400", "#9ea4b0")
+    m.cNeutral400 = TC("neutral-400", "#c8c8c8")
+    m.cAmber400 = "0xf59e0bff"
     m.cNeutral500 = TC("neutral-500", "#e279ce")
-    m.cNeutral600 = TC("neutral-600", "#a12189")
+    m.cNeutral600 = TC("neutral-600", "#3d3d3d")
+    m.cNeutral800 = TC("neutral-800", "#121212")
     m.cNeutral700 = "0x404040ff"
     ' neutral-900 (tertiary/background) drives the themed dialog surfaces, matching
     ' React's bg-neutral-900 on the confirm/OTP popups.
@@ -98,6 +154,87 @@ end sub
 function TC(name as string, fallbackHex as string) as string
     return ThemeTokenColor(m.tokens, name, fallbackHex)
 end function
+
+' React userProfile.tsx branches on HEADER_STYLE === NETFLIX vs SIDEBAR (cases 4/6).
+function ProfileUsesSquareAvatars() as boolean
+    return ThemeIsSidebarHeader()
+end function
+
+function ProfileRowPitch() as integer
+    if ProfileUsesSquareAvatars() then return ProfileUiRowPitch()
+    return 210
+end function
+
+sub ApplyProfileLayoutFromSpec()
+    if m.uiSpec = invalid then m.uiSpec = ProfileUiSpec()
+    titlePos = ProfileUiTitlePos()
+    listPos = ProfileUiProfilesPos()
+    listTopY = ProfileListTopY()
+    if m.title <> invalid then
+        m.title.translation = [titlePos.x, titlePos.y]
+        titleFont = m.title.findNode("font")
+        if titleFont <> invalid then titleFont.size = m.uiSpec.titleFont
+    end if
+    if m.errorLabel <> invalid then
+        m.errorLabel.translation = [titlePos.x, titlePos.y + m.uiSpec.titleFont + 8]
+    end if
+    if m.profilesScrollHost <> invalid then
+        m.profilesScrollHost.translation = [listPos.x, 0]
+    end if
+    if m.profilesViewport <> invalid then
+        vw = ProfileListViewportWidth()
+        vh = ProfileListViewportHeight()
+        m.profilesViewport.maskSize = [vw, vh]
+        m.profilesViewport.maskOffset = [0, listTopY]
+    end if
+    m.listContentPadY = listTopY
+    if m.skeletonGroup <> invalid then
+        m.skeletonGroup.translation = [listPos.x, listTopY]
+    end if
+    ApplyProfileHeaderBackdrop()
+    ProfileUiLogScreen(titlePos.x, titlePos.y, listPos.x, listTopY, ProfileRowPitch())
+end sub
+
+sub ApplyProfileHeaderBackdrop()
+    if m.headerTextBackdrop = invalid then return
+    if m.uiSpec = invalid then m.uiSpec = ProfileUiSpec()
+    s = m.uiSpec
+    titlePos = ProfileUiTitlePos()
+    padX = s.headerBackdropPadX
+    padY = s.headerBackdropPadY
+    topY = s.logoY - padY
+    if topY < 0 then topY = 0
+    bottomY = titlePos.y + s.titleFont + padY
+    w = 900 + padX * 2
+    m.headerTextBackdrop.translation = [titlePos.x - padX, topY]
+    m.headerTextBackdrop.width = w
+    m.headerTextBackdrop.height = bottomY - topY
+    m.headerTextBackdrop.opacity = s.headerBackdropOpacity
+end sub
+
+sub ApplyProfileSkeletonLayout()
+    pitch = ProfileRowPitch()
+    square = ProfileUsesSquareAvatars()
+    slots = [
+        { a: "sk0a", b: "sk0b", y: 0 }
+        { a: "sk1a", b: "sk1b", y: pitch }
+        { a: "sk2a", b: "sk2b", y: pitch * 2 }
+    ]
+    for each slot in slots
+        skA = m.top.findNode(slot.a)
+        skB = m.top.findNode(slot.b)
+        if skA <> invalid then skA.translation = [0, slot.y]
+        if skB <> invalid then
+            if square then
+                skB.visible = false
+                skB.running = false
+            else
+                skB.visible = true
+                skB.translation = [170, slot.y + 66]
+            end if
+        end if
+    end for
+end sub
 
 sub ApplyProfileColors()
     m.title.color = m.cNeutral50
@@ -132,15 +269,191 @@ sub ApplyProfileColors()
     m.otpPopup.cNeutral600 = m.cNeutral600
     m.otpPopup.cNeutral700 = m.cNeutral700
     m.otpPopup.cCardBg = m.cNeutral900
+
+    ' Profile name inherits body/title light text (React: same tone as text-neutral-50 h1).
+    for each av in m.avatars
+        if av <> invalid then
+            if av.hasField("nameColor") then av.nameColor = m.cNeutral50
+            if av.hasField("hintColor") then av.hintColor = m.cNeutral400
+        end if
+    end for
+end sub
+
+' Cumulative row layout — each row gets the height of its scaled card + name (+ hint).
+sub LayoutProfileRows()
+    ReflowProfileRows()
+    UpdateProfileListScrollTarget()
+    AnimateProfileListScroll()
+end sub
+
+sub ReflowProfileRows()
+    if m.avatars = invalid or m.avatars.Count() = 0 then return
+
+    ' All header styles share the same list top — first row never sits under logo/title.
+    padY = ProfileListTopY()
+    m.listContentPadY = padY
+    gap = 0
+    if m.useSquareAvatars = true and m.uiSpec <> invalid then gap = m.uiSpec.rowGap
+
+    y = padY
+    m.rowTops = []
+    for i = 0 to m.avatars.Count() - 1
+        m.rowTops.Push(y)
+        m.avatars[i].translation = [0, y]
+        h = ProfileAvatarRowHeight(i)
+        y = y + h
+        if i < m.avatars.Count() - 1 and gap > 0 then y = y + gap
+    end for
+    m.listContentHeight = y
+end sub
+
+sub UpdateProfileListScrollTarget()
+    if m.rowTops = invalid or m.rowTops.Count() = 0 then
+        m.listScrollTarget = 0
+        return
+    end if
+    if m.listScrollTarget = invalid then m.listScrollTarget = 0
+
+    viewH = ProfileListViewportHeight()
+    padY = ProfileListTopY()
+    if m.listContentPadY <> invalid and m.listContentPadY > 0 then padY = m.listContentPadY
+    target = m.listScrollY
+    if target = invalid then target = 0
+
+    if m.focusArea = "profiles" and m.profileIndex >= 0 and m.profileIndex < m.rowTops.Count() then
+        idx = m.profileIndex
+        rowTop = m.rowTops[idx]
+        rowBottom = rowTop + ProfileAvatarRowHeight(idx)
+        visTop = rowTop - target
+        visBottom = rowBottom - target
+        if visTop < padY then
+            target = rowTop - padY
+        else if visBottom > padY + viewH then
+            target = rowBottom - padY - viewH
+        end if
+    end if
+
+    contentH = m.listContentHeight
+    if contentH = invalid then contentH = padY
+    maxScroll = contentH - padY - viewH
+    if maxScroll < 0 then maxScroll = 0
+    if target > maxScroll then target = maxScroll
+    if target < 0 then target = 0
+    m.listScrollTarget = target
+end sub
+
+sub AnimateProfileListScroll()
+    if m.profilesContainer = invalid then return
+    if m.listScrollTarget = invalid then m.listScrollTarget = 0
+    if m.listScrollY = invalid then m.listScrollY = 0
+
+    delta = m.listScrollTarget - m.listScrollY
+    if delta < 0 then delta = -delta
+    if delta < 1 then
+        m.listScrollY = m.listScrollTarget
+        m.profilesContainer.translation = [0, -m.listScrollY]
+        if m.listScrollAnimTimer <> invalid then m.listScrollAnimTimer.control = "stop"
+        return
+    end if
+
+    m.listScrollAnimFrom = m.listScrollY
+    m.listScrollAnimTo = m.listScrollTarget
+    m.listScrollAnimStep = 0
+    if m.listScrollAnimTimer <> invalid then
+        m.listScrollAnimTimer.control = "stop"
+        m.listScrollAnimTimer.control = "start"
+    end if
+end sub
+
+sub OnListScrollAnimTick()
+    if m.profilesContainer = invalid then return
+    m.listScrollAnimStep = m.listScrollAnimStep + 1
+    t = m.listScrollAnimStep / m.LIST_SCROLL_ANIM_STEPS
+    if t > 1.0 then t = 1.0
+
+    inv = 1.0 - t
+    eased = 1.0 - (inv * inv * inv)
+    y = m.listScrollAnimFrom + ((m.listScrollAnimTo - m.listScrollAnimFrom) * eased)
+    m.listScrollY = y
+    m.profilesContainer.translation = [0, -m.listScrollY]
+
+    if t >= 1.0 and m.listScrollAnimTimer <> invalid then
+        m.listScrollAnimTimer.control = "stop"
+        m.listScrollY = m.listScrollTarget
+        m.profilesContainer.translation = [0, -m.listScrollY]
+    end if
+end sub
+
+sub ApplyProfileListScrollSnap()
+    UpdateProfileListScrollTarget()
+    if m.listScrollTarget = invalid then m.listScrollTarget = 0
+    m.listScrollY = m.listScrollTarget
+    if m.listScrollAnimTimer <> invalid then m.listScrollAnimTimer.control = "stop"
+    if m.profilesContainer <> invalid then m.profilesContainer.translation = [0, -m.listScrollY]
+end sub
+
+function ProfileAvatarRowHeight(index as integer) as integer
+    if index < 0 or index >= m.avatars.Count() then return ProfileRowPitch()
+    if m.useSquareAvatars <> true then return ProfileRowPitch()
+    av = m.avatars[index]
+    if av <> invalid and av.hasField("layoutHeight") and av.layoutHeight > 0 then
+        return av.layoutHeight
+    end if
+    focused = (m.focusArea = "profiles" and index = m.profileIndex)
+    showHint = false
+    if focused and av <> invalid and av.hasField("hintText") then
+        txt = av.hintText
+        showHint = (txt <> invalid and txt <> "")
+    end if
+    return ProfileSquareRowContentHeight(focused, showHint)
+end function
+
+sub OnAvatarLayoutChanged(event as object)
+    if m.top.dispose = true then return
+    if m.useSquareAvatars <> true then return
+    ReflowProfileRows()
+    UpdateProfileListScrollTarget()
+    SmoothProfileListScrollStep()
+end sub
+
+' Gentle scroll follow while a row grows/shrinks during focus scale animation.
+sub SmoothProfileListScrollStep()
+    if m.profilesContainer = invalid then return
+    if m.listScrollTarget = invalid then m.listScrollTarget = 0
+    if m.listScrollY = invalid then m.listScrollY = 0
+    delta = m.listScrollTarget - m.listScrollY
+    if delta > -0.5 and delta < 0.5 then
+        m.listScrollY = m.listScrollTarget
+    else
+        m.listScrollY = m.listScrollY + (delta * 0.28)
+    end if
+    m.profilesContainer.translation = [0, -m.listScrollY]
 end sub
 
 ' The resolved business config (theme tokens + branding) arrived/updated — re-apply
 ' so the dialog colors, logo and login background reflect the live theme.
 sub OnBusinessResolved()
     LoadProfileTokens()
+    m.uiSpec = ProfileUiSpec()
+    m.useSquareAvatars = ProfileUsesSquareAvatars()
+    ApplyProfileLayoutFromSpec()
+    ApplyProfileSkeletonLayout()
     ApplyProfileColors()
+    ApplySquareAvatarColors()
     ApplyProfileBranding()
     ApplyProfileFocus()
+end sub
+
+sub ApplySquareAvatarColors()
+    if m.useSquareAvatars <> true then return
+    for each av in m.avatars
+        av.cardTopColor = m.cNeutral600
+        av.cardBottomColor = m.cNeutral800
+        av.cardBackingColor = m.cBg
+        av.borderColor = m.cPrimary700
+        av.nameColor = m.cNeutral50
+        av.hintColor = m.cNeutral400
+    end for
 end sub
 
 sub ApplyProfileBranding()
@@ -171,12 +484,24 @@ end sub
 ' ── Loading / shimmer ──────────────────────────────────────────────────────────
 
 sub ShowLoading(show as boolean)
+    ApplyProfileSkeletonLayout()
     m.skeletonGroup.visible = show
     for each id in ["sk0a", "sk0b", "sk1a", "sk1b", "sk2a", "sk2b"]
         sk = m.top.findNode(id)
         if sk <> invalid then sk.running = show
     end for
-    m.profilesContainer.visible = not show
+    host = m.profilesScrollHost
+    if host = invalid then host = m.profilesContainer
+    if host <> invalid then host.visible = not show
+end sub
+
+sub ShowSelectingOverlay(show as boolean)
+    if m.selectingOverlay <> invalid then m.selectingOverlay.visible = show
+    if m.selectingLabel <> invalid then
+        m.selectingLabel.text = CopySelecting()
+        if show then m.selectingLabel.color = m.cPrimary500
+    end if
+    if m.logoutBtn <> invalid and show then m.logoutBtn.visible = false
 end sub
 
 sub ShowProfileError(msg as string)
@@ -187,29 +512,123 @@ end sub
 ' ── Fetch profiles ───────────────────────────────────────────────────────────
 
 sub FetchProfiles()
+    m.profileFetchRetriesLeft = m.PROFILE_FETCH_MAX_RETRIES
+    m.profileFetchRefreshTried = false
+    m.profileFetchAwaiting = false
+    if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
+    FireProfileFetch()
+end sub
+
+sub FireProfileFetch()
+    if m.profileFetchAwaiting = true then return
+    KillProfileTask(m.profilesTask)
+    m.profilesTask = invalid
     path = Endpoints().PROFILE.GET_LOGIN_PROFILES
     m.profilesTask = ApiGet(path)
+    m.profileFetchAwaiting = true
     m.profilesTask.observeField("apiResult", "OnProfilesResponse")
     StartHttpTask(m.profilesTask)
 end sub
 
-sub OnProfilesResponse()
-    if m.profilesTask = invalid then return
-    api = m.profilesTask.apiResult
+sub ScheduleProfileFetchRetry()
+    if m.profileFetchRetryTimer = invalid then
+        m.profileFetchRetryTimer = CreateObject("roSGNode", "Timer")
+        m.profileFetchRetryTimer.duration = 0.75
+        m.profileFetchRetryTimer.repeat = false
+        m.top.appendChild(m.profileFetchRetryTimer)
+        m.profileFetchRetryTimer.observeField("fire", "OnProfileFetchRetry")
+    end if
+    m.profileFetchRetryTimer.control = "stop"
+    m.profileFetchRetryTimer.control = "start"
+end sub
+
+sub OnProfileFetchRetry()
+    if m.top.dispose = true then return
+    if IsOrphaned() then return
+    if m.profileFetchAwaiting = true then return
+    FireProfileFetch()
+end sub
+
+sub AttemptProfileFetchRefresh()
+    if GetRefreshToken() = "" then
+        ProfileFetchGiveUp()
+        return
+    end if
+    ProfileSelectLogNode("PROFILE_FETCH", "refresh session", m.top)
+    KillProfileTask(m.refreshTask)
+    m.refreshTask = ApiGet(Endpoints().LOGIN.REFRESH_TOKEN)
+    m.refreshTask.observeField("apiResult", "OnProfileFetchRefreshResponse")
+    StartHttpTask(m.refreshTask)
+end sub
+
+sub OnProfileFetchRefreshResponse()
+    if m.top.dispose = true then return
+    if IsOrphaned() then return
+    if m.refreshTask = invalid then return
+    api = m.refreshTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then return
+
+    if api.ok and ApplyRefreshTokens(api.result) then
+        ProfileSelectLogNode("PROFILE_FETCH", "refresh ok -> retry list", m.top)
+        m.profileFetchRetriesLeft = m.PROFILE_FETCH_MAX_RETRIES
+        m.profileFetchAwaiting = false
+        FireProfileFetch()
+        return
+    end if
+
+    ProfileSelectLogNode("PROFILE_FETCH", "refresh failed httpStatus=" + ProfileSelectFmt(api.httpStatus), m.top)
+    ProfileFetchGiveUp()
+end sub
+
+sub ProfileFetchGiveUp()
+    ShowLoading(false)
+    ProfileSelectLogNode("PROFILE_FETCH", "give up -> login", m.top)
+    ShowProfileError(MsgFailedLoadProfiles())
+    LogoutToLogin(false)
+end sub
+
+sub OnProfilesResponse(event as object)
+    if m.top.dispose = true then return
+    if IsOrphaned() then
+        ProfileSelectLogNode("PROFILE_FETCH", "response ignored (orphaned)", m.top)
+        return
+    end if
+
+    task = invalid
+    if event <> invalid then task = event.getRoSGNode()
+    if task = invalid then task = m.profilesTask
+    if task = invalid then return
+    if m.profilesTask <> invalid and not task.isSameNode(m.profilesTask) then return
+
+    m.profileFetchAwaiting = false
+    api = task.apiResult
     if api = invalid then return
 
     if HandleSessionExpiry(m.top, api) then return
 
-    ShowLoading(false)
-
     if not api.ok or api.result = invalid then
-        ShowProfileError(MsgFailedLoadProfiles())
-        LogoutToLogin(false)
+        if api.httpStatus = 401 and m.profileFetchRefreshTried <> true then
+            m.profileFetchRefreshTried = true
+            AttemptProfileFetchRefresh()
+            return
+        end if
+        if ProfileFetchRetriable(api.httpStatus) and m.profileFetchRetriesLeft > 0 then
+            m.profileFetchRetriesLeft = m.profileFetchRetriesLeft - 1
+            ProfileSelectLogNode("PROFILE_FETCH", "retry httpStatus=" + ProfileSelectFmt(api.httpStatus) + " left=" + ProfileSelectFmt(m.profileFetchRetriesLeft), m.top)
+            ScheduleProfileFetchRetry()
+            return
+        end if
+        ProfileFetchGiveUp()
         return
     end if
 
+    m.profileFetchRefreshTried = false
+    ShowLoading(false)
+
     m.profiles = ExtractProfiles(api.result)
     m.profilesLoaded = true
+    ProfileSelectLogNode("PROFILE_FETCH", "ok count=" + ProfileSelectFmt(m.profiles.Count()), m.top)
     SaveProfilesMeta(m.profiles)
     BuildAvatars()
 
@@ -233,28 +652,46 @@ function InitialFocusIndex() as integer
 end function
 
 sub BuildAvatars()
+    m.listScrollY = 0
     ' Clear any previous avatars.
     while m.profilesContainer.getChildCount() > 0
         m.profilesContainer.removeChildIndex(0)
     end while
     m.avatars = []
 
+    pitch = ProfileRowPitch()
+    square = ProfileUsesSquareAvatars()
+    compName = "ProfileAvatar"
+    if square then compName = "ProfileAvatarSquare"
+
     for i = 0 to m.profiles.Count() - 1
         p = m.profiles[i]
-        av = m.profilesContainer.createChild("ProfileAvatar")
-        av.bgColor = m.cAvatarBg
-        av.ringColor = m.cNeutral50
-        av.nameColor = m.cNeutral50
-        ' Keep enough pitch for the enlarged focused avatar while fitting 4 rows.
-        av.translation = [0, i * 210]
+        av = m.profilesContainer.createChild(compName)
         nm = ""
         if p.name <> invalid then nm = p.name
         av.profileName = nm
         av.initials = ProfileInitials(nm)
-        if p.avatar <> invalid then av.avatarUri = p.avatar
         av.parentalLock = (p.parentalLock = true)
+        av.rowIndex = i
+
+        if square then
+            av.cardTopColor = m.cNeutral600
+            av.cardBottomColor = m.cNeutral800
+            av.cardBackingColor = m.cBg
+            av.borderColor = m.cPrimary700
+            av.nameColor = m.cNeutral50
+            av.hintColor = m.cNeutral400
+            av.observeField("layoutHeight", "OnAvatarLayoutChanged")
+        else
+            av.bgColor = m.cAvatarBg
+            av.ringColor = m.cNeutral50
+            av.nameColor = m.cNeutral50
+            if p.avatar <> invalid then av.avatarUri = p.avatar
+        end if
         m.avatars.Push(av)
     end for
+    ReflowProfileRows()
+    ApplyProfileListScrollSnap()
 end sub
 
 ' ── Focus ────────────────────────────────────────────────────────────────────
@@ -264,18 +701,34 @@ sub ApplyProfileFocus()
         av = m.avatars[i]
         focused = (m.focusArea = "profiles" and i = m.profileIndex)
         if focused then
-            av.hintText = FocusHint(i)
+            if m.selecting then
+                av.hintText = CopySelecting()
+                av.hintColor = m.cPrimary500
+            else
+                av.hintText = FocusHint(i)
+                if ProfileNeedsPin(m.profiles[i]) then
+                    av.hintColor = m.cAmber400
+                else
+                    av.hintColor = m.cNeutral400
+                end if
+            end if
         else
             av.hintText = ""
         end if
         ' Progress reflects the focused profile's auto-select elapsed; others reset.
         if focused then
-            av.progress = AutoProgressFor(i)
+            if m.selecting then
+                av.progress = 1.0
+            else
+                av.progress = AutoProgressFor(i)
+            end if
         else
             av.progress = 0.0
         end if
         av.focusedState = focused
     end for
+
+    ShowSelectingOverlay(m.selecting)
 
     ' Logout button focus (bg-primary-600 when focused). Selection is shown by the
     ' fill change only — no drop shadow (kept as-is per the current correct look;
@@ -286,12 +739,21 @@ sub ApplyProfileFocus()
         m.logoutBtn.bgColor = m.cPrimary500
     end if
     m.logoutBtn.showShadow = false
+    LayoutProfileRows()
 end sub
 
-' Locked profiles show a PIN hint; unlocked ones show the filling progress ring (no text).
+' Locked profiles show a PIN hint; square avatars also show auto-select countdown text.
 function FocusHint(index as integer) as string
     p = m.profiles[index]
     if ProfileNeedsPin(p) then return CopyEnterPinHint()
+    if m.useSquareAvatars = true and m.autoArmedIndex = index then
+        frac = AutoProgressFor(index)
+        if frac > 0 and frac < 1.0 then
+            secs = Int((1.0 - frac) * 15 + 0.999)
+            if secs < 1 then secs = 1
+            return CopyAutoSelectingIn(secs)
+        end if
+    end if
     return ""
 end function
 
@@ -322,35 +784,40 @@ sub OnKey()
 end sub
 
 sub HandleProfilesKey(key as string)
+    changed = false
     if key = "up" then
         if m.profileIndex > 0 then
             m.profileIndex = m.profileIndex - 1
+            changed = true
         end if
-        ResetAutoSelect()
-        ApplyProfileFocus()
     else if key = "down" then
         if m.profileIndex < m.profiles.Count() - 1 then
             m.profileIndex = m.profileIndex + 1
-        else if m.logoutBtn.visible then
+            changed = true
+        else if m.logoutBtn.visible and m.focusArea <> "logout" then
             m.focusArea = "logout"
+            changed = true
         end if
-        ResetAutoSelect()
-        ApplyProfileFocus()
     else if key = "left" or key = "right" then
-        ResetAutoSelect()
-        ApplyProfileFocus()
+        ' Single-column list — no horizontal move; do not reset auto-select.
+        return
     else if key = "OK" or key = "ok" then
         if m.profiles.Count() > 0 then SelectProfile(m.profiles[m.profileIndex])
+        return
+    end if
+    if changed then
+        ResetAutoSelect()
+        ApplyProfileFocus()
     end if
 end sub
 
 sub HandleLogoutKey(key as string)
     if key = "up" then
-        if m.profiles.Count() > 0 then
+        if m.focusArea = "logout" and m.profiles.Count() > 0 then
             m.focusArea = "profiles"
+            ResetAutoSelect()
+            ApplyProfileFocus()
         end if
-        ResetAutoSelect()
-        ApplyProfileFocus()
     else if key = "OK" or key = "ok" then
         OpenConfirm()
     end if
@@ -459,27 +926,81 @@ sub SelectProfile(profile as object)
 end sub
 
 sub DoSelectProfile(profileId as string)
-    ' Guard against a second trigger (auto-select tick racing a manual press, or a double
-    ' press) starting another navigation, which would mount Home twice.
-    if m.selecting then return
+    if m.selecting then
+        ProfileSelectLogNode("PROFILE_SELECT", "skipped (already selecting)", m.top)
+        return
+    end if
+    if IsOrphaned() then
+        ProfileSelectLogNode("PROFILE_SELECT", "skipped (orphaned) id=" + profileId, m.top)
+        return
+    end if
     m.selecting = true
     StopAutoSelect()
-    ' Navigate to Home immediately and hand off the chosen profile + avatar; Home
-    ' establishes the session (select-profile) behind its shimmer, so there is no
-    ' full-screen loader on this screen.
-    avatar = ""
-    if m.selectedProfile <> invalid and m.selectedProfile.avatar <> invalid then avatar = m.selectedProfile.avatar
-    SetValueByKey(SK_SelectedItem(), "Home", "app")
-    if m.vm <> invalid then
-        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
-    else
-        ' Navigation unavailable — don't leave the screen permanently locked behind the
-        ' m.selecting guard; surface an error and let the user try again.
-        m.selecting = false
-        ShowAlert(m.top, 2, MsgFailedSelectProfile())
-        ResetAutoSelect()
-        ApplyProfileFocus()
+    ShowSelectingOverlay(true)
+    ApplyProfileFocus()
+    m.pendingNavigateProfileId = profileId
+    m.pendingNavigateAvatar = ""
+    if m.selectedProfile <> invalid and m.selectedProfile.avatar <> invalid then
+        m.pendingNavigateAvatar = m.selectedProfile.avatar
     end if
+    ProfileSelectLogNode("PROFILE_SELECT", "api select id=" + profileId, m.top)
+    WarmHttpConnections(SelectProfilePath())
+    KillProfileTask(m.selectTask)
+    m.selectTask = ApiPost(SelectProfilePath(), SelectProfilePayload(profileId))
+    m.selectTask.observeField("apiResult", "OnProfileSelectResponse")
+    StartHttpTask(m.selectTask)
+end sub
+
+sub OnProfileSelectResponse()
+    if m.top.dispose = true then return
+    if not m.selecting then return
+    if m.selectTask = invalid then return
+    api = m.selectTask.apiResult
+    if api = invalid then return
+
+    if HandleSessionExpiry(m.top, api) then
+        m.selecting = false
+        ShowSelectingOverlay(false)
+        ApplyProfileFocus()
+        return
+    end if
+
+    profileId = m.pendingNavigateProfileId
+    avatar = m.pendingNavigateAvatar
+    ok = false
+    if api.ok and ApplySelectProfileTokens(api.result) then ok = true
+    if not ok and api.httpStatus = 404 and (GetRefreshToken() <> "" or GetAccessToken() <> "") then
+        ProfileSelectLogNode("PROFILE_SELECT", "select 404 ignored (session valid)", m.top)
+        ok = true
+    end if
+
+    if ok then
+        PersistSelectedProfile(profileId, avatar)
+        m.selecting = false
+        ShowSelectingOverlay(false)
+        m.pendingNavigateProfileId = ""
+        m.pendingNavigateAvatar = ""
+        ProfileSelectLogNode("PROFILE_SELECT", "select ok -> navigate Home", m.top)
+        SetValueByKey(SK_SelectedItem(), "Home", "app")
+        if m.vm <> invalid then
+            m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
+        else
+            ProfileSelectLogNode("PROFILE_SELECT_FAIL", "vm invalid id=" + profileId, m.top)
+            ShowAlert(m.top, 2, MsgFailedSelectProfile())
+            ResetAutoSelect()
+            ApplyProfileFocus()
+        end if
+        return
+    end if
+
+    m.selecting = false
+    ShowSelectingOverlay(false)
+    m.pendingNavigateProfileId = ""
+    m.pendingNavigateAvatar = ""
+    ProfileSelectLogNode("PROFILE_SELECT_FAIL", "httpStatus=" + ProfileSelectFmt(api.httpStatus), m.top)
+    ShowAlert(m.top, 2, MsgFailedSelectProfile())
+    ResetAutoSelect()
+    ApplyProfileFocus()
 end sub
 
 ' ── Logout ───────────────────────────────────────────────────────────────────
@@ -531,10 +1052,11 @@ end sub
 
 ' Clear the session and return to login. showToast => "Logged out successfully".
 sub LogoutToLogin(showToast as boolean)
+    ProfileSelectLogNode("PROFILE_LOGOUT", "clear storage showToast=" + ProfileSelectFmt(showToast), m.top)
     ClearStorage()
     SetOverlayOpen(false)
     if showToast then ShowAlert(m.top, 1, MsgLoggedOut())
-    if m.vm <> invalid then m.vm.callFunc("NavigateReplace", RouteLogin(), {})
+    if m.vm <> invalid then m.vm.callFunc("NavigateClearAndReplace", RouteLogin(), {})
 end sub
 
 ' ── OTP (parental lock) ──────────────────────────────────────────────────────

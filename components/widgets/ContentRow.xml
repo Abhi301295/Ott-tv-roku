@@ -8,6 +8,8 @@
     <field id="cardFocusIndex" type="integer" value="0" onChange="OnCardFocusChanged" />
     <field id="rowFocused" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <field id="rowDimmed" type="boolean" value="false" onChange="OnRowVisualChanged" />
+    <!-- Hidden while scrolled above focus, or when header/hero owns the screen (netflixContent). -->
+    <field id="rowSuppressed" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <!-- Row stays visible below the hero when header/hero has focus (parity: netflixContent row 0). -->
     <field id="rowPeekVisible" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <field id="cardCount" type="integer" value="0" />
@@ -38,6 +40,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/ContentRow.brs" />
 

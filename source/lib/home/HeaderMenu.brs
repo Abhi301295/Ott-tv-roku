@@ -16,11 +16,11 @@ function HeaderMenuItems(reelsEnabled as boolean) as object
         { text: "Movies", route: RouteGenere(), type: HM_TypeSingleVideo() }
         { text: "Series", route: RouteGenere(), type: HM_TypeSeries() }
         { text: "My Watchlist", route: RouteMyListDetail(), type: "" }
-        { text: "Profile", route: RouteLoginProfile(), type: "" }
     ]
     if reelsEnabled then
         items.Push({ text: "Reels", route: RouteReels(), type: "" })
     end if
+    items.Push({ text: "Profile", route: RouteLoginProfile(), type: "" })
     return items
 end function
 

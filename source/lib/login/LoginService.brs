@@ -78,6 +78,20 @@ sub ApplyLoginTokens(deviceToken as object)
     end if
 end sub
 
+' Refresh session (parity with checkRefreshToken in login/services/action.ts).
+function ApplyRefreshTokens(result as object) as boolean
+    if result = invalid then return false
+    authToken = result.authToken
+    if authToken = invalid or authToken = "" then return false
+    SetAccessToken(authToken)
+    SetCognitoToken(authToken)
+    refreshToken = result.refreshToken
+    if refreshToken <> invalid and refreshToken <> "" then
+        SetRefreshToken(refreshToken)
+    end if
+    return true
+end function
+
 ' Navigate after successful login (parity with handleRedirect in login/index.tsx).
 sub HandleLoginRedirect(deviceToken as object, viewManager as object, fromNode = invalid as object)
     if deviceToken = invalid or viewManager = invalid then return

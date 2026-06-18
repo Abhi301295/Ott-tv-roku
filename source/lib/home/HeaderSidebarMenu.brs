@@ -7,11 +7,11 @@ function SidebarMenuItems(reelsEnabled as boolean) as object
         { text: "Movies", route: RouteGenere(), type: HM_TypeSingleVideo(), icon: "pkg:/images/ui/menu_tv.png", iconActive: "pkg:/images/ui/menu_tv_active.png" }
         { text: "Series", route: RouteGenere(), type: HM_TypeSeries(), icon: "pkg:/images/ui/menu_play.png", iconActive: "pkg:/images/ui/menu_play_active.png" }
         { text: "My Watchlist", route: RouteMyListDetail(), type: "", icon: "pkg:/images/ui/menu_list.png", iconActive: "pkg:/images/ui/menu_list_active.png" }
-        { text: "Profile", route: RouteLoginProfile(), type: "", icon: "pkg:/images/ui/menu_profile.png", iconActive: "pkg:/images/ui/menu_profile_active.png" }
     ]
     if reelsEnabled then
         items.Push({ text: "Reels", route: RouteReels(), type: "", icon: "pkg:/images/ui/menu_reels.png", iconActive: "pkg:/images/ui/menu_reels_active.png" })
     end if
+    items.Push({ text: "Profile", route: RouteLoginProfile(), type: "", icon: "pkg:/images/ui/menu_profile.png", iconActive: "pkg:/images/ui/menu_profile_active.png" })
     return items
 end function
 

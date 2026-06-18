@@ -21,7 +21,9 @@
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileSelectTrace.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
