@@ -122,7 +122,7 @@ function CreateScreenForRoute(route as string, state as object) as object
         screen.navState = state
         return screen
     end if
-    if route = RouteSeries() then
+    if route = RouteSeries() or route = RouteGenere() or route = RouteNewRelease() then
         screen = CreateObject("roSGNode", "SeriesScreen")
         screen.navState = state
         return screen

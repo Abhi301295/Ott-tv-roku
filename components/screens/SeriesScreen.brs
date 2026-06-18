@@ -39,8 +39,14 @@ sub OnNavStateReady()
     if state.genere_id <> invalid then m.genreId = state.genere_id
     if state.genere_title <> invalid and state.genere_title <> "" then
         m.titleLabel.text = state.genere_title
+    else if state.selectedID <> invalid and state.selectedID <> "" then
+        m.titleLabel.text = state.selectedID
     else if state.title <> invalid then
         m.titleLabel.text = state.title
+    else if m.listType = "SERIES_AND_EPISODES" then
+        m.titleLabel.text = "Series"
+    else if m.listType = "SINGLE_VIDEO" then
+        m.titleLabel.text = "Movies"
     end if
     if m.listType = "" then return
     ResetAndFetch()

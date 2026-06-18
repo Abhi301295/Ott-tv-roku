@@ -368,6 +368,15 @@ sub ClearActionFocus()
 end sub
 
 sub UpdateWatchlistLabel()
+    if m.watchlistBtn = invalid then return
+    if m.watchlistBusy then
+        if m.isWatchlisted then
+            m.watchlistBtn.label = CopyRemovingWatchlist()
+        else
+            m.watchlistBtn.label = CopyAddingWatchlist()
+        end if
+        return
+    end if
     if m.isWatchlisted then
         m.watchlistBtn.label = CopyRemoveWatchlist()
     else
@@ -400,6 +409,7 @@ sub HandleActionsKey(key as string)
         if m.actionIndex < m.actionIds.Count() - 1 then m.actionIndex = m.actionIndex + 1
         ApplyActionFocus()
     else if key = "OK" or key = "ok" then
+        if m.watchlistBusy then return
         id = m.actionIds[m.actionIndex]
         if id = "watchNow" then
             OnWatchNow(false)
@@ -492,6 +502,7 @@ end sub
 sub OnWatchlistToggle()
     if m.watchlistBusy or m.contentId = "" then return
     m.watchlistBusy = true
+    UpdateWatchlistLabel()
     path = Endpoints().DETAIL.WATCH_LIST
     m.watchlistTask = ApiGetQuery(path, { content: m.contentId })
     m.watchlistTask.observeField("apiResult", "OnWatchlistFoldersResponse")
@@ -505,6 +516,13 @@ sub OnWatchlistFoldersResponse()
     api = m.watchlistTask.apiResult
     m.watchlistTask = invalid
 
+    if api = invalid or api.ok <> true then
+        m.watchlistBusy = false
+        UpdateWatchlistLabel()
+        ShowAlert(m.top, 2, CopyDetailLoadFailed())
+        return
+    end if
+
     folders = []
     if api <> invalid and api.result <> invalid and api.result.data <> invalid then
         folders = api.result.data
@@ -512,6 +530,7 @@ sub OnWatchlistFoldersResponse()
 
     if folders.Count() = 0 then
         m.watchlistBusy = false
+        UpdateWatchlistLabel()
         ShowAlert(m.top, 2, "No watchlist folder found")
         return
     end if
@@ -526,10 +545,11 @@ sub OnWatchlistFoldersResponse()
 
     if folder = invalid or folder._id = invalid then
         m.watchlistBusy = false
+        UpdateWatchlistLabel()
         return
     end if
 
-    if folder.isChecked = true then
+    if folder.isChecked = true or m.isWatchlisted = true then
         path = Endpoints().DETAIL.REMOVE_FROM_WATCH_LIST + folder._id + "/content"
         m.watchlistMutTask = ApiDelete(path, { content: m.contentId })
     else
@@ -548,7 +568,8 @@ sub OnWatchlistMutResponse()
     m.watchlistMutTask = invalid
     m.watchlistBusy = false
 
-    if api = invalid or api.statusCode = invalid or api.statusCode <> 200 then
+    if api = invalid or api.ok <> true then
+        UpdateWatchlistLabel()
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         return
     end if
@@ -648,23 +669,27 @@ end sub
 sub BuildMoreLikeCards()
     ClearMoreLikeCards()
     x = 0
-    gap = 10
-    cardW = 226
+    gap = HC_CardGap()
+    cardW = BS_ListCardW()
+    pitch = BS_ListCardPitch()
     for i = 0 to m.moreLikeVideos.Count() - 1
         item = m.moreLikeVideos[i]
         if item = invalid then continue for
         card = m.moreLikeCardsHost.createChild("VerticalCard")
         card.translation = [x, 0]
+        card.listType = true
         card.cPrimary500 = m.cPrimary500
         card.cPrimary700 = m.cPrimary700
         card.cNeutral700 = m.cNeutral700
+        card.cNeutral800 = m.cNeutral800
         uri = ""
         if item.thumbnails <> invalid then
+            ' Parity SeriesCard — horizontal art in 272×340 with object-cover (scaleToZoom).
             uri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
         end if
         card.thumbnailUri = uri
         m.moreLikeCards.Push(card)
-        x = x + cardW + gap
+        x = x + pitch
     end for
 end sub
 
@@ -699,14 +724,44 @@ sub ApplyMoreLikeCloseFocus()
     end if
 end sub
 
+' Keep the focused card in view without over-scrolling — same clamp as ContentRow.brs
+' ScrollToFocusedCard so navigating right does not leave empty space on the right.
 sub ScrollMoreLikeToFocused()
     if m.moreLikeCards.Count() = 0 then return
-    cardW = 236
-    targetX = 40 - (m.moreLikeIndex * cardW)
-    if targetX > 40 then targetX = 40
-    minX = 40 - ((m.moreLikeCards.Count() - 1) * cardW)
-    if targetX < minX then targetX = minX
-    m.moreLikeCardsHost.translation = [targetX, 612]
+    if m.moreLikeCardsHost = invalid then return
+
+    idx = m.moreLikeIndex
+    if idx < 0 then idx = 0
+    if idx >= m.moreLikeCards.Count() then idx = m.moreLikeCards.Count() - 1
+
+    leftPad = 40
+    cardW = BS_ListCardW()
+    gap = HC_CardGap()
+    pitch = cardW + gap
+    viewportW = 1920 - leftPad - 64
+
+    cardLeft = idx * pitch
+    cardRight = cardLeft + cardW
+
+    currentScroll = leftPad - m.moreLikeCardsHost.translation[0]
+    if currentScroll < 0 then currentScroll = 0
+
+    scrollX = currentScroll
+    if cardLeft < scrollX then
+        scrollX = cardLeft
+    else if cardRight > scrollX + viewportW then
+        scrollX = cardRight - viewportW
+    end if
+
+    n = m.moreLikeCards.Count()
+    totalW = n * cardW + (n - 1) * gap
+    maxScroll = totalW - viewportW
+    if maxScroll < 0 then maxScroll = 0
+
+    if scrollX < 0 then scrollX = 0
+    if scrollX > maxScroll then scrollX = maxScroll
+
+    m.moreLikeCardsHost.translation = [leftPad - scrollX, 612]
 end sub
 
 sub CloseMoreLike(refocus as boolean)
