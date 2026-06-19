@@ -109,3 +109,26 @@ end function
 function ProfileListViewportWidth() as integer
     return ProfileUiSpec().hintRowWidth
 end function
+
+function ProfileArcFrameCount() as integer
+    return 151
+end function
+
+function ProfileArcFrameUriForIndex(idx as integer) as string
+    last = ProfileArcFrameCount() - 1
+    if idx < 0 then idx = 0
+    if idx > last then idx = last
+    suffix = idx.ToStr()
+    if idx < 10 then
+        suffix = "00" + suffix
+    else if idx < 100 then
+        suffix = "0" + suffix
+    end if
+    return "pkg:/images/ui/profile_arc_" + suffix + ".png"
+end function
+
+function ProfileArcFrameUriForProgress(progress as float) as string
+    last = ProfileArcFrameCount() - 1
+    idx = Int(progress * last + 0.5)
+    return ProfileArcFrameUriForIndex(idx)
+end function

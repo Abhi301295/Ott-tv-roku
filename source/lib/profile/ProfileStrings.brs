@@ -23,8 +23,18 @@ function CopyAutoSelectingIn(secs as integer) as string
     return "Auto-selecting in " + secs.ToStr() + "s"
 end function
 
-function CopySelecting() as string
-    return "Setting up your profile..."
+function CopyWelcomeBack(name as string) as string
+    if name = invalid or name = "" then return "Welcome back"
+    return "Welcome back, " + name
+end function
+
+function CopySelectingStatusMessages() as object
+    return [
+        "Preparing your home...",
+        "Loading your recommendations...",
+        "Curating your watchlist...",
+        "Almost there..."
+    ]
 end function
 
 ' Toast / inline messages (parity with messages.ts)

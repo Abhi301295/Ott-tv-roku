@@ -14,9 +14,9 @@
   <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileService.brs" />
@@ -82,17 +82,7 @@
     <ConfirmPopup id="confirmPopup" visible="false" />
     <OtpPopup id="otpPopup" visible="false" />
 
-    <!-- Full-screen feedback while select-profile API runs before Home loads. -->
-    <Group id="selectingOverlay" visible="false">
-      <Rectangle width="1920" height="1080" color="0x141414cc" />
-      <BusySpinner id="selectSpinner" translation="[932, 490]" visible="true">
-        <Poster role="poster" uri="pkg:/images/ui/spinner.png" width="56" height="56" />
-      </BusySpinner>
-      <Label id="selectingLabel" text="Setting up your profile..." translation="[710, 570]" width="500" height="44"
-        horizAlign="center" vertAlign="top" color="0x0b75e0ff">
-        <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="26" />
-      </Label>
-    </Group>
+    <ProfileSelectingOverlay id="selectingOverlay" visible="false" />
 
     <Timer id="autoSelectTimer" duration="0.1" repeat="true" />
   </children>

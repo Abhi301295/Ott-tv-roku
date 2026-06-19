@@ -19,7 +19,6 @@ sub init()
     m.offsetInterp = m.top.findNode("offsetInterp")
     m.sizeAnimTimer = m.top.findNode("sizeAnimTimer")
 
-    m.ARC_FRAMES = 151
     ' OTTPlay React parity: focused profile wrapper uses origin-left scale-125.
     m.FOCUS_SCALE = 1.25
     m.REST_SCALE = 1.0
@@ -87,7 +86,7 @@ sub OnFocusChanged()
 
     m.progressTrack.visible = showArc
     m.progressArc.visible = showArc
-    if showArc then m.progressArc.uri = ArcFrameUri(progress)
+    if showArc then m.progressArc.uri = ProfileArcFrameUriForProgress(progress)
 
     m.ring.visible = (focused and not showArc)
     m.dot.visible = (focused and not showArc)
@@ -209,18 +208,3 @@ sub ApplyAvatarSize(scale as float)
     end if
 end sub
 
-' Map progress (0..1) to one of the pre-rendered arc frames (parity with the
-' reference's UiProfileProgressArcUri frame mapping).
-function ArcFrameUri(progress as float) as string
-    last = m.ARC_FRAMES - 1
-    idx = Int(progress * last + 0.5)
-    if idx < 0 then idx = 0
-    if idx > last then idx = last
-    suffix = idx.ToStr()
-    if idx < 10 then
-        suffix = "00" + suffix
-    else if idx < 100 then
-        suffix = "0" + suffix
-    end if
-    return "pkg:/images/ui/profile_arc_" + suffix + ".png"
-end function
