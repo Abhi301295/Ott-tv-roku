@@ -154,6 +154,11 @@ function ThemeIsNetflixHeader() as boolean
     return ThemeHeaderStyle() = TC_HeaderNetflix()
 end function
 
+' True when the layout exposes top Netflix bar or left sidebar nav.
+function ThemeHasHomeNav() as boolean
+    return ThemeIsSidebarHeader() or ThemeIsNetflixHeader()
+end function
+
 ' Sidebar widths — parity header.tsx collapsed (~100px) vs expanded (~220px).
 function ThemeSidebarCollapsedWidth() as integer
     return 100

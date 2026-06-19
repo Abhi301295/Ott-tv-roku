@@ -1,6 +1,10 @@
 sub init()
     m.screenHost = m.top.findNode("screenHost")
+    m.appHeader = m.top.findNode("appHeader")
     m.stack = []
+    m.menuItems = []
+    m.shellMenuBuilt = false
+    m.shellMenuReels = invalid
     m.top.overlayOpen = false
     m.top.observeField("overlayDismiss", "OnOverlayDismissChanged")
 end sub
@@ -54,6 +58,7 @@ function NavigatePop() as boolean
     end if
     m.top.currentRoute = prev.route
     m.top.navState = prev.state
+    SetupAppHeader(m.top, prev.route, prev.state)
     m.top.overlayOpen = false
     return true
 end function
@@ -84,15 +89,26 @@ sub ShowRoute(route as string, state as object, replace as boolean)
 
     m.top.currentRoute = route
     m.top.navState = state
+    SetupAppHeader(m.top, route, state)
+    AssignScreenNavState(screen, state)
     screen.setFocus(true)
 end sub
+
+sub AssignScreenNavState(screen as object, state as object)
+    if screen = invalid then return
+    if screen.hasField("navState") then screen.navState = state
+end sub
+
+function HandleShellKey(key as string, press as boolean) as boolean
+    if not press then return false
+    return AppShellHandleHeaderKey(m.top, key)
+end function
 
 ' Replace navigation: pause the outgoing screen, dispose it, and drop any HTTP jobs
 ' still waiting in the pool queue so Movies (or any new route) is not starved by Home
 ' boot fetches the user abandoned mid-load.
 sub TeardownReplacedScreen(screen as object)
     if screen = invalid then return
-    BrowseDbg("nav_teardown", "replace — pause dispose drain-http-queue")
     if screen.hasField("visible") then screen.visible = false
     if screen.hasField("dispose") then screen.dispose = true
     DrainHttpQueueForNavigation()
@@ -100,49 +116,29 @@ sub TeardownReplacedScreen(screen as object)
 end sub
 
 function CreateScreenForRoute(route as string, state as object) as object
-    BrowseDbg("create_screen", "route=" + route)
-    BrowseDbgState("create_screen_state", state)
     if route = RouteLogin() then
-        screen = CreateObject("roSGNode", "LoginScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "LoginScreen")
     end if
     if route = RouteLoginProfile() then
-        screen = CreateObject("roSGNode", "ProfileScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "ProfileScreen")
     end if
     if route = RouteHome() then
-        screen = CreateObject("roSGNode", "HomeScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "HomeScreen")
     end if
     if route = RouteDetail() then
-        screen = CreateObject("roSGNode", "DetailScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "DetailScreen")
     end if
     if route = RouteVideoPlayer() then
-        screen = CreateObject("roSGNode", "VideoPlayerScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "VideoPlayerScreen")
     end if
     if route = RouteSeriesEpisodes() then
-        screen = CreateObject("roSGNode", "SeriesEpisodesScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "SeriesEpisodesScreen")
     end if
     if route = RouteGenere() then
-        BrowseDbg("create_screen", "component=GenreListScreen")
-        screen = CreateObject("roSGNode", "GenreListScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "GenreListScreen")
     end if
     if route = RouteSeries() or route = RouteNewRelease() then
-        BrowseDbg("create_screen", "component=SeriesScreen")
-        screen = CreateObject("roSGNode", "SeriesScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "SeriesScreen")
     end if
     return CreatePlaceholderScreen(route, state)
 end function

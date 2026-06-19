@@ -18,10 +18,27 @@ sub ApplyHeaderSelection()
     if m.activeHeader <> invalid then
         m.activeHeader.visible = true
     end if
-    SyncToActiveHeader()
+    SyncAllToActiveHeader()
 end sub
 
-sub SyncToActiveHeader()
+' Full sync — header widget switch / first paint only.
+sub SyncAllToActiveHeader()
+    SyncMenuToActiveHeader()
+    SyncFocusToActiveHeader()
+    SyncBrandingToActiveHeader()
+    SyncThemeToActiveHeader()
+    SyncScrimToActiveHeader()
+end sub
+
+' Focus / selection must NOT reassign menuItems — that rebuilds every row in BuildMenu().
+sub SyncFocusToActiveHeader()
+    if m.activeHeader = invalid then return
+    m.activeHeader.focusedIndex = m.top.focusedIndex
+    m.activeHeader.selectedIndex = m.top.selectedIndex
+    m.activeHeader.headerActive = m.top.headerActive
+end sub
+
+sub SyncMenuToActiveHeader()
     if m.activeHeader = invalid then return
     if m.activeHeader.hasField("menuItems") then
         m.activeHeader.menuItems = m.top.menuItems
@@ -29,41 +46,50 @@ sub SyncToActiveHeader()
     if m.activeHeader.hasField("menuTexts") then
         m.activeHeader.menuTexts = m.top.menuTexts
     end if
-    m.activeHeader.focusedIndex = m.top.focusedIndex
-    m.activeHeader.selectedIndex = m.top.selectedIndex
-    m.activeHeader.headerActive = m.top.headerActive
+end sub
+
+sub SyncBrandingToActiveHeader()
+    if m.activeHeader = invalid then return
     m.activeHeader.logoUri = m.top.logoUri
     if m.activeHeader.hasField("logoCroppedUri") then
         m.activeHeader.logoCroppedUri = m.top.logoCroppedUri
     end if
     m.activeHeader.appName = m.top.appName
     m.activeHeader.avatarUri = m.top.avatarUri
+end sub
+
+sub SyncThemeToActiveHeader()
+    if m.activeHeader = invalid then return
     m.activeHeader.cPrimary500 = m.top.cPrimary500
     m.activeHeader.cNeutral50 = m.top.cNeutral50
     m.activeHeader.cNeutral200 = m.top.cNeutral200
     m.activeHeader.cNeutral800 = m.top.cNeutral800
     m.activeHeader.cNeutral950 = m.top.cNeutral950
+end sub
+
+sub SyncScrimToActiveHeader()
+    if m.activeHeader = invalid then return
     if m.activeHeader.hasField("scrimOpacity") then
         m.activeHeader.scrimOpacity = m.top.scrimOpacity
     end if
 end sub
 
 sub OnMenuChanged()
-    SyncToActiveHeader()
+    SyncMenuToActiveHeader()
 end sub
 
 sub OnFocusProxy()
-    SyncToActiveHeader()
+    SyncFocusToActiveHeader()
 end sub
 
 sub OnBrandingProxy()
-    SyncToActiveHeader()
+    SyncBrandingToActiveHeader()
 end sub
 
 sub OnThemeProxy()
-    SyncToActiveHeader()
+    SyncThemeToActiveHeader()
 end sub
 
 sub OnScrimProxy()
-    SyncToActiveHeader()
+    SyncScrimToActiveHeader()
 end sub

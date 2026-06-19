@@ -7,10 +7,10 @@ function BrowseDbgStr(val as dynamic) as string
         if val = true then return "true"
         return "false"
     end if
-    if t = "roInteger" or t = "Integer" then return Str(val).Trim()
+    if t = "roInteger" or t = "Integer" or t = "roInt" then return Str(val).Trim()
     if t = "roFloat" or t = "Float" then return Str(val).Trim()
     if t = "roString" or t = "String" then return val
-    return "" + val
+    return Str(val).Trim()
 end function
 
 sub BrowseDbg(tag as string, detail as string)

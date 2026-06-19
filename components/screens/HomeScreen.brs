@@ -1,8 +1,7 @@
 sub init()
     m.hero = m.top.findNode("hero")
-    m.headerNetflix = m.top.findNode("homeHeaderNetflix")
-    m.headerSidebar = m.top.findNode("homeHeaderSidebar")
-    ApplyActiveHeader()
+    m.vm = FindViewManager(m.top)
+    m.header = FindAppHeader(m.top)
     m.rowsHost = m.top.findNode("rowsHost")
     m.rowsAnim = m.top.findNode("rowsAnim")
     m.rowsInterp = m.top.findNode("rowsInterp")
@@ -27,8 +26,8 @@ sub init()
     m.cardIndex = 0
     m.loadingMore = false
 
-    ' Land on content once rows are ready (LG netflixContent sets FocusKey.CONTENT).
-    ' Until then the header stays focused so nav remains usable during shimmer.
+    ' Auto-land on first row only when there is no header/sidebar nav; otherwise stay on Home.
+    ' Until rows are ready the header stays focused so nav remains usable during shimmer.
     m.focusZone = "header"
     m.pendingContentFocus = true
     m.menuItems = []
@@ -83,15 +82,14 @@ sub init()
     m.top.appendChild(m.continueBootTimeout)
     m.continueBootTimeout.observeField("fire", "OnContinueBootTimeout")
 
-    m.vm = FindViewManager(m.top)
-
-    ' Select-profile runs on Home (behind the shimmer) so the profile screen can navigate
+    ' Select-profile runs on Home
     ' here instantly — no full-screen loader. The chosen profile id + avatar arrive via
     ' navState, which ViewManager assigns AFTER init() returns, so the boot sequence is
     ' deferred to OnNavStateReady (see TryStartHomeBoot).
     m.pendingSelectId = ""
     m.pendingSelectAvatar = ""
     m.bootStarted = false
+    m.homeNavReady = false
     m.contentBootStarted = false
     m.selectInFlight = false
     m.selectAwaitingApiResult = false
@@ -109,7 +107,6 @@ sub init()
     m.selectWatchdog.repeat = false
     m.top.appendChild(m.selectWatchdog)
     m.selectWatchdog.observeField("fire", "OnSelectWatchdog")
-    m.top.observeField("navState", "OnNavStateReady")
 
     LoadThemeTokens()
     if m.global <> invalid then
@@ -165,19 +162,44 @@ sub init()
     m.cwRevealAtMs = -1
 
     if m.layoutAnim <> invalid then m.layoutAnim.observeField("state", "OnLayoutAnimState")
+end sub
 
-    SetupHeader()
+' ViewManager assigns navState after SetupAppHeader — see OnNavStateReady.
+sub OnNavStateReady()
+    if m.homeNavReady = true then return
+    m.homeNavReady = true
+    SyncHeaderFromShell()
+    ClaimHomeHeaderFocus()
+    TryStartHomeBoot()
+end sub
+
+sub ClaimHomeHeaderFocus()
+    if not ThemeHasHomeNav() then return
+    if not IsHomeForeground() then return
+    if m.vm = invalid then m.vm = FindViewManager(m.top)
+    if m.header = invalid then m.header = FindAppHeader(m.top)
+    if m.header = invalid then return
+    idx = HeaderSelectedIndex(m.menuItems, RouteHome())
+    if idx < 0 then idx = 0
     if ThemeIsSidebarHeader() then
         EnterSidebarHomeDefault(false)
     else
         EnterHeader(false)
     end if
-    ' Boot (redirect check, shimmer, API calls) waits for navState — see OnNavStateReady.
 end sub
 
-' ViewManager assigns navState after init(); consume it once and start the boot sequence.
-sub OnNavStateReady()
-    TryStartHomeBoot()
+sub SyncHeaderFromShell()
+    if m.vm = invalid then m.vm = FindViewManager(m.top)
+    if m.header = invalid then m.header = FindAppHeader(m.top)
+    if m.header = invalid then return
+    if m.vm <> invalid and m.vm.menuItems <> invalid then m.menuItems = m.vm.menuItems
+    if m.vm <> invalid and m.vm.shellFocus = "header" then
+        m.focusZone = "header"
+        if m.header.focusedIndex <> invalid then m.menuIndex = m.header.focusedIndex
+    end if
+    ApplyHeaderTheme()
+    ApplyHeaderBranding()
+    UpdateHeaderScrimForHero()
 end sub
 
 sub ConsumeHomeNavState()
@@ -290,7 +312,6 @@ sub OnDispose()
     end if
     m.top.unobserveField("keyEvent")
     m.top.unobserveField("visible")
-    m.top.unobserveField("navState")
 end sub
 
 ' Stop a finished/in-flight HTTP task and detach its result listener.
@@ -391,7 +412,7 @@ sub OnBusinessResolved()
     LoadThemeTokens()
     InjectRowTheme()
     ApplyThemeToHero()
-    SetupHeader()
+    if IsHomeForeground() then SetupHeader()
 end sub
 
 sub InjectRowTheme()
@@ -413,15 +434,7 @@ sub ApplyThemeToRow(row as object)
 end sub
 
 sub ApplyActiveHeader()
-    if ThemeIsSidebarHeader() then
-        m.header = m.headerSidebar
-        if m.headerNetflix <> invalid then m.headerNetflix.visible = false
-        if m.headerSidebar <> invalid then m.headerSidebar.visible = true
-    else
-        m.header = m.headerNetflix
-        if m.headerNetflix <> invalid then m.headerNetflix.visible = true
-        if m.headerSidebar <> invalid then m.headerSidebar.visible = false
-    end if
+    m.header = FindAppHeader(m.top)
 end sub
 
 sub ApplyLayoutGeometry(animate = false as boolean)
@@ -576,7 +589,17 @@ end sub
 ' ── Header (parity with ottHeader.tsx NetflixHeader) ─────────────────────────
 
 sub SetupHeader()
+    if m.header = invalid then m.header = FindAppHeader(m.top)
     if m.header = invalid then return
+
+    if m.vm = invalid then m.vm = FindViewManager(m.top)
+    if m.vm <> invalid and m.vm.menuItems <> invalid and m.vm.menuItems.Count() > 0 then
+        m.menuItems = m.vm.menuItems
+        ApplyHeaderTheme()
+        ApplyHeaderBranding()
+        UpdateHeaderScrimForHero()
+        return
+    end if
 
     reels = false
     resolved = invalid
@@ -651,18 +674,34 @@ end sub
 
 sub EnterHeader(animateLayout = true as boolean)
     if m.header = invalid then return
+    if not IsHomeForeground() then return
     m.focusZone = "header"
     m.menuIndex = m.header.selectedIndex
-    m.header.focusedIndex = m.menuIndex
-    m.header.headerActive = true
+    if m.vm <> invalid then
+        ShellEnterHeader(m.vm, m.menuIndex)
+    else
+        m.header.focusedIndex = m.menuIndex
+        m.header.headerActive = true
+    end if
     if ThemeIsSidebarHeader() then ApplyLayoutGeometry(animateLayout)
-    row = CurrentRow()
-    if row <> invalid then row.cardFocusIndex = -1
+    ClearAllRowCardFocus()
     ApplyAllRowFocusStates()
 end sub
 
+sub ClearAllRowCardFocus()
+    if m.rowWidgets = invalid then return
+    for each row in m.rowWidgets
+        if row <> invalid and row.hasField("cardFocusIndex") then row.cardFocusIndex = -1
+    end for
+end sub
+
 sub ExitHeaderToRows()
-    if m.header <> invalid then m.header.headerActive = false
+    if not IsHomeForeground() then return
+    if m.vm <> invalid then
+        ShellEnterContent(m.vm)
+    else if m.header <> invalid then
+        m.header.headerActive = false
+    end if
     if ThemeIsSidebarHeader() then ApplyLayoutGeometry(true)
     m.focusZone = "rows"
     ApplyHomeFocus()
@@ -699,7 +738,12 @@ end sub
 
 ' RIGHT leaves sidebar — collapse to icons and restore hero or row focus.
 sub ExitHeaderToPrevious()
-    if m.header <> invalid then m.header.headerActive = false
+    if not IsHomeForeground() then return
+    if m.vm <> invalid then
+        ShellEnterContent(m.vm)
+    else if m.header <> invalid then
+        m.header.headerActive = false
+    end if
     if ThemeIsSidebarHeader() then ApplyLayoutGeometry(true)
 
     zone = m.headerReturnZone
@@ -717,15 +761,33 @@ sub ExitHeaderToPrevious()
     ApplyHomeFocus()
 end sub
 
-' LG netflixContent.tsx sets initial focus to CONTENT once category data is ready.
+' Rows ready / CW painted: stay on Home menu when header/sidebar exist; otherwise land row 0 once.
 sub MaybeLandContentFocus()
-    if not m.pendingContentFocus then return
+    if not IsHomeForeground() then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
-    m.pendingContentFocus = false
-    if ThemeIsSidebarHeader() then
-        EnterSidebarHomeDefault(false)
+
+    if ThemeHasHomeNav() then
+        m.pendingContentFocus = false
+        if m.focusZone = "header" then
+            if m.header <> invalid and m.header.headerActive <> true then
+                if ThemeIsSidebarHeader() then
+                    EnterSidebarHomeDefault(false)
+                else
+                    EnterHeader(false)
+                end if
+            end if
+            return
+        end if
+        if ThemeIsSidebarHeader() then
+            EnterSidebarHomeDefault(false)
+        else
+            EnterHeader(false)
+        end if
         return
     end if
+
+    if not m.pendingContentFocus then return
+    m.pendingContentFocus = false
     if m.focusZone = "header" then ExitHeaderToRows()
 end sub
 
@@ -814,7 +876,11 @@ sub EnterHeroOrHeader()
 end sub
 
 sub EnterHeroFromHeader()
-    if m.header <> invalid then m.header.headerActive = false
+    if m.vm <> invalid then
+        ShellEnterContent(m.vm)
+    else if m.header <> invalid then
+        m.header.headerActive = false
+    end if
     if HeroAvailable() then
         EnterHero("next")
     else if m.rowWidgets.Count() > 0 then
@@ -828,7 +894,11 @@ end sub
 sub EnterHero(target as string)
     if not HeroAvailable() then return
     m.focusZone = "hero"
-    if m.header <> invalid then m.header.headerActive = false
+    if m.vm <> invalid then
+        ShellEnterContent(m.vm)
+    else if m.header <> invalid then
+        m.header.headerActive = false
+    end if
     ' Drop any card highlight while the hero is focused.
     for each row in m.rowWidgets
         if row <> invalid then row.cardFocusIndex = -1
@@ -950,8 +1020,6 @@ sub SelectHeaderItem()
 
     if m.vm <> invalid then
         state = { type: item.type, selectedID: item.text }
-        BrowseDbg("header_nav", "route=" + item.route + " text=" + item.text + " type=" + BrowseDbgStr(item.type))
-        BrowseDbgState("header_nav_state", state)
         m.vm.callFunc("NavigateReplace", item.route, state)
     end if
 end sub
@@ -1554,6 +1622,8 @@ sub OnRowBuildTick()
     span = CreateObject("roTimespan")
     row = m.rowsHost.createChild("ContentRow")
     ApplyThemeToRow(row)
+    ' Default cardFocusIndex=0 would highlight card 0 while nodes build — clear before data.
+    row.cardFocusIndex = -1
     ' Only row 0 builds immediately — row 1+ are shells until CW has painted, so their
     ' card nodes cannot steal the render thread from the first visible strip.
     if m.rowBuildIndex = 0 then
@@ -1643,15 +1713,14 @@ end sub
 sub PrepareFirstRowReveal()
     EnsureFirstRowVisibleUnderShimmer()
     m.rowsRevealed = true
-    ApplyAllRowFocusStates()
     HomeBootLog(m.bootSpan, "rows revealed", "shimmer off")
     LogCwRowState("cards painted -> hide shimmer")
     ShowRowsSkeleton(false)
     UpdateRowsScrim()
     LogCwRowState("shimmer hidden")
-    MaybeLandContentFocus()
     ApplyHomeFocus()
-    LogCwRowState("post-focus")
+    MaybeLandContentFocus()
+    LogCwRowState("post-focus zone=" + m.focusZone)
     ScheduleSecondRowWarmup()
 end sub
 
@@ -1887,7 +1956,6 @@ sub OnKey()
     key = ev.key
     ' Give the render thread to this interaction: suspend any in-progress background build.
     BeginInteraction()
-    print "[KEYDBG] OnKey key='"; key; "' zone='"; m.focusZone; "' heroFocus='"; m.heroFocus; "'"
 
     if m.focusZone = "header" then
         HandleHeaderKey(key)

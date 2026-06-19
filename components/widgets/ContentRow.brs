@@ -5,6 +5,7 @@ sub init()
     m.cardWidths = []
     m.seeAllOrientation = HC_CardTypeVertical()
     if m.rowTitle <> invalid then m.rowTitle.opacity = 0.0
+    ApplyRowTitleFont()
 
     ' Cards are built progressively (a small chunk per tick) instead of all-at-once.
     ' Creating a full row's cards synchronously blocks the render thread for hundreds of
@@ -47,6 +48,23 @@ sub OnCategoryChanged()
     BuildRowCards()
 end sub
 
+sub OnRowTitleFontChanged()
+    ApplyRowTitleFont()
+end sub
+
+sub ApplyRowTitleFont()
+    if m.rowTitle = invalid then return
+    size = m.top.rowTitleFontSize
+    if size = invalid or size < 12 then size = 41
+    font = m.rowTitle.font
+    if font = invalid then
+        font = CreateObject("roSGNode", "Font")
+        font.uri = "pkg:/fonts/Inter-Bold.ttf"
+        m.rowTitle.font = font
+    end if
+    font.size = size
+end sub
+
 sub OnThemeChanged()
     ApplyRowTheme()
     OnCardFocusChanged()
@@ -61,6 +79,7 @@ sub OnRowVisualChanged()
     ' netflixContent.tsx: focused=1, above focus=0, below focus=0.4 (OTT below stays 1.0).
     if m.top.rowFocused = true then
         m.top.opacity = 1.0
+        if m.top.ottRowReveal = true and m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
     else if m.top.rowSuppressed = true then
         m.top.opacity = 0.0
     else if m.top.rowPeekVisible = true then
@@ -320,9 +339,10 @@ end sub
 
 ' Reveal only when every card node exists AND its media is loaded, so the
 ' shimmer stays up continuously and the real strip swaps in instantly.
+' Genre / OTT catalogue: reveal once nodes exist — card skeletons cover thumb fetch.
 sub MaybeReveal()
     if not m.buildComplete then return
-    if m.pendingMediaLoads > 0 then return
+    if m.pendingMediaLoads > 0 and m.top.ottRowReveal <> true then return
     RevealNow()
 end sub
 
@@ -467,7 +487,7 @@ end sub
 sub ScrollToFocusedCard()
     if m.cardsHost = invalid then return
     idx = m.top.cardFocusIndex
-    if idx < 0 then idx = 0
+    if idx < 0 then return
     if m.cardWidths.Count() = 0 then return
     if idx >= m.cardWidths.Count() then idx = m.cardWidths.Count() - 1
 

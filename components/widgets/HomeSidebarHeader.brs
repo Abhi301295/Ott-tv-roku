@@ -29,6 +29,23 @@ sub init()
     m.currentWidth = m.COLLAPSED
     m.skipWidthAnim = true
     if m.widthAnim <> invalid then m.widthAnim.observeField("state", "OnWidthAnimState")
+
+    m.fontRegular = CreateObject("roSGNode", "Font")
+    m.fontRegular.uri = "pkg:/fonts/Inter-Regular.ttf"
+    m.fontRegular.size = 18
+
+    m.fontRegular20 = CreateObject("roSGNode", "Font")
+    m.fontRegular20.uri = "pkg:/fonts/Inter-Regular.ttf"
+    m.fontRegular20.size = 20
+
+    m.fontMedium20 = CreateObject("roSGNode", "Font")
+    m.fontMedium20.uri = "pkg:/fonts/Inter-Medium.ttf"
+    m.fontMedium20.size = 20
+
+    m.fontBold20 = CreateObject("roSGNode", "Font")
+    m.fontBold20.uri = "pkg:/fonts/Inter-Bold.ttf"
+    m.fontBold20.size = 20
+
     ApplyWidth(false)
 end sub
 
@@ -37,8 +54,9 @@ sub OnMenuChanged()
 end sub
 
 sub OnLayoutChanged()
-    ApplyWidth(true)
+    instant = m.top.instantLayout = true
     ApplyFocus()
+    ApplyWidth(not instant)
     OnLogoChanged()
 end sub
 
@@ -139,7 +157,7 @@ sub BuildMenu()
         lbl.color = m.top.cNeutral100
         lbl.visible = false
         if it.text <> invalid then lbl.text = it.text
-        ApplySidebarFont(lbl, "pkg:/fonts/Inter-Regular.ttf", 20)
+        ApplySidebarFont(lbl, "regular", 20)
 
         m.itemRows.Push({ row: row, bg: bg, icon: icon, label: lbl, item: it })
         y = y + m.ITEM_H + m.ITEM_GAP
@@ -199,12 +217,17 @@ sub OnFocusChanged()
     ApplyFocus()
 end sub
 
-sub ApplySidebarFont(lbl as object, uri as string, size as integer)
+sub ApplySidebarFont(lbl as object, weight as string, size as integer)
     if lbl = invalid then return
-    f = CreateObject("roSGNode", "Font")
-    f.uri = uri
-    f.size = size
-    lbl.font = f
+    if weight = "bold" and size = 20 then
+        lbl.font = m.fontBold20
+    else if weight = "medium" and size = 20 then
+        lbl.font = m.fontMedium20
+    else if size = 20 then
+        lbl.font = m.fontRegular20
+    else
+        lbl.font = m.fontRegular
+    end if
 end sub
 
 sub ApplyFocus()
@@ -233,15 +256,15 @@ sub ApplyFocus()
         if showSel then
             if lbl <> invalid then
                 lbl.color = m.top.cNeutral50
-                ApplySidebarFont(lbl, "pkg:/fonts/Inter-Bold.ttf", 20)
+                ApplySidebarFont(lbl, "bold", 20)
             end if
         else if lbl <> invalid then
             if isFoc then
                 lbl.color = m.top.cPrimary700
-                ApplySidebarFont(lbl, "pkg:/fonts/Inter-Medium.ttf", 20)
+                ApplySidebarFont(lbl, "medium", 20)
             else
                 lbl.color = m.top.cNeutral100
-                ApplySidebarFont(lbl, "pkg:/fonts/Inter-Regular.ttf", 18)
+                ApplySidebarFont(lbl, "regular", 18)
             end if
         end if
 

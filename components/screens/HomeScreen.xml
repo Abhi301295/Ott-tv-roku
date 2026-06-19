@@ -3,7 +3,7 @@
      features/home/index.tsx; rows mirror netflixContent.tsx + contentRow.tsx. -->
 <component name="HomeScreen" extends="Group">
   <interface>
-    <field id="navState" type="assocarray" />
+    <field id="navState" type="assocarray" onChange="OnNavStateReady" />
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
     <!-- Set by ViewManager right before this screen is removed, so we can stop the hero
          carousel + build timers (prevents orphaned auto-rotating heroes). -->
@@ -18,6 +18,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
@@ -33,6 +34,9 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeNav.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseDebug.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
 
   <children>
@@ -69,8 +73,6 @@
 
     <HomeSkeleton id="homeSkeleton" visible="true" />
 
-    <!-- Direct header nodes (no proxy host) — Netflix bar matches dev HomeHeader wiring. -->
-    <HomeHeader id="homeHeaderNetflix" translation="[0, 0]" visible="false" />
-    <HomeSidebarHeader id="homeHeaderSidebar" translation="[0, 0]" visible="false" />
+    <!-- Direct header nodes live on ViewManager appHeader (PageContainer parity). -->
   </children>
 </component>

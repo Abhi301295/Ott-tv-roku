@@ -2,6 +2,7 @@
 
 sub init()
     m.bg = m.top.findNode("bg")
+    m.contentHost = m.top.findNode("contentHost")
     m.hero = m.top.findNode("hero")
     m.genreSkeleton = m.top.findNode("genreSkeleton")
     m.rowsHost = m.top.findNode("rowsHost")
@@ -9,6 +10,7 @@ sub init()
     m.rowsInterp = m.top.findNode("rowsInterp")
     m.emptyLabel = m.top.findNode("emptyLabel")
     m.rowBuildTimer = m.top.findNode("rowBuildTimer")
+    m.prefetchWarmupTimer = m.top.findNode("prefetchWarmupTimer")
     m.heroSkeletonTimeout = m.top.findNode("heroSkeletonTimeout")
     m.rowsSkeletonTimeout = m.top.findNode("rowsSkeletonTimeout")
 
@@ -27,13 +29,14 @@ sub init()
     m.cardIndex = 0
     m.layoutAnchorY = GL_RowAnchorY()
     m.firstRowWatch = invalid
-    m.loadMoreSkeleton = invalid
+    m.prefetchWarmupIdx = 1
 
     m.vm = FindViewManager(m.top)
     LoadGenreTokens()
     ApplyStaticColors()
 
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.observeField("fire", "OnRowBuildTick")
+    if m.prefetchWarmupTimer <> invalid then m.prefetchWarmupTimer.observeField("fire", "OnPrefetchWarmupTick")
     if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.observeField("fire", "OnHeroSkeletonTimeout")
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.observeField("fire", "OnRowsSkeletonTimeout")
     if m.rowsAnim <> invalid then m.rowsAnim.observeField("state", "OnRowsAnimState")
@@ -54,7 +57,39 @@ sub OnNavStateReady()
         BrowseDbg("genre_nav_ready", "abort: listType empty")
         return
     end if
+    ApplyGenreShellLayout()
     ResetAndFetch()
+end sub
+
+sub ApplyGenreShellLayout()
+    header = FindAppHeader(m.top)
+    offX = ShellContentOffsetX(header)
+    viewportW = ShellContentViewportW(header)
+    if m.contentHost <> invalid then m.contentHost.translation = [offX, 0]
+    if m.hero <> invalid then
+        m.hero.contentWidth = viewportW
+        ApplyHeroTheme()
+    end if
+end sub
+
+sub OnShellEnterContent()
+    if m.top.shellEnterContent <> true then return
+    m.top.shellEnterContent = false
+    if not m.rowsRevealed then return
+    if m.categories.Count() = 0 then return
+    m.rowIndex = 0
+    m.cardIndex = 0
+    ApplyGenreFocus()
+end sub
+
+sub OnShellLayoutRev()
+    ApplyGenreShellLayout()
+end sub
+
+sub ClearGenreRowCardFocus()
+    for each row in m.rowWidgets
+        if row <> invalid and row.hasField("cardFocusIndex") then row.cardFocusIndex = -1
+    end for
 end sub
 
 sub OnDispose()
@@ -65,12 +100,12 @@ sub OnDispose()
     DetachFirstRowWatch()
     AbortAllGenreRowBuilds()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+    if m.prefetchWarmupTimer <> invalid then m.prefetchWarmupTimer.control = "stop"
     if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
     if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "stop"
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     KillCatalogueTask(m.catalogueTask)
     m.catalogueTask = invalid
-    HideLoadMoreSkeleton()
     if m.hero <> invalid then
         m.hero.unobserveField("posterReady")
         m.hero.visible = false
@@ -97,30 +132,55 @@ sub OnBusinessResolved()
     ApplyStaticColors()
     ApplyHeroTheme()
     RefreshRowThemes()
+    ApplyGenreShellLayout()
 end sub
 
 sub LoadGenreTokens()
     m.tokens = {}
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then m.tokens = tm.themeTokens
-    m.cPrimary500 = TCg("primary-500", "#0b75e0")
-    m.cPrimary600 = TCg("primary-600", "#0760bb")
-    m.cPrimary700 = TCg("primary-700", "#04478b")
-    m.cNeutral50 = TCg("neutral-50", "#f5f5f5")
-    m.cNeutral700 = TCg("neutral-700", "#404040")
-    m.cNeutral800 = TCg("neutral-800", "#262626")
-    m.cNeutral950 = TCg("neutral-950", "#0a0a0a")
+
+    ' Fallbacks mirror HomeScreen LoadThemeTokens / React dark.theme.ts.
+    m.cPrimary500 = TokenColor(m.tokens, "primary-500", "#0092ff")
+    m.cPrimary600 = TokenColor(m.tokens, "primary-600", "#459adb")
+    m.cPrimary700 = TokenColor(m.tokens, "primary-700", "#80bbe9")
+    m.cNeutral50 = TokenColor(m.tokens, "neutral-50", "#ffffff")
+    m.cNeutral100 = TokenColor(m.tokens, "neutral-100", "#f8f8f8")
+    m.cNeutral700 = TokenColor(m.tokens, "neutral-700", "#181818")
+    m.cNeutral800 = TokenColor(m.tokens, "neutral-800", "#121212")
+    m.cNeutral950 = TokenColor(m.tokens, "neutral-900", "#0a0a0a")
 end sub
 
-function TCg(name as string, fallbackHex as string) as string
-    return ThemeTokenColor(m.tokens, name, fallbackHex)
+function TokenColor(tokens as object, name as string, fallbackHex as string) as string
+    hex = fallbackHex
+    if tokens <> invalid and tokens[name] <> invalid and tokens[name] <> "" then
+        hex = tokens[name]
+    end if
+    if Left(hex, 1) = "#" then hex = Mid(hex, 2)
+    if Len(hex) = 8 then return "0x" + hex
+    if Len(hex) = 6 then return "0x" + hex + "ff"
+    return "0x0b75e0ff"
 end function
 
 sub ApplyStaticColors()
+    ' Full-screen chrome stays dark like HomeScreen.xml / HeroBannerOtt (poster covers the rest).
     if m.bg <> invalid then m.bg.color = "0x0a0a0aff"
-    if m.emptyLabel <> invalid then m.emptyLabel.color = "0xf5f5f5ff"
+    if m.emptyLabel <> invalid then
+        m.emptyLabel.color = m.cNeutral50
+        ApplyEmptyLabelFont()
+    end if
     ApplyHeroTheme()
     ApplySkeletonColors()
+end sub
+
+sub ApplyEmptyLabelFont()
+    if m.emptyLabel = invalid then return
+    if m.emptyLabelFont = invalid then
+        m.emptyLabelFont = CreateObject("roSGNode", "Font")
+        m.emptyLabelFont.uri = "pkg:/fonts/Inter-Bold.ttf"
+    end if
+    m.emptyLabelFont.size = GL_EmptyTitleFontSize()
+    m.emptyLabel.font = m.emptyLabelFont
 end sub
 
 sub ApplyHeroTheme()
@@ -137,45 +197,6 @@ sub ApplySkeletonColors()
     if hi = invalid or hi = "" then hi = "0x262626ff"
     m.genreSkeleton.baseColor = base
     m.genreSkeleton.highlightColor = hi
-    ApplyLoadMoreSkeletonColors()
-end sub
-
-sub ApplyLoadMoreSkeletonColors()
-    if m.loadMoreSkeleton = invalid then return
-    base = CardContrastSkeletonBase("0x0a0a0aff", m.cNeutral700)
-    hi = m.cNeutral800
-    if hi = invalid or hi = "" then hi = "0x262626ff"
-    m.loadMoreSkeleton.baseColor = base
-    m.loadMoreSkeleton.highlightColor = hi
-end sub
-
-sub ShowLoadMoreSkeleton(show as boolean)
-    if not show then
-        HideLoadMoreSkeleton()
-        return
-    end if
-    if m.loadMoreSkeleton <> invalid then
-        m.loadMoreSkeleton.visible = true
-        m.loadMoreSkeleton.running = true
-        return
-    end if
-    sk = CreateObject("roSGNode", "GenreLoadMoreSkeleton")
-    if sk = invalid then return
-    ' Fixed tail affordance — always visible while the next page fetches (parity React pageLoader).
-    sk.translation = [0, 820]
-    sk.visible = true
-    sk.running = true
-    m.top.appendChild(sk)
-    m.loadMoreSkeleton = sk
-    ApplyLoadMoreSkeletonColors()
-    BrowseDbg("genre_loadmore", "shimmer on")
-end sub
-
-sub HideLoadMoreSkeleton()
-    if m.loadMoreSkeleton = invalid then return
-    m.top.removeChild(m.loadMoreSkeleton)
-    m.loadMoreSkeleton = invalid
-    BrowseDbg("genre_loadmore", "shimmer off")
 end sub
 
 sub ResetAndFetch()
@@ -256,10 +277,8 @@ end sub
 sub FetchNextPage()
     if m.loading then return
     if not m.hasMore then return
-    pagination = m.rowsRevealed and m.rowWidgets.Count() > 0
     m.page = m.page + 1
     m.loading = true
-    if pagination then ShowLoadMoreSkeleton(true)
     path = Endpoints().SERIES.GENERE_LIST
     q = GL_BuildCatalogueQuery(m.page, m.listType)
     BrowseDbg("genre_fetch", "path=" + path + " page=" + Str(m.page) + " type=" + m.listType + " limit=" + Str(GL_CataloguePageLimit()))
@@ -276,7 +295,6 @@ sub OnCatalogueResponse()
     api = m.catalogueTask.apiResult
     m.catalogueTask = invalid
     m.loading = false
-    HideLoadMoreSkeleton()
     m.initialLoad = false
 
     BrowseDbgApi("genre_response", api)
@@ -395,6 +413,7 @@ sub OnRowBuildTick()
     m.rowContentHeight = m.rowContentHeight + HC_ContentRowLayoutHeight(cat)
     m.rowWidgets.Push(row)
     ApplyRowFocusState(m.rowWidgets.Count() - 1)
+    if m.rowsRevealed then MaterializePrefetchWindow()
     m.rowBuildIndex = m.rowBuildIndex + 1
 end sub
 
@@ -414,6 +433,7 @@ sub AppendRowsFrom(startIdx as integer)
         m.rowWidgets.Push(row)
     end for
     m.rowContentHeight = y
+    MaterializePrefetchWindow()
 end sub
 
 sub OnFirstRowPainted()
@@ -447,8 +467,40 @@ sub PrepareGenreReveal()
         end if
     end if
     ShowRowsSkeleton(false)
+    ScheduleGenrePrefetchWarmup()
     ApplyGenreFocus()
     BrowseDbg("genre_reveal", "rows visible focus applied")
+end sub
+
+sub ScheduleGenrePrefetchWarmup()
+    m.prefetchWarmupIdx = 1
+    if m.prefetchWarmupTimer <> invalid then m.prefetchWarmupTimer.control = "start"
+    BrowseDbg("genre_prefetch", "warmup start max=" + Str(GL_PrefetchWarmupMax()))
+end sub
+
+sub StopGenrePrefetchWarmup()
+    if m.prefetchWarmupTimer <> invalid then m.prefetchWarmupTimer.control = "stop"
+end sub
+
+sub OnPrefetchWarmupTick()
+    if m.top.dispose = true then
+        StopGenrePrefetchWarmup()
+        return
+    end if
+    if m.prefetchWarmupIdx >= GL_PrefetchWarmupMax() then
+        StopGenrePrefetchWarmup()
+        BrowseDbg("genre_prefetch", "warmup done idx=" + Str(m.prefetchWarmupIdx))
+        return
+    end if
+    if m.prefetchWarmupIdx >= m.rowWidgets.Count() then
+        StopGenrePrefetchWarmup()
+        BrowseDbg("genre_prefetch", "warmup done widgets=" + Str(m.rowWidgets.Count()))
+        return
+    end if
+    row = m.rowWidgets[m.prefetchWarmupIdx]
+    if row <> invalid then row.callFunc("Materialize", invalid)
+    BrowseDbg("genre_prefetch", "warmup row=" + Str(m.prefetchWarmupIdx))
+    m.prefetchWarmupIdx = m.prefetchWarmupIdx + 1
 end sub
 
 sub DetachFirstRowWatch()
@@ -467,7 +519,7 @@ end sub
 
 sub ClearRows()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
-    HideLoadMoreSkeleton()
+    StopGenrePrefetchWarmup()
     if m.rowsHost = invalid then return
     for i = m.rowsHost.getChildCount() - 1 to 0 step -1
         m.rowsHost.removeChildIndex(i)
@@ -480,6 +532,7 @@ end sub
 sub ApplyThemeToRow(row as object)
     if row = invalid then return
     if row.hasField("ottRowReveal") then row.ottRowReveal = true
+    if row.hasField("rowTitleFontSize") then row.rowTitleFontSize = GL_RowTitleFontSize()
     row.cPrimary500 = m.cPrimary500
     row.cPrimary600 = m.cPrimary600
     row.cPrimary700 = m.cPrimary700
@@ -514,7 +567,9 @@ sub ApplyGenreFocus()
     if m.rowIndex < 0 then m.rowIndex = 0
     if m.rowIndex >= m.rowWidgets.Count() then m.rowIndex = m.rowWidgets.Count() - 1
     ClampCardIndex()
-    MaterializeVisibleRows()
+    MaterializePrefetchWindow()
+    ResumeFocusedRowBuild()
+    EnsureFocusedRowReady()
     GenreApplyVerticalScroll()
 
     for i = 0 to m.rowWidgets.Count() - 1
@@ -548,7 +603,8 @@ sub GenreLogRowTops(tag as string)
     BrowseDbg("genre_scroll", tag + " " + parts)
 end sub
 
-' Pin focused row at layout anchor (parity HomeScreen OTT ApplyHomeFocus).
+' Pin focused row at OTT anchor (parity Home). Tail rows use ideal pin when the list
+' still fits on screen — avoids the old +80 viewH clamp that pushed the last row to Y=750.
 sub GenreApplyVerticalScroll()
     hostY = m.layoutAnchorY
     if m.rowsHost <> invalid then hostY = m.rowsHost.translation[1]
@@ -561,42 +617,45 @@ sub GenreApplyVerticalScroll()
     end if
 
     rowTop = m.rowTops[m.rowIndex]
-    anchorY = m.layoutAnchorY - rowTop
+    idealAnchorY = m.layoutAnchorY - rowTop
+    anchorY = idealAnchorY
     contentH = GenreRowsContentHeight()
-    viewH = 1080 - m.layoutAnchorY + 80
+    viewH = GL_GenreViewHeight()
     maxScroll = contentH - viewH
-    if maxScroll > 0 then
-        minAnchor = m.layoutAnchorY - maxScroll
-        if anchorY < minAnchor then anchorY = minAnchor
+    if maxScroll < 0 then maxScroll = 0
+    minAnchor = m.layoutAnchorY - maxScroll
+    tailPinned = false
+
+    if anchorY < minAnchor then
+        contentBottom = idealAnchorY + contentH
+        if contentBottom < 1080 then
+            anchorY = idealAnchorY
+            tailPinned = true
+        else
+            anchorY = minAnchor
+        end if
     end if
     if anchorY > m.layoutAnchorY then anchorY = m.layoutAnchorY
 
     screenRowY = anchorY + rowTop
-    row0ScreenY = anchorY
-    if m.rowTops.Count() > 0 then row0ScreenY = anchorY + m.rowTops[0]
     detail = "pin row=" + Str(m.rowIndex) + " rowTop=" + Str(rowTop) + " hostFrom=" + Str(hostY)
-    detail = detail + " hostTo=" + Str(anchorY) + " screenRowY=" + Str(screenRowY) + " row0ScreenY=" + Str(row0ScreenY)
-    detail = detail + " anchor=" + Str(m.layoutAnchorY) + " contentH=" + Str(contentH) + " maxScroll=" + Str(maxScroll)
+    detail = detail + " hostTo=" + Str(anchorY) + " screenRowY=" + Str(screenRowY)
+    detail = detail + " contentH=" + Str(contentH) + " maxScroll=" + Str(maxScroll)
+    detail = detail + " minAnchor=" + Str(minAnchor) + " tailPinned=" + BrowseDbgStr(tailPinned)
     BrowseDbg("genre_scroll", detail)
 
     AnimateRowsHost(anchorY)
 end sub
 
-' Smooth row pinning (parity HomeScreen AnimateRowsHost / netflixContent 400ms).
+' Smooth row scroll (parity HomeScreen — no mid-flight stop, chain from current Y).
 sub AnimateRowsHost(targetY as integer)
     if m.rowsHost = invalid then return
     fromY = m.rowsHost.translation[1]
-    if Abs(fromY - targetY) < 3 then
+    if m.rowsAnim = invalid or m.rowsInterp = invalid or fromY = targetY then
         m.rowsHost.translation = [0, targetY]
         MaterializeNearbyRows()
         return
     end if
-    if m.rowsAnim = invalid or m.rowsInterp = invalid then
-        m.rowsHost.translation = [0, targetY]
-        MaterializeNearbyRows()
-        return
-    end if
-    if m.rowsAnim.state = "running" then m.rowsAnim.control = "stop"
     m.rowsInterp.keyValue = [[0, fromY], [0, targetY]]
     m.rowsAnim.control = "start"
     BrowseDbg("genre_scroll", "anim from=" + Str(fromY) + " to=" + Str(targetY))
@@ -608,30 +667,58 @@ sub OnRowsAnimState()
     MaterializeNearbyRows()
 end sub
 
-sub MaterializeVisibleRows()
-    if not m.rowsRevealed then return
-    if m.rowWidgets.Count() = 0 then return
-    lo = m.rowIndex
-    hi = m.rowIndex + 1
-    if m.rowIndex > 0 then lo = m.rowIndex - 1
-    for i = lo to hi
-        if i >= 0 and i < m.rowWidgets.Count() then
-            row = m.rowWidgets[i]
-            if row <> invalid then row.callFunc("Materialize", invalid)
-        end if
-    end for
-end sub
-
-sub MaterializeNearbyRows()
-    if m.rowWidgets.Count() = 0 then return
+function GenrePrefetchLo() as integer
     lo = m.rowIndex - 1
     if lo < 0 then lo = 0
-    hi = m.rowIndex + 1
+    return lo
+end function
+
+function GenrePrefetchHi() as integer
+    ahead = GL_PrefetchAhead()
+    hi = m.rowIndex + ahead
     if hi >= m.rowWidgets.Count() then hi = m.rowWidgets.Count() - 1
+    return hi
+end function
+
+' Materialize shell rows within the prefetch window around focus (parity Home OTT).
+sub MaterializePrefetchWindow()
+    if not m.rowsRevealed then return
+    if m.rowWidgets.Count() = 0 then return
+    lo = GenrePrefetchLo()
+    hi = GenrePrefetchHi()
     for i = lo to hi
         row = m.rowWidgets[i]
         if row <> invalid then row.callFunc("Materialize", invalid)
     end for
+    BrowseDbg("genre_prefetch", "window lo=" + Str(lo) + " hi=" + Str(hi) + " focus=" + Str(m.rowIndex))
+end sub
+
+sub ResumeFocusedRowBuild()
+    if m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return
+    row = m.rowWidgets[m.rowIndex]
+    if row <> invalid then row.callFunc("ResumeBuild", invalid)
+end sub
+
+' Focused row must never sit blank — accelerate in-flight builds and show title immediately.
+sub EnsureFocusedRowReady()
+    if m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return
+    row = m.rowWidgets[m.rowIndex]
+    if row = invalid then return
+    built = false
+    if row.hasField("built") then built = row.built
+    if built = true then return
+    row.callFunc("ForceReveal", invalid)
+    title = row.findNode("rowTitle")
+    if title <> invalid then title.opacity = 1.0
+    BrowseDbg("genre_prefetch", "force reveal row=" + Str(m.rowIndex))
+end sub
+
+sub MaterializeVisibleRows()
+    MaterializePrefetchWindow()
+end sub
+
+sub MaterializeNearbyRows()
+    MaterializePrefetchWindow()
 end sub
 
 sub ApplyRowFocusState(i as integer)
@@ -684,11 +771,18 @@ sub OnKey()
     ev = m.top.keyEvent
     if ev = invalid or ev.key = invalid or ev.press = invalid then return
     if not ev.press then return
+    if m.vm <> invalid and m.vm.shellFocus = "header" then return
+
     if not m.rowsRevealed then return
     if m.categories.Count() = 0 then return
 
     key = ev.key
     if key = "up" then
+        if m.rowIndex = 0 then
+            ShellEnterHeader(m.vm, invalid)
+            ClearGenreRowCardFocus()
+            return
+        end if
         if m.rowIndex > 0 then m.rowIndex = m.rowIndex - 1
         ClampCardIndex()
         ApplyGenreFocus()
@@ -701,6 +795,11 @@ sub OnKey()
             TryLoadMoreFromDown()
         end if
     else if key = "left" then
+        if ThemeIsSidebarHeader() and m.cardIndex = 0 then
+            ShellEnterHeader(m.vm, invalid)
+            ClearGenreRowCardFocus()
+            return
+        end if
         if m.cardIndex > 0 then m.cardIndex = m.cardIndex - 1
         ApplyGenreFocus()
     else if key = "right" then
