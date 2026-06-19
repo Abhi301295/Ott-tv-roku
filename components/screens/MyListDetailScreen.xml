@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- My Watchlist — parity with features/list-detail/ (6-up grid, folder details API). -->
+<component name="MyListDetailScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" onChange="OnNavStateReady" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="shellEnterContent" type="boolean" value="false" alwaysNotify="true" onChange="OnShellEnterContent" />
+    <field id="stackResumed" type="boolean" value="false" alwaysNotify="true" onChange="OnStackResumed" />
+    <field id="shellLayoutRev" type="integer" value="0" alwaysNotify="true" onChange="OnShellLayoutRev" />
+    <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/SeriesListService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/watchlist/MyListConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/watchlist/WatchlistService.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/MyListDetailScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
+
+    <Group id="contentHost">
+      <Group id="skeletonHost" translation="[56, 162]" visible="false" />
+
+      <Group id="rowsHost" translation="[56, 162]" clippingRect="[0, 0, 1814, 900]" />
+
+      <Group id="emptyHost" visible="false">
+        <Label id="emptyLabel" width="355" height="120" wrap="true"
+          horizAlign="center" vertAlign="center" text="No data in watchList">
+          <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="43" />
+        </Label>
+      </Group>
+    </Group>
+  </children>
+</component>
