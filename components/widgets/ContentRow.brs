@@ -5,6 +5,7 @@ sub init()
     m.cardWidths = []
     m.seeAllOrientation = HC_CardTypeVertical()
     if m.rowTitle <> invalid then m.rowTitle.opacity = 0.0
+    ApplyRowTitleFont()
 
     ' Cards are built progressively (a small chunk per tick) instead of all-at-once.
     ' Creating a full row's cards synchronously blocks the render thread for hundreds of
@@ -47,6 +48,23 @@ sub OnCategoryChanged()
     BuildRowCards()
 end sub
 
+sub OnRowTitleFontChanged()
+    ApplyRowTitleFont()
+end sub
+
+sub ApplyRowTitleFont()
+    if m.rowTitle = invalid then return
+    size = m.top.rowTitleFontSize
+    if size = invalid or size < 12 then size = 41
+    font = m.rowTitle.font
+    if font = invalid then
+        font = CreateObject("roSGNode", "Font")
+        font.uri = "pkg:/fonts/Inter-Bold.ttf"
+        m.rowTitle.font = font
+    end if
+    font.size = size
+end sub
+
 sub OnThemeChanged()
     ApplyRowTheme()
     OnCardFocusChanged()
@@ -61,10 +79,11 @@ sub OnRowVisualChanged()
     ' netflixContent.tsx: focused=1, above focus=0, below focus=0.4 (OTT below stays 1.0).
     if m.top.rowFocused = true then
         m.top.opacity = 1.0
-    else if m.top.rowPeekVisible = true then
-        m.top.opacity = 1.0
+        if m.top.ottRowReveal = true and m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
     else if m.top.rowSuppressed = true then
         m.top.opacity = 0.0
+    else if m.top.rowPeekVisible = true then
+        m.top.opacity = 1.0
     else if m.top.rowDimmed = true then
         m.top.opacity = 0.4
     else
@@ -140,6 +159,15 @@ function ForceReveal(dummy = invalid as dynamic) as boolean
         return true
     end if
     OnRevealSafety()
+    return true
+end function
+
+' Screen dispose — stop every timer and abandon any in-progress build.
+function AbortBuild(dummy = invalid as dynamic) as boolean
+    if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+    if m.revealTimer <> invalid then m.revealTimer.control = "stop"
+    if m.paintTimer <> invalid then m.paintTimer.control = "stop"
+    m.buildActive = false
     return true
 end function
 
@@ -311,9 +339,10 @@ end sub
 
 ' Reveal only when every card node exists AND its media is loaded, so the
 ' shimmer stays up continuously and the real strip swaps in instantly.
+' Genre / OTT catalogue: reveal once nodes exist — card skeletons cover thumb fetch.
 sub MaybeReveal()
     if not m.buildComplete then return
-    if m.pendingMediaLoads > 0 then return
+    if m.pendingMediaLoads > 0 and m.top.ottRowReveal <> true then return
     RevealNow()
 end sub
 
@@ -325,8 +354,8 @@ sub RevealNow()
     m.top.built = true
     if m.top.mediaReady <> true then m.top.mediaReady = true
     CwPerfMark(m.cwPerfSpan, "row RevealNow", "pendingLoads=0 cards=" + Str(m.cards.Count()))
-    ' OTT: media is loaded — skip the paint-poll loop (simulator often never passes it).
-    if ThemeIsOttHome() then
+    ' OTT home + genre catalogue: media loaded — skip paint-poll (sim often never passes it).
+    if ThemeIsOttHome() or m.top.ottRowReveal = true then
         MarkPaintedReady(false)
         return
     end if
@@ -376,7 +405,7 @@ sub OnPaintPoll()
     ' Two consecutive painted frames — avoids cutting shimmer before compositor shows cards.
     ' OTT home: one stable frame is enough (faster handoff off the rows shimmer).
     needStable = 2
-    if ThemeIsOttHome() then needStable = 1
+    if ThemeIsOttHome() or m.top.ottRowReveal = true then needStable = 1
     if m.paintStableCount >= needStable then
         MarkPaintedReady(false)
         return
@@ -458,7 +487,7 @@ end sub
 sub ScrollToFocusedCard()
     if m.cardsHost = invalid then return
     idx = m.top.cardFocusIndex
-    if idx < 0 then idx = 0
+    if idx < 0 then return
     if m.cardWidths.Count() = 0 then return
     if idx >= m.cardWidths.Count() then idx = m.cardWidths.Count() - 1
 

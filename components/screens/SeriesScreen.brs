@@ -33,7 +33,11 @@ end sub
 
 sub OnNavStateReady()
     state = m.top.navState
-    if state = invalid then return
+    BrowseDbgState("series_nav", state)
+    if state = invalid then
+        BrowseDbg("series_nav", "abort: navState invalid")
+        return
+    end if
     if state.type <> invalid then m.listType = state.type
     if state.categoryId <> invalid then m.categoryId = state.categoryId
     if state.genere_id <> invalid then m.genreId = state.genere_id
@@ -48,7 +52,11 @@ sub OnNavStateReady()
     else if m.listType = "SINGLE_VIDEO" then
         m.titleLabel.text = "Movies"
     end if
-    if m.listType = "" then return
+    BrowseDbg("series_nav", "listType=" + m.listType + " categoryId=" + m.categoryId + " genreId=" + m.genreId + " title=" + m.titleLabel.text)
+    if m.listType = "" then
+        BrowseDbg("series_nav", "abort: listType empty — no fetch")
+        return
+    end if
     ResetAndFetch()
 end sub
 
@@ -120,6 +128,7 @@ sub FetchNextPage()
     ShowLoading(true)
     path = Endpoints().SERIES.SERIES_LIST
     q = SL_BuildQuery(m.page, m.listType, m.categoryId, m.genreId)
+    BrowseDbg("series_fetch", "path=" + path + " page=" + Str(m.page) + " type=" + m.listType + " category=" + m.categoryId + " genre=" + m.genreId)
     KillListTask(m.listTask)
     m.listTask = ApiGetQuery(path, q)
     m.listTask.observeField("apiResult", "OnListResponse")
@@ -135,7 +144,9 @@ sub OnListResponse()
     m.initialLoad = false
     ShowLoading(false)
 
+    BrowseDbgApi("series_response", api)
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 then
+        BrowseDbg("series_response", "fail: bad status — show empty=" + BrowseDbgStr(m.rows.Count() = 0))
         m.hasMore = false
         if m.rows.Count() = 0 then ShowEmpty(true)
         return
@@ -147,7 +158,9 @@ sub OnListResponse()
     end if
 
     m.hasMore = SL_PageHasMore(api, listing.Count())
+    BrowseDbg("series_response", "listingCount=" + Str(listing.Count()) + " hasMore=" + BrowseDbgStr(m.hasMore) + " existingRows=" + Str(m.rows.Count()))
     if listing.Count() = 0 and m.rows.Count() = 0 then
+        BrowseDbg("series_response", "empty listing — show empty state")
         ShowEmpty(true)
         return
     end if
@@ -159,6 +172,7 @@ sub OnListResponse()
 end sub
 
 sub ShowEmpty(show as boolean)
+    BrowseDbg("series_empty", "visible=" + BrowseDbgStr(show))
     if m.emptyLabel <> invalid then m.emptyLabel.visible = show
     if m.rowsHost <> invalid then m.rowsHost.visible = not show
 end sub

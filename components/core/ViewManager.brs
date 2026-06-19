@@ -1,6 +1,10 @@
 sub init()
     m.screenHost = m.top.findNode("screenHost")
+    m.appHeader = m.top.findNode("appHeader")
     m.stack = []
+    m.menuItems = []
+    m.shellMenuBuilt = false
+    m.shellMenuReels = invalid
     m.top.overlayOpen = false
     m.top.observeField("overlayDismiss", "OnOverlayDismissChanged")
 end sub
@@ -22,11 +26,13 @@ function NavigateClearAndReplace(route as string, state = {} as object) as void
     while m.stack.Count() > 0
         entry = m.stack[m.stack.Count() - 1]
         if entry.screen <> invalid then
+            if entry.screen.hasField("visible") then entry.screen.visible = false
             if entry.screen.hasField("dispose") then entry.screen.dispose = true
             m.screenHost.removeChild(entry.screen)
         end if
         m.stack.Pop()
     end while
+    DrainHttpQueueForNavigation()
     ShowRoute(route, state, false)
 end function
 
@@ -52,6 +58,7 @@ function NavigatePop() as boolean
     end if
     m.top.currentRoute = prev.route
     m.top.navState = prev.state
+    SetupAppHeader(m.top, prev.route, prev.state)
     m.top.overlayOpen = false
     return true
 end function
@@ -62,13 +69,7 @@ sub ShowRoute(route as string, state as object, replace as boolean)
     ProfileSelectLog("NAV", mode + " route=" + route + " stackDepth=" + ProfileSelectFmt(m.stack.Count()))
     if replace and m.stack.Count() > 0 then
         entry = m.stack[m.stack.Count() - 1]
-        if entry.screen <> invalid then
-            ' Let the screen tear down its timers/video before it leaves the tree —
-            ' removeChild alone doesn't stop child Timers, which would keep an orphaned
-            ' HomeScreen's hero auto-rotating (stacked instances) after navigation.
-            if entry.screen.hasField("dispose") then entry.screen.dispose = true
-            m.screenHost.removeChild(entry.screen)
-        end if
+        TeardownReplacedScreen(entry.screen)
         m.stack.Pop()
     else if not replace and m.stack.Count() > 0 then
         ' Push: pause the screen being covered so its timers/video/hero stop ticking in
@@ -88,44 +89,56 @@ sub ShowRoute(route as string, state as object, replace as boolean)
 
     m.top.currentRoute = route
     m.top.navState = state
+    SetupAppHeader(m.top, route, state)
+    AssignScreenNavState(screen, state)
     screen.setFocus(true)
+end sub
+
+sub AssignScreenNavState(screen as object, state as object)
+    if screen = invalid then return
+    if screen.hasField("navState") then screen.navState = state
+end sub
+
+function HandleShellKey(key as string, press as boolean) as boolean
+    if not press then return false
+    return AppShellHandleHeaderKey(m.top, key)
+end function
+
+' Replace navigation: pause the outgoing screen, dispose it, and drop any HTTP jobs
+' still waiting in the pool queue so Movies (or any new route) is not starved by Home
+' boot fetches the user abandoned mid-load.
+sub TeardownReplacedScreen(screen as object)
+    if screen = invalid then return
+    if screen.hasField("visible") then screen.visible = false
+    if screen.hasField("dispose") then screen.dispose = true
+    DrainHttpQueueForNavigation()
+    m.screenHost.removeChild(screen)
 end sub
 
 function CreateScreenForRoute(route as string, state as object) as object
     if route = RouteLogin() then
-        screen = CreateObject("roSGNode", "LoginScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "LoginScreen")
     end if
     if route = RouteLoginProfile() then
-        screen = CreateObject("roSGNode", "ProfileScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "ProfileScreen")
     end if
     if route = RouteHome() then
-        screen = CreateObject("roSGNode", "HomeScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "HomeScreen")
     end if
     if route = RouteDetail() then
-        screen = CreateObject("roSGNode", "DetailScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "DetailScreen")
     end if
     if route = RouteVideoPlayer() then
-        screen = CreateObject("roSGNode", "VideoPlayerScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "VideoPlayerScreen")
     end if
     if route = RouteSeriesEpisodes() then
-        screen = CreateObject("roSGNode", "SeriesEpisodesScreen")
-        screen.navState = state
-        return screen
+        return CreateObject("roSGNode", "SeriesEpisodesScreen")
     end if
-    if route = RouteSeries() or route = RouteGenere() or route = RouteNewRelease() then
-        screen = CreateObject("roSGNode", "SeriesScreen")
-        screen.navState = state
-        return screen
+    if route = RouteGenere() then
+        return CreateObject("roSGNode", "GenreListScreen")
+    end if
+    if route = RouteSeries() or route = RouteNewRelease() then
+        return CreateObject("roSGNode", "SeriesScreen")
     end if
     return CreatePlaceholderScreen(route, state)
 end function

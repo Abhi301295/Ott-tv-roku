@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Movies/Series catalogue loading — hero metadata + first row vertical cards. -->
+<component name="GenreListSkeleton" extends="Group">
+  <interface>
+    <field id="heroRunning" type="boolean" value="false" onChange="OnRunningChanged" />
+    <field id="rowsRunning" type="boolean" value="false" onChange="OnRunningChanged" />
+    <field id="baseColor" type="string" value="0x404040ff" onChange="OnColorsChanged" />
+    <field id="highlightColor" type="string" value="0x262626ff" onChange="OnColorsChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/GenreListSkeleton.brs" />
+
+  <children>
+    <!-- Hero metadata shimmer — mirrors HeroBannerOtt metaHost at [48, 200]. -->
+    <Group id="heroPulse" visible="false">
+      <Skeleton id="skHeroTitle" translation="[48, 200]" boxWidth="600" boxHeight="60" running="false" />
+      <Skeleton id="skHeroRating" translation="[48, 308]" boxWidth="80" boxHeight="28" running="false" />
+      <Skeleton id="skHeroGenre" translation="[48, 352]" boxWidth="420" boxHeight="22" running="false" />
+      <Skeleton id="skHeroDesc" translation="[48, 388]" boxWidth="520" boxHeight="22" running="false" />
+    </Group>
+
+    <!-- First row card shimmer only — row title reveals with cards (parity CW / case 6). -->
+    <Group id="rowsPulse" visible="false">
+      <Skeleton id="skCard0" translation="[32, 649]" boxWidth="220" boxHeight="300" running="false" />
+      <Skeleton id="skCard1" translation="[262, 649]" boxWidth="220" boxHeight="300" running="false" />
+      <Skeleton id="skCard2" translation="[492, 649]" boxWidth="220" boxHeight="300" running="false" />
+      <Skeleton id="skCard3" translation="[722, 649]" boxWidth="220" boxHeight="300" running="false" />
+    </Group>
+  </children>
+</component>

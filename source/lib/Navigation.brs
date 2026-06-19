@@ -60,3 +60,9 @@ function GetInitialRoute() as string
     end if
     return RouteLogin()
 end function
+
+function FindViewManager(fromNode as object) as object
+    scene = fromNode.getScene()
+    if scene = invalid then return invalid
+    return scene.findNode("viewManager")
+end function

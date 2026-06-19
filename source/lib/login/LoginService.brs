@@ -131,12 +131,6 @@ sub HandleLoginRedirect(deviceToken as object, viewManager as object, fromNode =
     ' and re-fetches QR — stay on login until poll returns a known nextStep + tokens.
 end sub
 
-function FindViewManager(fromNode as object) as object
-    scene = fromNode.getScene()
-    if scene = invalid then return invalid
-    return scene.findNode("viewManager")
-end function
-
 ' Session-expiry handler — parity with axios.instance.ts 403 handler + logoutSession():
 ' when an API result is flagged shouldLogout (HTTP 403), clear all tokens and send
 ' the user back to Login. Returns true when it handled a logout so the caller can

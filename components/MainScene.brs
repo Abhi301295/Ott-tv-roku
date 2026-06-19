@@ -112,6 +112,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return NavigationHandleBack(m.viewManager)
     end if
 
+    if m.viewManager <> invalid then
+        if m.viewManager.callFunc("HandleShellKey", key, press) = true then return true
+    end if
+
     ' Forward arrow/OK keys to the active screen (BRS simulator does not always
     ' bubble onKeyEvent to nested Groups inside ViewManager).
     screen = GetActiveScreen(m.viewManager)

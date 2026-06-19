@@ -1,24 +1,40 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Screen stack + navigation (parity with react-router + location.state). -->
+<!-- Screen stack + navigation (parity with react-router + PageContainer header). -->
 <component name="ViewManager" extends="Group">
   <interface>
     <field id="currentRoute" type="string" alwaysNotify="true" />
     <field id="navState" type="assocarray" />
     <field id="overlayOpen" type="boolean" value="false" />
     <field id="overlayDismiss" type="boolean" alwaysNotify="true" />
+    <!-- "header" | "content" — which shell zone owns remote keys when showSideMenu. -->
+    <field id="shellFocus" type="string" value="content" />
+    <field id="menuIndex" type="integer" value="0" />
+    <field id="menuItems" type="array" />
     <function name="NavigatePush" />
     <function name="NavigateReplace" />
     <function name="NavigatePop" />
     <function name="NavigateClearAndReplace" />
+    <function name="HandleShellKey" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileSelectTrace.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/ViewManager.brs" />
 
   <children>
     <Group id="screenHost" translation="[0, 0]" />
+    <!-- Persistent nav chrome — parity with PageContainer showSideMenu routes. -->
+    <HomeHeaderHost id="appHeader" visible="false" translation="[0, 0]" />
   </children>
 </component>

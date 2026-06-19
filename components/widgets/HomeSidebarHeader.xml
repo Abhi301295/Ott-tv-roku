@@ -6,6 +6,7 @@
     <field id="focusedIndex" type="integer" value="0" onChange="OnFocusChanged" />
     <field id="selectedIndex" type="integer" value="0" onChange="OnFocusChanged" />
     <field id="headerActive" type="boolean" value="false" onChange="OnLayoutChanged" />
+    <field id="instantLayout" type="boolean" value="false" />
     <field id="logoUri" type="string" value="" onChange="OnLogoChanged" />
     <field id="logoCroppedUri" type="string" value="" onChange="OnLogoChanged" />
     <field id="appName" type="string" value="" onChange="OnLogoChanged" />

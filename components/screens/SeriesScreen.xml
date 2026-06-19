@@ -15,6 +15,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/NextStep.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/login/LoginService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
@@ -22,6 +23,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/SeriesListService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailStrings.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SeriesScreen.brs" />

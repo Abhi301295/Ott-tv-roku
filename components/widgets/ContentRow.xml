@@ -20,6 +20,10 @@
     <!-- Fires after RevealNow + a short paint window so Home can drop the rows shimmer only
          once real card pixels are on screen (loadStatus=ready is not enough). -->
     <field id="paintedReady" type="boolean" value="false" alwaysNotify="true" />
+    <!-- Genre / OTT catalogue rows: skip the Netflix paint-poll loop once media loads. -->
+    <field id="ottRowReveal" type="boolean" value="false" />
+    <!-- Home fs-34 → 41px; genre-list fs-38 → 46px (see GL_RowTitleFontSize). -->
+    <field id="rowTitleFontSize" type="integer" value="41" onChange="OnRowTitleFontChanged" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
     <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
     <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
@@ -35,6 +39,9 @@
     <function name="PauseBuild" />
     <function name="ResumeBuild" />
     <function name="ForceReveal" />
+    <!-- Hard stop for screen dispose — kills row timers so a removed Home cannot keep
+         building cards on the single render thread. -->
+    <function name="AbortBuild" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
