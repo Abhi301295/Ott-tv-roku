@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- My Watchlist tile — parity with features/list-detail/listDetailCard.tsx -->
+<component name="ListDetailCard" extends="Group">
+  <interface>
+    <field id="title" type="string" value="" onChange="OnDataChanged" />
+    <field id="contentType" type="string" value="" onChange="OnDataChanged" />
+    <field id="originalLang" type="string" value="" onChange="OnDataChanged" />
+    <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
+    <field id="isLoading" type="boolean" value="false" onChange="OnDataChanged" />
+    <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="cPageBg" type="string" value="0x0a0a0aff" onChange="OnThemeChanged" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xffffffff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/ListDetailCard.brs" />
+
+  <children>
+    <Group id="contentHost">
+      <Group id="thumbBlock">
+        <Skeleton id="thumbSkel" boxWidth="368" boxHeight="208" />
+        <Poster id="thumb" width="368" height="208" loadDisplayMode="scaleToZoom" visible="false" />
+        <Poster id="grad" width="368" height="208" uri="pkg:/images/ui/grad_bottom.png" opacity="0.35" blendColor="0x505050ff" />
+      </Group>
+
+      <Group id="titleSkelHost" visible="false">
+        <Skeleton id="titleSkel" boxWidth="313" boxHeight="33" />
+      </Group>
+      <Label id="titleLbl" width="370" height="32" wrap="false" ellipsizeOnBoundary="true"
+        horizAlign="left" vertAlign="top" visible="false">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="34" />
+      </Label>
+
+      <Group id="metaSkelHost" visible="false">
+        <Skeleton id="typeSkel" boxWidth="72" boxHeight="20" />
+        <Skeleton id="dotSkel" translation="[90, 0]" boxWidth="10" boxHeight="10"
+          shapeUri="pkg:/images/ui/sk_detail_dot.png" />
+        <Skeleton id="langSkel" translation="[110, 2]" boxWidth="40" boxHeight="16" />
+      </Group>
+      <Group id="metaHost" visible="false">
+        <Label id="typeLbl" width="72" height="22" wrap="false" horizAlign="left" vertAlign="top" color="0x0b75e0ff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="18" />
+        </Label>
+        <Poster id="metaDot" width="10" height="10" uri="pkg:/images/ui/sk_detail_dot.png"
+          loadDisplayMode="scaleToFill" />
+        <Label id="langLbl" width="80" height="18" wrap="false" horizAlign="left" vertAlign="top" color="0x80ffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="14" />
+        </Label>
+      </Group>
+    </Group>
+  </children>
+</component>

@@ -55,6 +55,7 @@ function NavigatePop() as boolean
         ' paused media (HomeScreen's hero trailer/carousel).
         prev.screen.visible = true
         prev.screen.setFocus(true)
+        if prev.screen.hasField("stackResumed") then prev.screen.stackResumed = true
     end if
     m.top.currentRoute = prev.route
     m.top.navState = prev.state
@@ -139,6 +140,9 @@ function CreateScreenForRoute(route as string, state as object) as object
     end if
     if route = RouteSearch() then
         return CreateObject("roSGNode", "SearchScreen")
+    end if
+    if route = RouteMyListDetail() then
+        return CreateObject("roSGNode", "MyListDetailScreen")
     end if
     if route = RouteSeries() or route = RouteNewRelease() then
         return CreateObject("roSGNode", "SeriesScreen")
