@@ -19,12 +19,12 @@ sub init()
     m.confirmPopup = m.top.findNode("confirmPopup")
     m.otpPopup = m.top.findNode("otpPopup")
     m.selectingOverlay = m.top.findNode("selectingOverlay")
-    m.selectingLabel = m.top.findNode("selectingLabel")
     m.autoSelectTimer = m.top.findNode("autoSelectTimer")
     m.bgImage = m.top.findNode("bgImage")
     m.bgOverlay = m.top.findNode("bgOverlay")
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
+    m.profileHeaderChrome = m.top.findNode("profileHeaderChrome")
 
     m.profiles = []
     m.avatars = []
@@ -495,13 +495,36 @@ sub ShowLoading(show as boolean)
     if host <> invalid then host.visible = not show
 end sub
 
+sub BindSelectingOverlayProfile()
+    if m.selectingOverlay = invalid or m.selectedProfile = invalid then return
+    p = m.selectedProfile
+    nm = ""
+    if p.name <> invalid then nm = p.name
+    uri = ""
+    if p.avatar <> invalid then uri = p.avatar
+    m.selectingOverlay.profileName = nm
+    m.selectingOverlay.avatarUri = uri
+    m.selectingOverlay.initials = ProfileInitials(nm)
+    m.selectingOverlay.primaryColor = m.cPrimary500
+    m.selectingOverlay.neutral50 = m.cNeutral50
+    m.selectingOverlay.avatarBg = m.cAvatarBg
+end sub
+
 sub ShowSelectingOverlay(show as boolean)
-    if m.selectingOverlay <> invalid then m.selectingOverlay.visible = show
-    if m.selectingLabel <> invalid then
-        m.selectingLabel.text = CopySelecting()
-        if show then m.selectingLabel.color = m.cPrimary500
+    if m.selectingOverlay <> invalid then
+        if show then BindSelectingOverlayProfile()
+        m.selectingOverlay.running = show
+        m.selectingOverlay.visible = show
     end if
-    if m.logoutBtn <> invalid and show then m.logoutBtn.visible = false
+    if m.profilesScrollHost <> invalid then m.profilesScrollHost.visible = not show
+    if m.profileHeaderChrome <> invalid then m.profileHeaderChrome.visible = not show
+    if m.logoutBtn <> invalid then
+        if show then
+            m.logoutBtn.visible = false
+        else
+            m.logoutBtn.visible = (GetRefreshToken() <> "")
+        end if
+    end if
 end sub
 
 sub ShowProfileError(msg as string)
@@ -701,34 +724,22 @@ sub ApplyProfileFocus()
         av = m.avatars[i]
         focused = (m.focusArea = "profiles" and i = m.profileIndex)
         if focused then
-            if m.selecting then
-                av.hintText = CopySelecting()
-                av.hintColor = m.cPrimary500
+            av.hintText = FocusHint(i)
+            if ProfileNeedsPin(m.profiles[i]) then
+                av.hintColor = m.cAmber400
             else
-                av.hintText = FocusHint(i)
-                if ProfileNeedsPin(m.profiles[i]) then
-                    av.hintColor = m.cAmber400
-                else
-                    av.hintColor = m.cNeutral400
-                end if
+                av.hintColor = m.cNeutral400
             end if
         else
             av.hintText = ""
         end if
-        ' Progress reflects the focused profile's auto-select elapsed; others reset.
         if focused then
-            if m.selecting then
-                av.progress = 1.0
-            else
-                av.progress = AutoProgressFor(i)
-            end if
+            av.progress = AutoProgressFor(i)
         else
             av.progress = 0.0
         end if
         av.focusedState = focused
     end for
-
-    ShowSelectingOverlay(m.selecting)
 
     ' Logout button focus (bg-primary-600 when focused). Selection is shown by the
     ' fill change only — no drop shadow (kept as-is per the current correct look;

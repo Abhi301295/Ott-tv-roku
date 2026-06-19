@@ -17,6 +17,7 @@
     <field id="nameColor" type="string" value="0xf8f1f7ff" onChange="OnColorsChanged" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/ProfileAvatar.brs" />
 
   <children>
