@@ -190,6 +190,7 @@ sub OnBannerItemsChanged()
     ApplyMeta()
     BuildBars()
     UpdateCounter()
+    ApplyNavChromeVisibility()
     PlayMetaEntrance()
     if m.top.visible then ScheduleTrailer()
     if m.top.visible and m.items.Count() > 1 then StartSwipeTimer()
@@ -543,6 +544,13 @@ sub UpdateCounter()
     m.counterCurrent.text = PadTwo(m.activeIndex + 1)
     m.counterTotal.text = PadTwo(total)
     m.counterHost.visible = true
+end sub
+
+' React only portals prev/next when items.length > 1 — hide (not disable) on single-slide heroes.
+sub ApplyNavChromeVisibility()
+    multi = (ItemCount() > 1)
+    if m.prevArrow <> invalid then m.prevArrow.visible = multi
+    if m.nextArrow <> invalid then m.nextArrow.visible = multi
 end sub
 
 function PadTwo(n as integer) as string

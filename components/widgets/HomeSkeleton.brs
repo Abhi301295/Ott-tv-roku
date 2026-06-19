@@ -2,8 +2,12 @@ sub init()
     m.heroPulse = m.top.findNode("heroPulse")
     m.rowsPulse = m.top.findNode("rowsPulse")
     m.rowsTitle = m.top.findNode("rowsTitle")
+    m.heroBackdrop = m.top.findNode("heroBackdrop")
+    m.heroBackdropShine = m.top.findNode("heroBackdropShine")
     m.heroAnim = m.top.findNode("heroAnim")
     m.rowsAnim = m.top.findNode("rowsAnim")
+    m.heroBarIds = ["hTitle", "hGenre", "hDesc1", "hDesc2"]
+    m.rowBarIds = ["rowBox1", "rowBox2", "rowBox3", "rowBox4"]
     ApplySkeletonLayout()
 end sub
 
@@ -11,13 +15,15 @@ sub OnLayoutChanged()
     ApplySkeletonLayout()
 end sub
 
-' Reposition placeholder bars to match the active home layout (Netflix vs OTT anchor
-' and card geometry). HomeScreen sets layoutMode + anchorY from ThemeConfig.
 sub ApplySkeletonLayout()
     mode = m.top.layoutMode
     if mode = invalid or mode = "" then mode = "netflix"
     anchorY = m.top.anchorY
     if anchorY = invalid or anchorY < 1 then anchorY = HC_NetflixAnchorY()
+
+    heroH = HC_HeroHeight()
+    PlaceBar("heroBackdrop", 0, 0, 1920, heroH)
+    PlaceBar("heroBackdropShine", 0, 0, 1920, heroH)
 
     cardsY = anchorY + HC_RowCardsTop()
     cardW = 540
@@ -25,28 +31,34 @@ sub ApplySkeletonLayout()
     startX = 32
 
     if mode = "ott" then
-        ' OTT hero metadata (HeroBannerOtt metaHost at 48,200).
-        PlaceBar("hTitle", 48, 200, 600, 60)
-        PlaceBar("hGenre", 48, 352, 400, 22)
-        PlaceBar("hDesc1", 48, 268, 520, 22)
-        PlaceBar("hDesc2", 48, 380, 480, 18)
-        ' OTT rows use horizontal cards while loading (content.tsx default).
+        PlaceHeroBar("hTitle", 48, 200, 600, 60)
+        PlaceHeroBar("hGenre", 48, 352, 400, 22)
+        PlaceHeroBar("hDesc1", 48, 268, 520, 22)
+        PlaceHeroBar("hDesc2", 48, 380, 480, 18)
         cardW = 556
         cardH = 312
     else
-        ' Netflix cinematic hero metadata (HeroBannerCinematic metaHost at 64,300).
-        PlaceBar("hTitle", 64, 300, 520, 54)
-        PlaceBar("hGenre", 64, 444, 360, 22)
-        PlaceBar("hDesc1", 64, 490, 630, 18)
-        PlaceBar("hDesc2", 64, 518, 580, 18)
+        PlaceHeroBar("hTitle", 64, 300, 520, 54)
+        PlaceHeroBar("hGenre", 64, 444, 360, 22)
+        PlaceHeroBar("hDesc1", 64, 490, 630, 18)
+        PlaceHeroBar("hDesc2", 64, 518, 580, 18)
     end if
 
     gap = HC_CardGap()
     for i = 1 to 4
         x = startX + (i - 1) * (cardW + gap)
-        PlaceBar("rowBox" + i.ToStr(), x, cardsY, cardW, cardH)
-        PlaceBar("rowShine" + i.ToStr(), x, cardsY, cardW, cardH)
+        PlaceRowBar(i, x, cardsY, cardW, cardH)
     end for
+end sub
+
+sub PlaceHeroBar(baseId as string, x as integer, y as integer, w as integer, h as integer)
+    PlaceBar(baseId, x, y, w, h)
+    PlaceBar(baseId + "Shine", x, y, w, h)
+end sub
+
+sub PlaceRowBar(index as integer, x as integer, y as integer, w as integer, h as integer)
+    PlaceBar("rowBox" + index.ToStr(), x, y, w, h)
+    PlaceBar("rowShine" + index.ToStr(), x, y, w, h)
 end sub
 
 sub PlaceBar(id as string, x as integer, y as integer, w as integer, h as integer)
@@ -57,8 +69,6 @@ sub PlaceBar(id as string, x as integer, y as integer, w as integer, h as intege
     bar.height = h
 end sub
 
-' Either region running keeps the shared pulse animation alive; each region's own
-' visibility is driven independently so the hero and rows can reveal separately.
 sub OnRunningChanged()
     if m.heroPulse <> invalid then m.heroPulse.visible = m.top.heroRunning
     if m.rowsPulse <> invalid then
@@ -66,51 +76,82 @@ sub OnRunningChanged()
             m.rowsPulse.opacity = 1.0
             m.rowsPulse.visible = true
         else if m.rowsPulse.visible then
-            ' Hard cut once real cards are painted — a dissolve exposes black underneath.
             m.rowsPulse.visible = false
             m.rowsPulse.opacity = 1.0
         end if
     end if
-    ' Do NOT show a "Continue Watching" label during loading: a profile may have no CW
-    ' row at all, and flashing the label before the data lands is wrong (parity: React
-    ' shows a neutral spinner while loading, then the real row supplies its own title).
     if m.rowsTitle <> invalid then m.rowsTitle.visible = false
 
     if m.heroAnim <> invalid then
         if m.top.heroRunning then
+            ResetHeroShine()
             m.heroAnim.control = "start"
         else
             m.heroAnim.control = "stop"
+            ResetHeroShine()
         end if
     end if
 
     if m.rowsAnim <> invalid then
         if m.top.rowsRunning then
+            ResetRowShine()
             m.rowsAnim.control = "start"
         else
             m.rowsAnim.control = "stop"
+            ResetRowShine()
         end if
     end if
 end sub
 
-sub OnColorsChanged()
-    color = m.top.boxColor
-    if color = invalid or color = "" then return
-    TintGroup(m.heroPulse, color)
-    TintGroup(m.rowsPulse, color)
+' Bases stay fully opaque; only highlight overlays animate.
+sub ResetHeroShine()
+    if m.heroBackdrop <> invalid then m.heroBackdrop.opacity = 1.0
+    if m.heroBackdropShine <> invalid then m.heroBackdropShine.opacity = 0.0
+    for each id in m.heroBarIds
+        bar = m.top.findNode(id)
+        if bar <> invalid then bar.opacity = 1.0
+        shine = m.top.findNode(id + "Shine")
+        if shine <> invalid then shine.opacity = 0.0
+    end for
 end sub
 
-sub TintGroup(grp as object, color as string)
-    if grp = invalid then return
-    count = grp.getChildCount()
-    for i = 0 to count - 1
-        bar = grp.getChild(i)
-        if bar <> invalid and bar.hasField("color") then
-            if Right(bar.id, 5) = "Shine" or Left(bar.id, 8) = "rowShine" then
-                bar.color = "0x404040ff"
-            else
-                bar.color = color
-            end if
-        end if
+sub ResetRowShine()
+    for each id in m.rowBarIds
+        bar = m.top.findNode(id)
+        if bar <> invalid then bar.opacity = 1.0
+        idx = Right(id, 1)
+        shine = m.top.findNode("rowShine" + idx)
+        if shine <> invalid then shine.opacity = 0.0
+    end for
+end sub
+
+sub OnColorsChanged()
+    base = m.top.boxColor
+    shine = m.top.shineColor
+    backdrop = m.top.backdropColor
+    if base = invalid or base = "" then return
+    if shine = invalid or shine = "" then shine = CardLightenHex(base, 56)
+    if backdrop = invalid or backdrop = "" then backdrop = "0xe5e5e5ff"
+    if m.heroBackdrop <> invalid then m.heroBackdrop.color = backdrop
+    if m.heroBackdropShine <> invalid then m.heroBackdropShine.color = CardLightenHex(backdrop, 28)
+    TintBarPair(m.heroBarIds, base, shine)
+    TintRowBars(base, shine)
+end sub
+
+sub TintBarPair(ids as object, base as string, shine as string)
+    for each id in ids
+        bar = m.top.findNode(id)
+        if bar <> invalid and bar.hasField("color") then bar.color = base
+        hi = m.top.findNode(id + "Shine")
+        if hi <> invalid and hi.hasField("color") then hi.color = shine
+    end for
+end sub
+
+sub TintRowBars(base as string, shine as string)
+    for i = 1 to 4
+        bar = m.top.findNode("rowBox" + i.ToStr())
+        if bar <> invalid and bar.hasField("color") then bar.color = base
+        hi = m.top.findNode("rowShine" + i.ToStr())
+        if hi <> invalid and hi.hasField("color") then hi.color = shine
     end for
 end sub

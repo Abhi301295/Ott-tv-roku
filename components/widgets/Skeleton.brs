@@ -44,11 +44,11 @@ end sub
 ' base color reads as a plain neutral block. Screens that want the sweep set animate.
 sub OnRunningChanged()
     if m.anim = invalid then return
+    if m.base <> invalid then m.base.opacity = 1.0
     if m.top.running and m.top.animate then
         m.anim.control = "start"
     else
         m.anim.control = "stop"
         if m.shine <> invalid then m.shine.opacity = 0.0
-        if m.base <> invalid then m.base.opacity = 1.0
     end if
 end sub
