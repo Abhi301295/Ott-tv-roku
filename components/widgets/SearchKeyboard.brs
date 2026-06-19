@@ -22,7 +22,11 @@ sub init()
 end sub
 
 sub OnLayoutModeChanged()
+    savedRow = m.top.focusedRow
+    savedCol = m.top.focusedCol
     BuildKeyboard()
+    m.top.focusedRow = savedRow
+    m.top.focusedCol = savedCol
     ApplyKeyFocus()
 end sub
 
@@ -42,12 +46,36 @@ function KeyWidth(label as string) as integer
     if label = SR_KeySpace() then return SR_KeyWSpace()
     if label = SR_KeyClear() then return SR_KeyWClear()
     if label = SR_Key123() or label = SR_KeyAbc() or label = SR_KeyBackspace() then return SR_KeyWSpecial()
-    if label = SR_KeyAa() then return SR_KeyWAa()
+    if KeyIsAaToggle(label) then return SR_KeyWAa()
     return SR_KeyW()
 end function
 
+function KeyIsAaToggle(label as string) as boolean
+    return label = SR_KeyAa()
+end function
+
+function KeyIsLetter(label as string) as boolean
+    if label = invalid or label = "" then return false
+    if Len(label) <> 1 then return false
+    ch = UCase(label)
+    if ch >= "A" and ch <= "Z" then return true
+    return false
+end function
+
+function KeyDisplayLabel(canonical as string) as string
+    if KeyIsAaToggle(canonical) then
+        if m.top.upperCase = true then return SR_KeyAa()
+        return SR_KeyAAToggle()
+    end if
+    if m.top.numberMode <> true and KeyIsLetter(canonical) then
+        if m.top.upperCase = true then return UCase(canonical)
+        return LCase(canonical)
+    end if
+    return canonical
+end function
+
 function KeyFontSize(label as string) as integer
-    if label = SR_Key123() or label = SR_KeyAbc() or label = SR_KeyAa() or label = SR_KeyClear() then
+    if label = SR_Key123() or label = SR_KeyAbc() or KeyIsAaToggle(label) or label = SR_KeyClear() then
         return SR_KeySpecialFontSize()
     end if
     return SR_KeyFontSize()
@@ -206,7 +234,7 @@ function CreateKey(label as string, kw as integer) as object
     lbl.translation = [bw, bw]
     lbl.horizAlign = "center"
     lbl.vertAlign = "center"
-    lbl.text = label
+    lbl.text = KeyDisplayLabel(label)
     lbl.color = m.top.cNeutral50
     f = CreateObject("roSGNode", "Font")
     f.uri = "pkg:/fonts/Inter-Medium.ttf"
@@ -288,7 +316,7 @@ end function
 function PressFocusedKey() as void
     label = KeyLabelAt(m.top.focusedRow, m.top.focusedCol)
     if label = "" then return
-    if label = SR_KeyAa() then
+    if KeyIsAaToggle(label) then
         m.top.upperCase = not m.top.upperCase
         return
     end if

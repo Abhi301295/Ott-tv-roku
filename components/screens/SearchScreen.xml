@@ -27,6 +27,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchTheme.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SearchScreen.brs" />
 
   <children>
@@ -42,19 +43,26 @@
         </Group>
 
         <Group id="rightPanel" translation="[768, 0]">
-          <Group id="gridHost" translation="[60, 0]" />
-          <Group id="loadingHost" visible="false" translation="[0, 200]">
-            <Label id="loadingLbl" translation="[200, 80]" width="400" height="40" text="Loading" horizAlign="center" color="0xffffffff">
-              <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="28" />
-            </Label>
+          <Group id="gridViewport" clippingRect="[0, 0, 1152, 952]">
+            <Group id="gridScrollHost" translation="[60, 0]">
+              <Group id="loadingHost" visible="false">
+                <Group id="skeletonHost" />
+              </Group>
+              <Group id="gridHost" />
+            </Group>
           </Group>
           <Group id="emptyHost" visible="false" translation="[0, 200]">
-            <Label id="emptyLbl" translation="[80, 80]" width="355" height="120" text="We are sorry, we can not find the content" wrap="true" horizAlign="center" color="0xffffffff">
+            <Poster id="emptyIcon" uri="pkg:/images/ui/menu_search.png" width="96" height="96"
+              loadDisplayMode="scaleToFit" blendColor="0xf5f5f5ff" />
+            <Label id="emptyLbl" translation="[0, 120]" width="355" height="120" text="We are sorry, we can not find the content"
+              wrap="true" horizAlign="center" color="0xf5f5f5ff">
               <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="30" />
             </Label>
           </Group>
         </Group>
       </Group>
     </Group>
+
+    <Timer id="searchDebounceTimer" duration="0.4" repeat="false" />
   </children>
 </component>

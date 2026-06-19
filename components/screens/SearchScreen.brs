@@ -7,15 +7,25 @@ sub init()
     m.inputWrap = m.top.findNode("inputWrap")
     m.searchInput = m.top.findNode("searchInput")
     m.keyboard = m.top.findNode("keyboard")
+    m.gridViewport = m.top.findNode("gridViewport")
+    m.gridScrollHost = m.top.findNode("gridScrollHost")
     m.gridHost = m.top.findNode("gridHost")
     m.loadingHost = m.top.findNode("loadingHost")
+    m.skeletonHost = m.top.findNode("skeletonHost")
     m.emptyHost = m.top.findNode("emptyHost")
+    m.emptyIcon = m.top.findNode("emptyIcon")
+    m.emptyLbl = m.top.findNode("emptyLbl")
+    m.searchDebounceTimer = m.top.findNode("searchDebounceTimer")
 
     m.focusZone = "input"
     m.searchText = ""
+    m.pendingKeyword = ""
+    m.lastFetchedKeyword = chr(1)
+    m.inFlightKeyword = ""
     m.results = []
     m.cardNodes = []
     m.gridIndex = 0
+    m.gridScrollY = 0
     m.gridCols = 3
     m.keyRow = 0
     m.keyCol = 0
@@ -40,12 +50,18 @@ sub init()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
+    if m.searchDebounceTimer <> invalid then
+        m.searchDebounceTimer.duration = SR_SearchDebounceMs()
+        m.searchDebounceTimer.observeField("fire", "OnSearchDebounceFire")
+    end if
+    ApplyEmptyCopy()
 end sub
 
 sub OnNavStateReady()
     LoadSearchTokens()
     ApplySearchTokens()
     EnterInput()
+    m.pendingKeyword = ""
     FetchSearch("")
 end sub
 
@@ -53,6 +69,10 @@ sub OnDispose()
     if not m.top.dispose then return
     KillSearchTask(m.searchTask)
     m.searchTask = invalid
+    if m.searchDebounceTimer <> invalid then
+        m.searchDebounceTimer.control = "stop"
+        m.searchDebounceTimer.unobserveField("fire")
+    end if
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid then tm.unobserveField("ready")
     if m.global <> invalid and m.global.hasField("businessResolved") then
@@ -141,7 +161,16 @@ sub ApplySearchShellLayout()
         m.keyboard.translation = [kx, SR_InputH() + SR_KeyboardMarginTop()]
     end if
     m.gridCols = SearchGridCols(m.rightW)
+    ApplyGridViewport()
     RebuildGridPositions()
+    ApplyGridScroll()
+    ApplyEmptyLayout()
+end sub
+
+sub ApplyGridViewport()
+    if m.gridViewport = invalid then return
+    viewH = SR_GridViewHeight()
+    m.gridViewport.clippingRect = [0, 0, m.rightW, viewH]
 end sub
 
 function SearchGridCols(panelW as integer) as integer
@@ -153,10 +182,38 @@ function SearchGridCols(panelW as integer) as integer
     return cols
 end function
 
+sub ScheduleSearch(keyword as string)
+    if keyword = invalid then keyword = ""
+    if keyword <> m.lastFetchedKeyword then BeginSearchLoading()
+    m.pendingKeyword = keyword
+    if m.searchDebounceTimer = invalid then
+        CommitSearch(keyword)
+        return
+    end if
+    m.searchDebounceTimer.duration = SR_SearchDebounceMs()
+    m.searchDebounceTimer.control = "stop"
+    m.searchDebounceTimer.control = "start"
+end sub
+
+sub OnSearchDebounceFire()
+    kw = m.pendingKeyword
+    if kw = invalid then kw = ""
+    if kw = m.lastFetchedKeyword then return
+    CommitSearch(kw)
+end sub
+
+sub CommitSearch(keyword as string)
+    if keyword = invalid then keyword = ""
+    if keyword = m.lastFetchedKeyword then return
+    FetchSearch(keyword)
+end sub
+
 sub FetchSearch(keyword as string)
+    if keyword = invalid then keyword = ""
+    m.lastFetchedKeyword = keyword
+    m.inFlightKeyword = keyword
     m.loading = true
-    ShowLoading(true)
-    ShowEmpty(false)
+    BeginSearchLoading()
     KillSearchTask(m.searchTask)
     path = SearchBuildPath(keyword, 1, SR_ApiLimit())
     m.searchTask = ApiGet(path)
@@ -164,12 +221,24 @@ sub FetchSearch(keyword as string)
     StartHttpTask(m.searchTask)
 end sub
 
+sub BeginSearchLoading()
+    m.gridScrollY = 0
+    ClearGrid()
+    ShowEmpty(false)
+    ShowLoading(true)
+    ApplyGridScroll()
+end sub
+
 sub OnSearchResponse()
     if m.top.dispose = true then return
     if m.searchTask = invalid then return
     m.searchTask.unobserveField("apiResult")
     api = m.searchTask.apiResult
+    respondedKw = m.inFlightKeyword
     m.searchTask = invalid
+
+    if respondedKw <> m.pendingKeyword then return
+
     m.loading = false
     ShowLoading(false)
 
@@ -187,6 +256,49 @@ end sub
 
 sub ShowLoading(show as boolean)
     if m.loadingHost <> invalid then m.loadingHost.visible = show
+    if show then
+        BuildSkeletonGrid()
+    else
+        ClearSkeletonGrid()
+        if m.gridHost <> invalid and m.emptyHost <> invalid and m.emptyHost.visible <> true then
+            m.gridHost.visible = true
+        end if
+    end if
+end sub
+
+sub BuildSkeletonGrid()
+    if m.skeletonHost = invalid then return
+    ClearSkeletonGrid()
+    base = CardContrastSkeletonBase(m.cPageBg, m.cKeyBorder)
+    hi = m.cKeyBorder
+    if hi = invalid or hi = "" then hi = "0x404040ff"
+    rows = SR_SkeletonRows()
+    count = m.gridCols * rows
+    for i = 0 to count - 1
+        cardPos = SearchCardPos(i)
+        tile = m.skeletonHost.createChild("Group")
+        tile.translation = [cardPos[0], cardPos[1]]
+        skThumb = tile.createChild("Skeleton")
+        skThumb.translation = [0, SR_CardTitleMarginTop()]
+        skThumb.boxWidth = SR_CardW()
+        skThumb.boxHeight = SR_CardH()
+        skThumb.shapeUri = SR_SkeletonThumbShapeUri()
+        CardApplySkeleton(skThumb, base, hi)
+        skThumb.running = true
+        titleY = SR_CardTitleMarginTop() + SR_CardH() + SR_CardTitleMarginTop()
+        skTitle = tile.createChild("Skeleton")
+        skTitle.translation = [0, titleY]
+        skTitle.boxWidth = SR_CardTitleMaxW()
+        skTitle.boxHeight = SR_CardTitleH()
+        skTitle.shapeUri = SR_SkeletonTitleShapeUri()
+        CardApplySkeleton(skTitle, base, hi)
+        skTitle.running = true
+    end for
+end sub
+
+sub ClearSkeletonGrid()
+    if m.skeletonHost = invalid then return
+    m.skeletonHost.removeChildrenIndex(m.skeletonHost.getChildCount(), 0)
 end sub
 
 sub ShowEmpty(show as boolean)
@@ -194,11 +306,44 @@ sub ShowEmpty(show as boolean)
     if m.gridHost <> invalid then m.gridHost.visible = not show
 end sub
 
+sub ApplyEmptyCopy()
+    if m.emptyLbl <> invalid then m.emptyLbl.text = SR_EmptyCopy()
+    if m.emptyIcon <> invalid then
+        m.emptyIcon.uri = SR_EmptyIconUri()
+        sz = SR_EmptyIconSize()
+        m.emptyIcon.width = sz
+        m.emptyIcon.height = sz
+    end if
+    ApplyEmptyLayout()
+end sub
+
+sub ApplyEmptyLayout()
+    if m.emptyHost = invalid then return
+    textW = SR_EmptyTextW()
+    iconSz = SR_EmptyIconSize()
+    blockW = textW
+    if iconSz > blockW then blockW = iconSz
+    x = Int((m.rightW - blockW) / 2)
+    if x < 0 then x = 0
+    y = 160
+    m.emptyHost.translation = [x, y]
+    if m.emptyIcon <> invalid then
+        iconX = Int((blockW - iconSz) / 2)
+        m.emptyIcon.translation = [iconX, 0]
+    end if
+    if m.emptyLbl <> invalid then
+        gap = SR_EmptyIconGap()
+        m.emptyLbl.translation = [0, iconSz + gap]
+        m.emptyLbl.width = textW
+    end if
+end sub
+
 sub ClearGrid()
     if m.gridHost = invalid then return
     m.gridHost.removeChildrenIndex(m.gridHost.getChildCount(), 0)
     m.cardNodes = []
     m.gridIndex = 0
+    m.gridScrollY = 0
 end sub
 
 sub BuildGrid()
@@ -215,9 +360,11 @@ sub BuildGrid()
         card.cPrimary700 = m.cPrimary700
         card.cNeutral50 = m.cText
         card.cNeutral700 = m.cKeyBorder
+        card.cPageBg = m.cPageBg
         m.cardNodes.Push(card)
     end for
     if m.gridIndex >= m.cardNodes.Count() then m.gridIndex = 0
+    m.gridScrollY = 0
     ApplyGridFocus()
 end sub
 
@@ -252,7 +399,7 @@ sub OnKeyboardKeyPress()
     UpdateInputLabel()
     kw = m.searchText.Trim()
     if kw = "" then kw = ""
-    FetchSearch(kw)
+    ScheduleSearch(kw)
 end sub
 
 sub UpdateInputLabel()
@@ -266,12 +413,70 @@ sub ApplyInputFocus()
     end if
 end sub
 
+function SearchGridRowCount() as integer
+    if m.cardNodes.Count() < 1 then return 0
+    return Int((m.cardNodes.Count() - 1) / m.gridCols) + 1
+end function
+
+function SearchCardHeight() as integer
+    return SR_CardTitleMarginTop() + SR_CardH() + SR_CardTitleMarginTop() + SR_CardTitleH()
+end function
+
+function SearchRowScrollBottom(row as integer) as integer
+    rowTop = row * SR_CardRowPitch()
+    tail = SearchCardHeight() + SR_CardTitleGlyphPad() + SR_GridScrollPad()
+    return rowTop + tail
+end function
+
+function SearchGridContentHeight() as integer
+    rows = SearchGridRowCount()
+    if rows < 1 then return 0
+    return SearchRowScrollBottom(rows - 1)
+end function
+
+function SearchGridMaxScroll() as integer
+    contentH = SearchGridContentHeight()
+    maxY = contentH - SR_GridViewHeight()
+    if maxY < 0 then return 0
+    return maxY
+end function
+
+sub ApplyGridScroll()
+    if m.gridScrollHost = invalid then return
+    if m.focusZone = "grid" and m.cardNodes.Count() > 0 then
+        idx = m.gridIndex
+        if idx < 0 then idx = 0
+        if idx >= m.cardNodes.Count() then idx = m.cardNodes.Count() - 1
+        row = Int(idx / m.gridCols)
+        rowTop = row * SR_CardRowPitch()
+        scrollBottom = SearchRowScrollBottom(row)
+        pad = SR_GridScrollPad()
+        viewH = SR_GridViewHeight()
+        if rowTop < m.gridScrollY + pad then
+            m.gridScrollY = rowTop - pad
+        else if scrollBottom > m.gridScrollY + viewH then
+            m.gridScrollY = scrollBottom - viewH
+        end if
+        lastRow = SearchGridRowCount() - 1
+        if row = lastRow then
+            needY = scrollBottom - viewH
+            if needY > m.gridScrollY then m.gridScrollY = needY
+        end if
+    end if
+    if m.gridScrollY < 0 then m.gridScrollY = 0
+    maxScroll = SearchGridMaxScroll()
+    if m.gridScrollY > maxScroll then m.gridScrollY = maxScroll
+    m.gridScrollHost.translation = [SR_GridMarginLeft(), -m.gridScrollY]
+end sub
+
 sub ApplyGridFocus()
     for i = 0 to m.cardNodes.Count() - 1
         card = m.cardNodes[i]
         if card = invalid then continue for
+        card.cPageBg = m.cPageBg
         card.focusedState = (m.focusZone = "grid" and i = m.gridIndex)
     end for
+    ApplyGridScroll()
 end sub
 
 sub ApplyKeyboardFocus()
@@ -418,11 +623,9 @@ sub HandleGridNav(key as string)
         end if
         m.gridIndex = idx - cols
     else if key = "down" then
-        if idx + cols >= m.cardNodes.Count() then
-            EnterInput()
-            return
+        if idx + cols < m.cardNodes.Count() then
+            m.gridIndex = idx + cols
         end if
-        m.gridIndex = idx + cols
     else if key = "OK" or key = "ok" then
         OpenDetail(idx)
         return

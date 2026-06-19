@@ -130,7 +130,7 @@ function SR_GridGapY() as integer
 end function
 
 function SR_GridGapX() as integer
-    return 16
+    return 24
 end function
 
 function SR_GridMinCol() as integer
@@ -150,7 +150,8 @@ function SR_CardMarginRight() as integer
 end function
 
 function SR_CardTitleMarginTop() as integer
-    return 40
+    ' React search-horizontalcard.tsx m-t-10 above thumb and above title.
+    return 10
 end function
 
 function SR_CardTitleMaxW() as integer
@@ -165,12 +166,65 @@ function SR_CardTitleLineH() as integer
     return 22
 end function
 
+function SR_CardTitleH() as integer
+    ' Slightly taller than font size so descenders are not clipped inside the Label.
+    return 28
+end function
+
+function SR_CardCornerRadius() as integer
+    return 12
+end function
+
+' Rounded search thumb (sim-safe) — reuse for home cards on a separate branch:
+'   • Do NOT use MaskGroup for rounded thumbs in brs-engine/sim (clip is ignored).
+'   • Stack: full-rect Poster thumb → grad → 4× search_card_corner_{tl,tr,bl,br}.png
+'     tinted at runtime via Poster.blendColor = cPageBg (page background token).
+'   • Corners generated in scripts/gen_search_keyboard_assets.py (pieslice L-masks, 12px).
+'   • Focus: search_card_focus_ring.png (inset 3px ring, same radius) — NOT outside FocusFrame.
+'   • Assets: search_card_corner_*.png, search_card_focus_ring.png; mask PNG exists but sim-only fails.
+function SR_CardCornerUri(quadrant as string) as string
+    return "pkg:/images/ui/search_card_corner_" + quadrant + ".png"
+end function
+
+function SR_CardMaskUri() as string
+    return "pkg:/images/ui/search_card_mask_280x150.png"
+end function
+
+function SR_CardFocusRingUri() as string
+    return "pkg:/images/ui/search_card_focus_ring.png"
+end function
+
 function SR_CardFocusBorderW() as integer
     return 3
 end function
 
+function SR_CardFocusScale() as float
+    return 1.05
+end function
+
+function SR_CardFocusAnimDuration() as float
+    return 0.3
+end function
+
 function SR_CardRowPitch() as integer
-    return SR_CardTitleMarginTop() + SR_CardH() + SR_CardTitleMarginTop() + SR_CardTitleLineH() + SR_GridGapY()
+    return SR_CardTitleMarginTop() + SR_CardH() + SR_CardTitleMarginTop() + SR_CardTitleH() + SR_GridGapY()
+end function
+
+function SR_GridViewHeight() as integer
+    return 1080 - SR_ContentPadTop() - SR_GridViewBottomInset()
+end function
+
+function SR_GridViewBottomInset() as integer
+  return 32
+end function
+
+function SR_CardTitleGlyphPad() as integer
+    return 4
+end function
+
+function SR_GridScrollPad() as integer
+    scaleExtra = Int(SR_CardH() * (SR_CardFocusScale() - 1.0) / 2.0 + 0.5)
+    return scaleExtra + 16
 end function
 
 function SR_ResultCap() as integer
@@ -215,7 +269,7 @@ function SR_PinPrimary700() as string
 end function
 
 function SR_CardColPitch() as integer
-    return SR_CardW() + SR_GridGapX()
+    return SR_CardW() + SR_CardMarginRight() + SR_GridGapX()
 end function
 
 ' React bg-neutral-950 is hardcoded #0a0a0a in Tailwind build (not var(--neutral-950)).
@@ -284,6 +338,30 @@ function SR_EmptyCopy() as string
     return "We are sorry, we can not find the content"
 end function
 
+function SR_EmptyTextW() as integer
+    return 355
+end function
+
+function SR_EmptyIconUri() as string
+    return "pkg:/images/ui/menu_search.png"
+end function
+
+function SR_EmptyIconSize() as integer
+    return 96
+end function
+
+function SR_EmptyIconGap() as integer
+    return 24
+end function
+
+function SR_SkeletonRows() as integer
+    return 3
+end function
+
+function SR_SearchDebounceMs() as float
+    return 0.4
+end function
+
 function SR_LoadingCopy() as string
     return "Loading"
 end function
@@ -294,6 +372,18 @@ end function
 
 function SR_KeyAa() as string
     return "Aa"
+end function
+
+function SR_KeyAAToggle() as string
+    return "AA"
+end function
+
+function SR_SkeletonThumbShapeUri() as string
+    return "pkg:/images/ui/sk_base.png"
+end function
+
+function SR_SkeletonTitleShapeUri() as string
+    return "pkg:/images/ui/sk_detail_line_230.png"
 end function
 
 function SR_Key123() as string

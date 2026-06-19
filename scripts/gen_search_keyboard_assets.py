@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rounded search keyboard fills + L/R/bottom panel shadow (no top halo)."""
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 OUT = Path(__file__).resolve().parents[1] / "images" / "ui"
 
@@ -23,6 +23,48 @@ SHADOW_DROP = 16
 SHADOW_BLUR_B = 12
 SHADOW_ALPHA_H = 90
 SHADOW_ALPHA_B = 165
+
+# Search result card — parity search-horizontalcard.tsx rounded-xl on neutral-1000 page.
+SEARCH_CARD_W = 280
+SEARCH_CARD_H = 150
+SEARCH_CARD_RADIUS = 12
+SEARCH_CARD_BORDER = 3
+
+
+def search_card_corner(quadrant: str, radius: int) -> Image.Image:
+    """White corner nub mask — tint with page bg via Poster.blendColor (FocusFrame parity)."""
+    img = Image.new("RGBA", (radius, radius), (255, 255, 255, 255))
+    d = ImageDraw.Draw(img)
+    pies = {
+        "tl": (0, 0, 2 * radius, 2 * radius, 180, 270),
+        "tr": (-radius, 0, radius - 1, 2 * radius, 270, 360),
+        "bl": (0, -radius, 2 * radius, radius - 1, 90, 180),
+        "br": (-radius, -radius, radius - 1, radius - 1, 0, 90),
+    }
+    args = pies[quadrant]
+    d.pieslice(list(args[:4]), args[4], args[5], fill=(0, 0, 0, 0))
+    return img
+
+
+def search_card_mask(w: int, h: int, radius: int) -> Image.Image:
+    """Rounded-rect clip mask — white=visible (parity React overflow-hidden)."""
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(img).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=(255, 255, 255, 255))
+    return img
+
+
+def search_card_focus_ring(w: int, h: int, radius: int, thickness: int) -> Image.Image:
+    """Inset border ring sharing the clip radius — tint via blendColor (parity inset-0 border-3)."""
+    outer = Image.new("L", (w, h), 0)
+    inner = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(outer).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=255)
+    inset = thickness
+    inner_r = max(0, radius - inset)
+    ImageDraw.Draw(inner).rounded_rectangle(
+        (inset, inset, w - 1 - inset, h - 1 - inset), radius=inner_r, fill=255
+    )
+    ring = ImageChops.subtract(outer, inner)
+    return Image.merge("RGBA", (ring, ring, ring, ring))
 
 
 def rounded_fill(w: int, h: int, radius: int) -> Image.Image:
@@ -113,6 +155,16 @@ def main() -> None:
     shadow = OUT / "search_keyboard_shadow.png"
     panel_lrb_shadow(PANEL_SHADOW_W, PANEL_SHADOW_H, PANEL_SHADOW_RADIUS).save(shadow)
     print("Wrote", shadow.name)
+    for q in ("tl", "tr", "bl", "br"):
+        path = OUT / f"search_card_corner_{q}.png"
+        search_card_corner(q, SEARCH_CARD_RADIUS).save(path)
+        print("Wrote", path.name)
+    mask = OUT / f"search_card_mask_{SEARCH_CARD_W}x{SEARCH_CARD_H}.png"
+    search_card_mask(SEARCH_CARD_W, SEARCH_CARD_H, SEARCH_CARD_RADIUS).save(mask)
+    print("Wrote", mask.name)
+    ring = OUT / "search_card_focus_ring.png"
+    search_card_focus_ring(SEARCH_CARD_W, SEARCH_CARD_H, SEARCH_CARD_RADIUS, SEARCH_CARD_BORDER).save(ring)
+    print("Wrote", ring.name)
 
 
 if __name__ == "__main__":
