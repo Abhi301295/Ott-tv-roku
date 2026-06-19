@@ -137,6 +137,9 @@ function CreateScreenForRoute(route as string, state as object) as object
     if route = RouteGenere() then
         return CreateObject("roSGNode", "GenreListScreen")
     end if
+    if route = RouteSearch() then
+        return CreateObject("roSGNode", "SearchScreen")
+    end if
     if route = RouteSeries() or route = RouteNewRelease() then
         return CreateObject("roSGNode", "SeriesScreen")
     end if

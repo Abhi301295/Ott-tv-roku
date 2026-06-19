@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SearchKeyboard" extends="Group">
+  <interface>
+    <field id="keyPress" type="string" value="" alwaysNotify="true" />
+    <field id="focusedRow" type="integer" value="0" alwaysNotify="true" onChange="OnFocusChanged" />
+    <field id="focusedCol" type="integer" value="0" alwaysNotify="true" onChange="OnFocusChanged" />
+    <field id="numberMode" type="boolean" value="false" alwaysNotify="true" onChange="OnLayoutModeChanged" />
+    <field id="upperCase" type="boolean" value="true" alwaysNotify="true" onChange="OnLayoutModeChanged" />
+    <field id="focusActive" type="boolean" value="false" alwaysNotify="true" onChange="OnFocusChanged" />
+    <field id="cPrimary500" type="string" value="0x0092ffff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xffffffff" onChange="OnThemeChanged" />
+    <field id="panelWidth" type="integer" value="0" />
+    <field id="panelHeight" type="integer" value="0" />
+    <function name="PressFocusedKey" />
+    <function name="RefreshKeyColors" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/search/SearchConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/SearchKeyboard.brs" />
+
+  <children>
+    <Group id="panelHost">
+      <Poster id="panelDropShadow" width="772" height="396" uri="pkg:/images/ui/search_keyboard_shadow.png" blendColor="0x000000ff" opacity="0.38" loadDisplayMode="scaleToFit" />
+      <Group id="rowsHost" translation="[0, 0]" />
+    </Group>
+  </children>
+</component>
