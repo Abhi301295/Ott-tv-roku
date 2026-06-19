@@ -78,7 +78,12 @@ sub ApplyAll()
         m.skeleton.running = true
         if m.dataApplied then ReportLoaded()
     end if
-    CardApplySkeleton(m.skeleton, CardSkeletonBaseColor(), CardSkeletonHighlightColor())
+    bg = m.top.cPageBg
+    if bg = invalid or bg = "" then bg = "0x0a0a0aff"
+    skBase = CardContrastSkeletonBase(bg, m.top.cNeutral700)
+    skHi = CardContrastSkeletonBase(bg, m.top.cNeutral800)
+    if CardAvgLum(skHi) <= CardAvgLum(skBase) then skHi = CardLightenHex(skBase, 48)
+    CardApplySkeleton(m.skeleton, skBase, skHi)
     if m.cardBg <> invalid then m.cardBg.color = CardThumbPlaceholderBg()
     m.progressTrack.color = CardProgressTrackColor()
     ApplyProgressFill()

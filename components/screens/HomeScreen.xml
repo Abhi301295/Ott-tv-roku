@@ -5,6 +5,8 @@
   <interface>
     <field id="navState" type="assocarray" onChange="OnNavStateReady" />
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="shellEnterContent" type="boolean" value="false" alwaysNotify="true" onChange="OnShellEnterContent" />
+    <field id="shellEnterAction" type="string" value="" />
     <!-- Set by ViewManager right before this screen is removed, so we can stop the hero
          carousel + build timers (prevents orphaned auto-rotating heroes). -->
     <field id="dispose" type="boolean" value="false" onChange="OnDispose" />

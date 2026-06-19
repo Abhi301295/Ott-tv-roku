@@ -14,6 +14,7 @@ sub init()
     m.homeSkeleton = m.top.findNode("homeSkeleton")
     m.rowsScrim = m.top.findNode("rowsScrim")
     m.rowsScrimGrad = m.top.findNode("rowsScrimGrad")
+    m.bg = m.top.findNode("bg")
     ' Once the Continue Watching row has painted, the dark content scrim is removed at the
     ' top row so the hero poster/video bleeds behind the cards (re-shown when scrolled down).
     m.rowsRevealed = false
@@ -200,6 +201,22 @@ sub SyncHeaderFromShell()
     ApplyHeaderTheme()
     ApplyHeaderBranding()
     UpdateHeaderScrimForHero()
+end sub
+
+' ViewManager/AppShell sets shellEnterContent when the user leaves the header (DOWN on
+' Netflix bar, DOWN on last sidebar item, RIGHT on sidebar). Home must land hero/rows here
+' because HandleShellKey consumes the key before HomeScreen.OnKey runs.
+sub OnShellEnterContent()
+    if m.top.shellEnterContent <> true then return
+    m.top.shellEnterContent = false
+    action = m.top.shellEnterAction
+    if action = invalid then action = ""
+    m.top.shellEnterAction = ""
+    if action = "restore" then
+        ExitHeaderToPrevious()
+        return
+    end if
+    if m.focusZone = "header" then EnterHeroFromHeader()
 end sub
 
 sub ConsumeHomeNavState()
@@ -395,7 +412,31 @@ sub LoadThemeTokens()
     m.cNeutral700 = TokenColor(tokens, "neutral-700", "#181818")
     m.cNeutral800 = TokenColor(tokens, "neutral-800", "#121212")
     m.cNeutral950 = TokenColor(tokens, "neutral-900", "#0a0a0a")
+    m.cPageBg = TokenColor(tokens, "background", "#0a0a0a")
+    ApplyHomePageBackground()
 end sub
+
+' Netflix home is always cinematic dark (netflixContent.tsx bg-black). OTT uses neutral-100
+' (content.tsx). API background/neutral tokens are light on some tenants — never use them here.
+sub ApplyHomePageBackground()
+    if m.bg = invalid then return
+    layout = m.homeLayout
+    if layout = invalid or layout = "" then layout = HomeLayoutMode()
+    bg = m.cPageBg
+    if ThemeIsNetflixHome() or layout = HC_HomeLayoutNetflix() then
+        bg = HC_HomeCinematicBg()
+    else if ThemeIsOttHome() or layout = HC_HomeLayoutOtt() then
+        bg = HC_HomeOttPageBg()
+    end if
+    m.cHomeBg = bg
+    m.bg.color = bg
+end sub
+
+function HomeRowPageBg() as string
+    if m.cHomeBg <> invalid and m.cHomeBg <> "" then return m.cHomeBg
+    if ThemeIsNetflixHome() then return HC_HomeCinematicBg()
+    return m.cPageBg
+end function
 
 function TokenColor(tokens as object, name as string, fallbackHex as string) as string
     hex = fallbackHex
@@ -412,6 +453,7 @@ sub OnBusinessResolved()
     LoadThemeTokens()
     InjectRowTheme()
     ApplyThemeToHero()
+    ApplyHomeSkeletonColors()
     if IsHomeForeground() then SetupHeader()
 end sub
 
@@ -431,6 +473,7 @@ sub ApplyThemeToRow(row as object)
     row.cNeutral800 = m.cNeutral800
     row.cNeutral950 = m.cNeutral950
     row.cNeutral700 = m.cNeutral700
+    row.cPageBg = HomeRowPageBg()
 end sub
 
 sub ApplyActiveHeader()
@@ -844,9 +887,24 @@ function HeroAvailable() as boolean
 end function
 
 function HeroMultiSlide() as boolean
-    if m.hero = invalid then return false
+    return HeroSlideCount() > 1
+end function
+
+function HeroSlideCount() as integer
+    if m.hero = invalid then return 0
     items = m.hero.bannerItems
-    return (items <> invalid and items.Count() > 1)
+    if items = invalid then return 0
+    return items.Count()
+end function
+
+' True when the merged category list includes a non-empty Continue Watching row.
+function HomeHasContinueWatchingRow() as boolean
+    cats = FilterContentRows(m.categories)
+    for each cat in cats
+        if cat = invalid then continue for
+        if cat.type = HC_TypeContinueWatching() then return true
+    end for
+    return false
 end function
 
 ' Pick a valid landing control given what is currently available.
@@ -884,6 +942,7 @@ sub EnterHeroFromHeader()
     if HeroAvailable() then
         EnterHero("next")
     else if m.rowWidgets.Count() > 0 then
+        ' Single-slide hero (or no trailer): skip arrow chrome — land on rows (React parity).
         ExitHeaderToRows()
     else
         ' Keep header focus active while Home content is still loading.
@@ -1442,6 +1501,9 @@ sub MaybeStartRowBuild()
     if not m.rowsDataReady then return
 
     if ThemeIsOttHome() then m.rowGateElapsed = true
+    ' No CW row for this profile — do not hold row build for a hero trailer preview gate.
+    if not HomeHasContinueWatchingRow() then m.rowGateElapsed = true
+    if not HeroMultiSlide() then m.rowGateElapsed = true
 
     heroLive = (m.hero <> invalid and m.hero.trailerPlaying = true)
     if heroLive or m.rowGateElapsed then
@@ -1450,7 +1512,7 @@ sub MaybeStartRowBuild()
             HomeBootLog(m.bootSpan, "row gate open", "trailer live")
             print "[HOME] row gate open (trailer live) -> build rows"
         else
-            HomeBootLog(m.bootSpan, "row gate open", "timeout/skip ott=" + CwPerfBool(ThemeIsOttHome()))
+            HomeBootLog(m.bootSpan, "row gate open", "timeout/skip ott=" + CwPerfBool(ThemeIsOttHome()) + " cw=" + CwPerfBool(HomeHasContinueWatchingRow()) + " slides=" + Str(HeroSlideCount()))
             print "[HOME] row gate open (timeout) -> build rows"
         end if
         BuildContentRows()
@@ -1520,9 +1582,28 @@ sub OnRowsForceHideTimer()
     end if
 end sub
 
+' Theme-aware skeleton fill — base must contrast page bg; animation breathes base opacity.
+sub ApplyHomeSkeletonColors()
+    if m.homeSkeleton = invalid then return
+    bg = HomeRowPageBg()
+    if bg = invalid or bg = "" then bg = HC_HomeCinematicBg()
+    base = CardContrastSkeletonBase(bg, m.cNeutral700)
+    if CardAvgLum(base) < 80 then base = "0x404040ff"
+    shine = CardLightenHex(base, 56)
+    if CardAvgLum(shine) <= CardAvgLum(base) then shine = CardLightenHex(base, 72)
+    backdrop = "0x141414ff"
+    if ThemeIsOttHome() and CardAvgLum(bg) > 160 then
+        backdrop = m.cNeutral200
+        if backdrop = invalid or backdrop = "" then backdrop = "0xe5e5e5ff"
+    end if
+    m.homeSkeleton.boxColor = base
+    m.homeSkeleton.shineColor = shine
+    m.homeSkeleton.backdropColor = backdrop
+end sub
+
 sub ShowHeroSkeleton(show as boolean)
     if m.homeSkeleton = invalid then return
-    m.homeSkeleton.boxColor = m.cNeutral800
+    ApplyHomeSkeletonColors()
     m.homeSkeleton.heroRunning = show
 end sub
 
@@ -1543,7 +1624,7 @@ sub ShowRowsSkeleton(show as boolean)
         CwPerfMark(m.cwShimmerSpan, "shimmer OFF", detail)
         m.cwShimmerSpan = invalid
     end if
-    m.homeSkeleton.boxColor = m.cNeutral800
+    ApplyHomeSkeletonColors()
     m.homeSkeleton.rowsRunning = show
     if m.rowsSkeletonTimeout <> invalid then
         if not show then
@@ -1627,6 +1708,11 @@ sub OnRowBuildTick()
     ' Only row 0 builds immediately — row 1+ are shells until CW has painted, so their
     ' card nodes cannot steal the render thread from the first visible strip.
     if m.rowBuildIndex = 0 then
+        ' Non-CW first row: skip Netflix paint-poll (profiles with no Continue Watching were
+        ' stranding the rows shimmer for seconds even though no CW row exists).
+        if cat <> invalid and cat.type <> HC_TypeContinueWatching() then
+            row.ottRowReveal = true
+        end if
         row.categoryData = cat
     else
         row.callFunc("PrepareShell", cat)
@@ -1708,14 +1794,14 @@ sub LogCwRowState(tag as string)
     CwPerfInstant(tag, detail)
 end sub
 
-' Make row 0 visible, cut shimmer, then move focus (sidebar / rows) so layout
-' animation cannot open a gap between shimmer-off and card-populate.
+' Cut the HomeSkeleton row strip before revealing real cards so the two shimmer
+' systems (HomeSkeleton rectangles vs per-card Skeleton widgets) never overlap.
 sub PrepareFirstRowReveal()
-    EnsureFirstRowVisibleUnderShimmer()
     m.rowsRevealed = true
     HomeBootLog(m.bootSpan, "rows revealed", "shimmer off")
     LogCwRowState("cards painted -> hide shimmer")
     ShowRowsSkeleton(false)
+    EnsureFirstRowVisibleUnderShimmer()
     UpdateRowsScrim()
     LogCwRowState("shimmer hidden")
     ApplyHomeFocus()

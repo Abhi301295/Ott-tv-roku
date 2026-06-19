@@ -54,6 +54,15 @@ sub ShellEnterContent(vm as object)
     AppShellNotifyLayoutChange(vm)
 end sub
 
+' Leave the header menu and hand off to the active screen (hero, rows, etc.).
+sub AppShellLeaveHeader(vm as object, action = "" as string)
+    ShellEnterContent(vm)
+    screen = AppShellActiveScreen(vm)
+    if screen = invalid then return
+    if action <> "" and screen.hasField("shellEnterAction") then screen.shellEnterAction = action
+    if screen.hasField("shellEnterContent") then screen.shellEnterContent = true
+end sub
+
 sub AppShellNotifyLayoutChange(vm as object)
     if vm = invalid then return
     screen = AppShellActiveScreen(vm)
@@ -233,19 +242,11 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
                 header.focusedIndex = menuIndex
                 vm.menuIndex = menuIndex
             else
-                ShellEnterContent(vm)
-                screen = AppShellActiveScreen(vm)
-                if screen <> invalid and screen.hasField("shellEnterContent") then
-                    screen.shellEnterContent = true
-                end if
+                AppShellLeaveHeader(vm, "hero")
             end if
             return true
         else if key = "right" then
-            ShellEnterContent(vm)
-            screen = AppShellActiveScreen(vm)
-            if screen <> invalid and screen.hasField("shellEnterContent") then
-                screen.shellEnterContent = true
-            end if
+            AppShellLeaveHeader(vm, "restore")
             return true
         else if key = "OK" or key = "ok" then
             AppShellSelectHeaderItem(vm, menuIndex)
@@ -270,11 +271,7 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
         end if
         return true
     else if key = "down" then
-        ShellEnterContent(vm)
-        screen = AppShellActiveScreen(vm)
-        if screen <> invalid and screen.hasField("shellEnterContent") then
-            screen.shellEnterContent = true
-        end if
+        AppShellLeaveHeader(vm, "hero")
         return true
     else if key = "OK" or key = "ok" then
         AppShellSelectHeaderItem(vm, menuIndex)
@@ -299,11 +296,7 @@ sub AppShellSelectHeaderItem(vm as object, menuIndex as integer)
             if ThemeIsSidebarHeader() then
                 ShellEnterHeader(vm, menuIndex)
             else
-                ShellEnterContent(vm)
-                screen = AppShellActiveScreen(vm)
-                if screen <> invalid and screen.hasField("shellEnterContent") then
-                    screen.shellEnterContent = true
-                end if
+                AppShellLeaveHeader(vm, "hero")
             end if
             return
         end if

@@ -17,18 +17,15 @@
 
   <children>
     <!-- Rounded base (primary-700) with a highlight overlay (primary-500) that pulses
-         its opacity — fully contained within the rounded box + name bar (the simulator
-         can't clip a sweeping band, so we breathe the fill like react's animate-pulse). -->
+         its opacity — fully contained within the rounded box. Base stays opaque. -->
     <Poster id="base" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
       loadDisplayMode="scaleToFill" blendColor="0xffffffff" />
     <Poster id="shine" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
       loadDisplayMode="scaleToFill" blendColor="0xf3f3f3ff" opacity="0.0" />
-    <!-- Breathe the base opacity (parity with react animate-pulse). Pulsing the highlight
-         overlay was invisible because base+highlight are both near-white; opacity is
-         visible against any background. -->
+    <!-- Opaque base + highlight overlay pulse (base opacity never drops — shimmer must not go transparent). -->
     <Animation id="anim" duration="1.1" repeat="true" easeFunction="inOutQuad">
       <FloatFieldInterpolator id="interp" key="[0.0,0.5,1.0]"
-        keyValue="[1.0,0.4,1.0]" fieldToInterp="base.opacity" />
+        keyValue="[0.0,0.85,0.0]" fieldToInterp="shine.opacity" />
     </Animation>
   </children>
 </component>

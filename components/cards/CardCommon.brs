@@ -119,7 +119,7 @@ sub CardApplyPosterCover(poster as object, clip as object, w as integer, h as in
     poster.loadHeight = 0
 end sub
 
-sub CardInjectTheme(card as object, primary500 as string, primary600 as string, primary700 as string, neutral50 as string, neutral800 as string, neutral700 = "" as string)
+sub CardInjectTheme(card as object, primary500 as string, primary600 as string, primary700 as string, neutral50 as string, neutral800 as string, neutral700 = "" as string, pageBg = "" as string)
     if card = invalid then return
     if card.hasField("cPrimary500") then card.cPrimary500 = primary500
     if card.hasField("cPrimary600") then card.cPrimary600 = primary600
@@ -127,6 +127,7 @@ sub CardInjectTheme(card as object, primary500 as string, primary600 as string, 
     if card.hasField("cNeutral50") then card.cNeutral50 = neutral50
     if card.hasField("cNeutral800") then card.cNeutral800 = neutral800
     if neutral700 <> "" and card.hasField("cNeutral700") then card.cNeutral700 = neutral700
+    if pageBg <> "" and card.hasField("cPageBg") then card.cPageBg = pageBg
 end sub
 
 ' Placeholder shimmer — parity with React bg-neutral-700 / neutral-800 pulse.
@@ -136,6 +137,7 @@ sub CardApplySkeleton(skeleton as object, neutral700 as string, neutral800 as st
     highlight = neutral800
     if base = invalid or base = "" then base = "0x404040ff"
     if highlight = invalid or highlight = "" then highlight = "0x262626ff"
+    if CardAvgLum(highlight) <= CardAvgLum(base) then highlight = CardLightenHex(base, 56)
     skeleton.baseColor = base
     skeleton.highlightColor = highlight
     ' Shimmer the card placeholder while its thumbnail loads (it stops itself on load),
@@ -190,4 +192,80 @@ sub CardDetachMediaObservers(card as object)
     if card.hasField("loaded") then card.unobserveField("loaded")
     thumb = card.findNode("thumb")
     if thumb <> invalid then thumb.unobserveField("loadStatus")
+end sub
+
+' ── Sim-safe rounded thumbs (parity search cards) ─────────────────────────────
+' Stack: full-rect Poster → overlays → 4× card_corner_{tl,tr,bl,br}.png with page bg
+' baked in (gen_card_assets.py — blendColor is unreliable for corner nubs in sim).
+' Focus: card_focus_ring_{w}x{h}.png inset 3px, tinted via blendColor — NOT FocusFrame.
+
+function CardThumbCornerRadius() as integer
+    return 10
+end function
+
+function CardFocusBorderW() as integer
+    return 3
+end function
+
+function CardDefaultPageBg() as string
+    return "0x0a0a0aff"
+end function
+
+function CardCornerUri(quadrant as string) as string
+    return "pkg:/images/ui/card_corner_" + quadrant + ".png"
+end function
+
+function CardFocusRingUri(w as integer, h as integer) as string
+    return "pkg:/images/ui/card_focus_ring_" + Stri(w).Trim() + "x" + Stri(h).Trim() + ".png"
+end function
+
+function CardPageBgColor(card as object) as string
+    if card = invalid then return CardDefaultPageBg()
+    if card.hasField("cPageBg") then
+        bg = card.cPageBg
+        if bg <> invalid and bg <> "" then return bg
+    end if
+    return CardDefaultPageBg()
+end function
+
+sub CardLayoutCornerPoster(node as object, quadrant as string, x as integer, y as integer, r as integer)
+    if node = invalid then return
+    node.uri = CardCornerUri(quadrant)
+    node.width = r
+    node.height = r
+    node.translation = [x, y]
+    node.loadDisplayMode = "scaleToFill"
+    node.visible = true
+end sub
+
+sub CardTintCornerNodes(tl as object, tr as object, bl as object, br as object, pageBg as string)
+    ' Corner PNGs ship with CardDefaultPageBg() baked in — no runtime tint.
+end sub
+
+sub CardLayoutThumbCorners(tl as object, tr as object, bl as object, br as object, w as integer, h as integer, pageBg as string)
+    r = CardThumbCornerRadius()
+    CardLayoutCornerPoster(tl, "tl", 0, 0, r)
+    CardLayoutCornerPoster(tr, "tr", w - r, 0, r)
+    CardLayoutCornerPoster(bl, "bl", 0, h - r, r)
+    CardLayoutCornerPoster(br, "br", w - r, h - r, r)
+    CardTintCornerNodes(tl, tr, bl, br, pageBg)
+end sub
+
+sub CardLayoutInsetFocusRing(ring as object, w as integer, h as integer)
+    if ring = invalid then return
+    ring.uri = CardFocusRingUri(w, h)
+    ring.width = w
+    ring.height = h
+    ring.loadDisplayMode = "scaleToFill"
+end sub
+
+sub CardApplyInsetFocusRing(ring as object, host as object, focused as boolean, color as string)
+    if ring = invalid then return
+    ring.visible = focused
+    if not focused then return
+    if color <> invalid and color <> "" then ring.blendColor = color
+    if host <> invalid then
+        host.removeChild(ring)
+        host.appendChild(ring)
+    end if
 end sub
