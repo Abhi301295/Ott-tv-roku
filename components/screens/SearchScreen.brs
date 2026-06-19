@@ -26,7 +26,6 @@ sub init()
 
     LoadSearchTokens()
     ApplySearchShellLayout()
-    SearchDbgSpec()
     ApplySearchInputTheme()
 
     if m.keyboard <> invalid then
@@ -44,7 +43,6 @@ sub init()
 end sub
 
 sub OnNavStateReady()
-    SearchDbg("boot", "nav ready — fetch default keyword")
     LoadSearchTokens()
     ApplySearchTokens()
     EnterInput()
@@ -104,7 +102,6 @@ sub ApplyKeyboardTheme()
     m.keyboard.cPrimary500 = m.cPrimary500
     m.keyboard.cNeutral700 = m.cKeyBorder
     m.keyboard.cNeutral50 = m.cText
-    m.keyboard.cPanelBg = m.cPanelBg
     m.keyboard.callFunc("RefreshKeyColors", invalid)
 end sub
 
@@ -113,7 +110,6 @@ sub OnShellEnterContent()
     m.top.shellEnterContent = false
     m.focusZone = "input"
     ApplyInputFocus()
-    SearchDbg("focus", "shell enter content -> input")
 end sub
 
 sub OnShellLayoutRev()
@@ -143,13 +139,8 @@ sub ApplySearchShellLayout()
         kx = inputX + Int((inputW - kw) / 2)
         if kx < 0 then kx = 0
         m.keyboard.translation = [kx, SR_InputH() + SR_KeyboardMarginTop()]
-        SearchDbg("layout", "keyboard center inputX=" + Str(inputX) + " inputW=" + Str(inputW) + " panelW=" + Str(kw) + " kx=" + Str(kx))
     end if
     m.gridCols = SearchGridCols(m.rightW)
-    SearchDbgLayout("shell_layout", offX, m.viewportW, m.leftW, m.rightW, SR_ContentPadTop())
-    SearchDbgRect("layout", "leftPanel", offX + SR_ColPadX(), SR_ContentPadTop(), m.leftW, 900)
-    SearchDbgRect("layout", "rightPanel", offX + SR_ColPadX() + m.leftW + SR_ColGap(), SR_ContentPadTop(), m.rightW, 900)
-    SearchDbgRect("layout", "input", inputX, 0, inputW, SR_InputH())
     RebuildGridPositions()
 end sub
 
@@ -166,7 +157,6 @@ sub FetchSearch(keyword as string)
     m.loading = true
     ShowLoading(true)
     ShowEmpty(false)
-    SearchDbg("fetch", "keyword=" + keyword)
     KillSearchTask(m.searchTask)
     path = SearchBuildPath(keyword, 1, SR_ApiLimit())
     m.searchTask = ApiGet(path)
@@ -183,12 +173,8 @@ sub OnSearchResponse()
     m.loading = false
     ShowLoading(false)
 
-    ok = false
-    if api <> invalid and api.ok = true then ok = true
-    count = 0
     m.results = SearchParseListing(api)
     count = m.results.Count()
-    SearchDbg("response", "ok=" + SearchDbgStr(ok) + " count=" + Str(count))
 
     if count = 0 and Len(m.searchText) > 0 then
         ShowEmpty(true)
@@ -233,7 +219,6 @@ sub BuildGrid()
     end for
     if m.gridIndex >= m.cardNodes.Count() then m.gridIndex = 0
     ApplyGridFocus()
-    SearchDbg("grid", "built cards=" + Str(m.cardNodes.Count()) + " cols=" + Str(m.gridCols))
 end sub
 
 sub RebuildGridPositions()
@@ -304,7 +289,6 @@ sub EnterInput()
     end if
     ApplyInputFocus()
     ApplyGridFocus()
-    SearchDbg("focus", "zone=input")
 end sub
 
 sub EnterKeyboard()
@@ -314,7 +298,6 @@ sub EnterKeyboard()
     if m.keyboard <> invalid then m.keyboard.focusActive = true
     ApplyInputFocus()
     ApplyKeyboardFocus()
-    SearchDbg("focus", "zone=keyboard row=" + Str(m.keyRow) + " col=" + Str(m.keyCol))
 end sub
 
 sub EnterGrid()
@@ -325,7 +308,6 @@ sub EnterGrid()
     if m.gridIndex >= m.cardNodes.Count() then m.gridIndex = m.cardNodes.Count() - 1
     ApplyInputFocus()
     ApplyGridFocus()
-    SearchDbg("focus", "zone=grid idx=" + Str(m.gridIndex))
 end sub
 
 sub OnKey()
@@ -392,7 +374,6 @@ sub HandleKeyboardNav(key as string)
         return
     end if
     ApplyKeyboardFocus()
-    SearchDbg("focus", "keyboard nav row=" + Str(m.keyRow) + " col=" + Str(m.keyCol))
 end sub
 
 function KeyRowCount(row as integer) as integer

@@ -34,9 +34,6 @@ sub OnThemeChanged()
     ApplyKeyFocus()
 end sub
 
-sub ApplyPanelTheme()
-end sub
-
 function KeyOuterWidth(label as string) as integer
     return KeyWidth(label) + (2 * SR_InputBorderW())
 end function
@@ -111,9 +108,7 @@ sub BuildKeyboard()
     LayoutPanel(maxRowW, y)
     m.top.panelWidth = maxRowW + (2 * m.panelPadX)
     m.top.panelHeight = y + m.panelPadTop + m.panelPadBottom
-    ApplyPanelTheme()
     ApplyKeyFocus()
-    SearchDbg("keyboard", "built rows=" + Str(m.keyRows.Count()) + " maxRowW=" + Str(maxRowW) + " panelW=" + Str(maxRowW + (2 * m.panelPadX)) + " panelH=" + Str(y + m.panelPadTop + m.panelPadBottom) + " dropShadow=1")
 end sub
 
 function KeyboardMaxRowWidth(layout as object) as integer
@@ -150,7 +145,6 @@ sub ApplyPanelDropShadow(panelW as integer, panelH as integer)
     m.panelDropShadow.blendColor = "0x000000ff"
     m.panelDropShadow.opacity = SR_PanelDropShadowOpacity()
     m.panelDropShadow.loadDisplayMode = "scaleToFit"
-    SearchDbg("keyboard", "panelShadow spreadH=" + Stri(spread).Trim() + " dropY=" + Stri(dropY).Trim() + " blurB=" + Stri(blurB).Trim() + " poster=" + Stri(panelW + (2 * spread)).Trim() + "x" + Stri(panelH + dropY + blurB).Trim())
 end sub
 
 function RowTotalWidth(rowData as object) as integer
@@ -195,7 +189,6 @@ function CreateKey(label as string, kw as integer) as object
     bg.translation = [bw, bw]
     bg.loadDisplayMode = "scaleToFill"
     bg.blendColor = SR_KeyFillColor()
-    if m.keyIdSeq = 1 then SearchDbg("keyboard", "keyFillUri=" + bg.uri)
 
     border = g.createChild("FocusFrame")
     border.id = "borderFrame"
@@ -280,7 +273,6 @@ sub ApplyKeyFocus()
 end sub
 
 function RefreshKeyColors() as void
-    ApplyPanelTheme()
     ApplyKeyFocus()
 end function
 

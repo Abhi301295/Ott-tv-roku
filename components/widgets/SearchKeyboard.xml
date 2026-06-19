@@ -10,7 +10,6 @@
     <field id="cPrimary500" type="string" value="0x0092ffff" onChange="OnThemeChanged" />
     <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
     <field id="cNeutral50" type="string" value="0xffffffff" onChange="OnThemeChanged" />
-    <field id="cPanelBg" type="string" value="0x1f1f22ff" onChange="OnThemeChanged" />
     <field id="panelWidth" type="integer" value="0" />
     <field id="panelHeight" type="integer" value="0" />
     <function name="PressFocusedKey" />
@@ -18,7 +17,6 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchConstants.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/search/SearchDebug.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/SearchKeyboard.brs" />
 
   <children>

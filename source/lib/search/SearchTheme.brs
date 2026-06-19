@@ -27,10 +27,7 @@ sub SearchApplyThemeColors(m as object)
     m.cPrimary700 = STC(tokens, "primary-700", "#80bbe9")
     m.cKeyBg = SR_KeyFillColor()
     m.cKeyBorder = SR_KeyBorderColor()
-    ' React customkeyboard.tsx: no panel bg — keys sit on page bg-neutral-1000 (shadow-xl only).
-    m.cPanelBg = m.cPageBg
 
-    SearchDbg("theme", "pageBg=" + m.cPageBg + " inputBg=" + m.cInputBg + " keyBg=" + m.cKeyBg + " panelBg=" + m.cPanelBg)
     bg = m.top.findNode("bg")
     if bg <> invalid then bg.color = m.cPageBg
 end sub

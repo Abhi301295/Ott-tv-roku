@@ -25,7 +25,6 @@
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchConstants.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/search/SearchDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchTheme.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SearchScreen.brs" />
