@@ -60,6 +60,7 @@ sub init()
 
     m.initialLoading = true
     m.continueLoading = true
+    m.categoriesPrefetched = false
     m.versionLoading = true
     m.heroBuilt = false
     m.rowsBuilt = false
@@ -158,6 +159,12 @@ sub init()
     m.rowsForceHideTimer.repeat = false
     m.top.appendChild(m.rowsForceHideTimer)
     m.rowsForceHideTimer.observeField("fire", "OnRowsForceHideTimer")
+    m.transitionSafetyTimer = CreateObject("roSGNode", "Timer")
+    m.transitionSafetyTimer.duration = 15.0
+    m.transitionSafetyTimer.repeat = false
+    m.top.appendChild(m.transitionSafetyTimer)
+    m.transitionSafetyTimer.observeField("fire", "OnTransitionSafetyTimer")
+    m.bootDeferPending = false
     m.cwShimmerSpan = invalid
     m.cwRowBuildSpan = invalid
     m.cwRevealAtMs = -1
@@ -230,8 +237,33 @@ sub ConsumeHomeNavState()
 end sub
 
 sub TryStartHomeBoot()
+    if m.bootDeferPending then return
     if m.bootStarted then return
     ConsumeHomeNavState()
+    if ProfileTransitionActive() then
+        ArmTransitionSafetyTimer()
+        if m.bootDeferTimer = invalid then
+            m.bootDeferTimer = CreateObject("roSGNode", "Timer")
+            m.bootDeferTimer.duration = 0.045
+            m.bootDeferTimer.repeat = false
+            m.top.appendChild(m.bootDeferTimer)
+            m.bootDeferTimer.observeField("fire", "OnBootDeferTimer")
+        end if
+        m.bootDeferPending = true
+        m.bootDeferTimer.control = "start"
+        return
+    end if
+    BeginHomeBootWork()
+end sub
+
+sub OnBootDeferTimer()
+    m.bootDeferPending = false
+    if m.bootStarted then return
+    BeginHomeBootWork()
+end sub
+
+sub BeginHomeBootWork()
+    if m.bootStarted then return
     m.bootStarted = true
 
     ' A pending select (from the profile screen) sets the profile id itself once it
@@ -242,6 +274,8 @@ sub TryStartHomeBoot()
         return
     end if
 
+    ConsumeHomeBootCacheIfReady()
+
     ' Shimmer regions follow layout; Netflix shows hero metadata placeholders, OTT relies on
     ' the banner fallback and only needs the row strip (parity: React Spinner until rows).
     ApplySkeletonLayout()
@@ -250,14 +284,53 @@ sub TryStartHomeBoot()
     else
         ShowHeroSkeleton(false)
     end if
-    ShowRowsSkeleton(true)
-    m.cwShimmerSpan = CreateObject("roTimespan")
-    CwPerfMark(m.cwShimmerSpan, "shimmer ON (boot)")
+    if m.categoriesPrefetched = true then
+        ShowRowsSkeleton(false)
+    else
+        ShowRowsSkeleton(true)
+        m.cwShimmerSpan = CreateObject("roTimespan")
+        CwPerfMark(m.cwShimmerSpan, "shimmer ON (boot)")
+    end if
     ' Rows timeout starts when BuildContentRows begins, not at boot (hero gate can take 3.5s+).
     ' Wall-clock from mount → hero poster painted = perceived first-content latency.
     m.bootSpan = CreateObject("roTimespan")
-    HomeBootLog(m.bootSpan, "boot start", "layout=" + m.homeLayout + " ott=" + CwPerfBool(ThemeIsOttHome()))
+    HomeBootLog(m.bootSpan, "boot start", "layout=" + m.homeLayout + " ott=" + CwPerfBool(ThemeIsOttHome()) + " prefetch=" + CwPerfBool(m.categoriesPrefetched = true))
     StartBootSequence()
+end sub
+
+sub ArmTransitionSafetyTimer()
+    if m.transitionSafetyTimer = invalid then return
+    m.transitionSafetyTimer.control = "stop"
+    m.transitionSafetyTimer.control = "start"
+end sub
+
+sub OnTransitionSafetyTimer()
+    if not ProfileTransitionActive() then return
+    ProfileTransitionHide(m.vm)
+end sub
+
+sub HideProfileWelcomeTransition()
+    if ProfileTransitionActive() then ProfileTransitionHide(m.vm)
+    if m.transitionSafetyTimer <> invalid then m.transitionSafetyTimer.control = "stop"
+end sub
+
+sub ConsumeHomeBootCacheIfReady()
+    m.categoriesPrefetched = false
+    pid = GetProfileId()
+    if pid = "" and m.pendingSelectId <> "" then pid = m.pendingSelectId
+    if pid = "" then return
+    if not HomeBootCacheHasData(pid) then return
+    if not HomeBootCacheHasUsableData(pid) then
+        HomeBootCacheClear()
+        return
+    end if
+    data = HomeBootCacheConsume(pid)
+    if data = invalid then return
+    m.categoriesPrefetched = true
+    m.categories = data.categories
+    m.initialLoading = false
+    m.continueLoading = false
+    m.hasMore = false
 end sub
 
 ' Stop every ContentRow timer on this screen (render-thread hygiene on dispose).
@@ -301,6 +374,10 @@ sub OnDispose()
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
     if m.rowWarmupTimer <> invalid then m.rowWarmupTimer.control = "stop"
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
+    if m.transitionSafetyTimer <> invalid then m.transitionSafetyTimer.control = "stop"
+    if m.bootDeferTimer <> invalid then m.bootDeferTimer.control = "stop"
+    if m.rowBuildDeferTimer <> invalid then m.rowBuildDeferTimer.control = "stop"
+    HideProfileWelcomeTransition()
     if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
 
     ' Kill every in-flight HTTP listener. The shared pool may still finish the request,
@@ -1114,6 +1191,16 @@ end sub
 sub BootHomeContent()
     if m.contentBootStarted then return
     m.contentBootStarted = true
+    if m.categoriesPrefetched = true then
+        HomeBootLog(m.bootSpan, "content boot", "prefetch hit skip CW+categories")
+        if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "stop"
+        m.continueLoading = false
+        EnsureHomeProfileDefaults()
+        FetchLatestVersion()
+        MaybeBuildHero()
+        MaybeBuildRows()
+        return
+    end if
     HomeBootLog(m.bootSpan, "content boot", "fetch CW + categories parallel")
     ' The profile was just selected on the previous screen, so the active profile
     ' identity is already persisted — only re-fetch profiles if it is somehow missing
@@ -1501,6 +1588,8 @@ sub MaybeStartRowBuild()
     if not m.rowsDataReady then return
 
     if ThemeIsOttHome() then m.rowGateElapsed = true
+    ' Profile handoff: user already waited on welcome overlay — build rows immediately.
+    if ProfileTransitionActive() then m.rowGateElapsed = true
     ' No CW row for this profile — do not hold row build for a hero trailer preview gate.
     if not HomeHasContinueWatchingRow() then m.rowGateElapsed = true
     if not HeroMultiSlide() then m.rowGateElapsed = true
@@ -1676,12 +1765,50 @@ sub BuildContentRows()
     CwPerfMark(m.cwRowBuildSpan, "BuildContentRows start", "rows=" + Str(m.contentRowCats.Count()))
     HomeBootLog(m.bootSpan, "BuildContentRows", "rows=" + Str(m.contentRowCats.Count()))
 
+    if m.contentRowCats.Count() = 0 then
+        HomeBootLog(m.bootSpan, "BuildContentRows", "no rows")
+        if ProfileTransitionActive() then HideProfileWelcomeTransition()
+        ShowRowsSkeleton(false)
+        if m.categoriesPrefetched = true then
+            m.categoriesPrefetched = false
+            m.categories = []
+            m.initialLoading = true
+            m.continueLoading = true
+            m.heroBuilt = false
+            m.rowsBuilt = false
+            m.rowsDataReady = false
+            m.contentBootStarted = false
+            BootHomeContent()
+        end if
+        return
+    end if
+
     ' Skeleton visibility is owned by OnHeroPosterReady / OnSkeletonTimeout, so we don't
     ' toggle it here — rows build underneath and the shimmer drops once the hero paints.
     if m.contentRowCats.Count() > 0 then
         if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
-        m.rowBuildTimer.control = "start"
+        if ProfileTransitionActive() then
+            ScheduleDeferredRowBuildStart()
+        else
+            m.rowBuildTimer.control = "start"
+        end if
     end if
+end sub
+
+sub ScheduleDeferredRowBuildStart()
+    if m.rowBuildDeferTimer = invalid then
+        m.rowBuildDeferTimer = CreateObject("roSGNode", "Timer")
+        m.rowBuildDeferTimer.duration = 0.045
+        m.rowBuildDeferTimer.repeat = false
+        m.top.appendChild(m.rowBuildDeferTimer)
+        m.rowBuildDeferTimer.observeField("fire", "OnRowBuildDefer")
+    end if
+    m.rowBuildDeferTimer.control = "stop"
+    m.rowBuildDeferTimer.control = "start"
+end sub
+
+sub OnRowBuildDefer()
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "start"
 end sub
 
 sub OnRowBuildTick()
@@ -1800,6 +1927,7 @@ sub PrepareFirstRowReveal()
     m.rowsRevealed = true
     HomeBootLog(m.bootSpan, "rows revealed", "shimmer off")
     LogCwRowState("cards painted -> hide shimmer")
+    if ProfileTransitionActive() then HideProfileWelcomeTransition()
     ShowRowsSkeleton(false)
     EnsureFirstRowVisibleUnderShimmer()
     UpdateRowsScrim()

@@ -15,12 +15,17 @@
     <function name="NavigatePop" />
     <function name="NavigateClearAndReplace" />
     <function name="HandleShellKey" />
+    <function name="GetHomeBootCacheEntry" />
+    <function name="SetHomeBootCacheEntry" />
+    <function name="ClearHomeBootCacheEntry" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileSelectTrace.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileTransition.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
@@ -36,5 +41,7 @@
     <Group id="screenHost" translation="[0, 0]" />
     <!-- Persistent nav chrome — parity with PageContainer showSideMenu routes. -->
     <HomeHeaderHost id="appHeader" visible="false" translation="[0, 0]" />
+    <!-- Profile → Home welcome overlay — survives screen replace; legacy arc loader only. -->
+    <ProfileSelectingOverlay id="profileTransition" visible="false" />
   </children>
 </component>

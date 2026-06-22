@@ -9,6 +9,9 @@
     <field id="neutral50" type="string" value="0xf8f1f7ff" onChange="OnColorsChanged" />
     <field id="avatarBg" type="string" value="0x404040ff" onChange="OnColorsChanged" />
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
+    <!-- Set during prefetch; label queues to next arc tick (never blocks spinner). -->
+    <field id="statusText" type="string" value="" onChange="OnStatusTextChanged" />
+    <function name="ClearStatusLabelFunc" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />

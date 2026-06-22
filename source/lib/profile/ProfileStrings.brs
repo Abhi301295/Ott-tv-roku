@@ -28,13 +28,18 @@ function CopyWelcomeBack(name as string) as string
     return "Welcome back, " + name
 end function
 
-function CopySelectingStatusMessages() as object
+' Ordered welcome-overlay status copy — advance forward only, never repeat.
+function CopyWelcomeStatusPhases() as object
     return [
+        "Setting up your profile...",
         "Preparing your home...",
-        "Loading your recommendations...",
         "Curating your watchlist...",
         "Almost there..."
     ]
+end function
+
+function CopySelectingStatusMessages() as object
+    return CopyWelcomeStatusPhases()
 end function
 
 ' Toast / inline messages (parity with messages.ts)

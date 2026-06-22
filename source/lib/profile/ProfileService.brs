@@ -73,9 +73,10 @@ function SelectProfileRetriable(httpStatus as integer) as boolean
     return (httpStatus = 401 or httpStatus <= 0)
 end function
 
-' GET profiles uses the same transient-failure rules as select-profile.
+' GET profiles: only transport failures are retried. HTTP 401 is handled on
+' ProfileScreen via one refresh attempt, then logout (React: catch -> handleLogout).
 function ProfileFetchRetriable(httpStatus as integer) as boolean
-    return SelectProfileRetriable(httpStatus)
+    return httpStatus <= 0
 end function
 
 ' Persist the active profile identity after a successful select-profile. SaveProfilesMeta

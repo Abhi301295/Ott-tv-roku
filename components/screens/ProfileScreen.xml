@@ -28,6 +28,11 @@
   <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeBootCache.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileTransition.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/ProfileScreen.brs" />
 
   <children>
