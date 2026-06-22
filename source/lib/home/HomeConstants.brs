@@ -42,6 +42,15 @@ function HC_HomeOttPageBg() as string
     return "0xf8f8f8ff"
 end function
 
+function HC_WelcomePhaseDwellSec() as float
+    return 0.55
+end function
+
+' Profile → Home prefetch window (welcome overlay stays on ProfileScreen).
+function HC_PrefetchMaxMs() as integer
+    return 12000
+end function
+
 ' Cinematic hero timing (parity with heroBannerCinematic.tsx).
 function HC_HeroHeight() as integer
     return 918

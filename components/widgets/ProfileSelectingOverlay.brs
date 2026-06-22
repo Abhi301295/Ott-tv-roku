@@ -12,11 +12,10 @@ sub init()
     m.statusTimer = m.top.findNode("statusTimer")
 
     m.arcFrame = 0
-    m.statusIndex = 0
-    m.statusMessages = CopySelectingStatusMessages()
+    m.arcMotionActive = false
 
     if m.arcTimer <> invalid then m.arcTimer.observeField("fire", "OnArcTick")
-    if m.statusTimer <> invalid then m.statusTimer.observeField("fire", "OnStatusTick")
+    if m.statusTimer <> invalid then m.statusTimer.control = "stop"
 
     OnColorsChanged()
     OnProfileChanged()
@@ -57,28 +56,57 @@ end sub
 
 sub OnRunningChanged()
     if m.top.running = true then
-        StartMotion()
+        StartMotion(m.arcMotionActive <> true)
     else
         StopMotion()
     end if
 end sub
 
-sub StartMotion()
+' coldStart=false resumes arc mid-spin without resetting frame or fade-in.
+sub StartMotion(coldStart as boolean)
+    if coldStart = false and m.arcMotionActive = true then return
+    if coldStart = false and m.arcTimer <> invalid and m.arcTimer.control = "start" then
+        m.arcMotionActive = true
+        return
+    end if
+
+    m.arcMotionActive = true
     m.arcFrame = 0
-    m.statusIndex = 0
     ApplyArcFrame()
-    ApplyStatusText()
+    ApplyStatusLabel()
     if m.contentHost <> invalid then m.contentHost.opacity = 0.0
     if m.fadeIn <> invalid then m.fadeIn.control = "start"
     if m.arcTimer <> invalid then m.arcTimer.control = "start"
-    if m.statusTimer <> invalid then m.statusTimer.control = "start"
 end sub
 
 sub StopMotion()
+    m.arcMotionActive = false
     if m.fadeIn <> invalid then m.fadeIn.control = "stop"
     if m.arcTimer <> invalid then m.arcTimer.control = "stop"
     if m.statusTimer <> invalid then m.statusTimer.control = "stop"
     if m.contentHost <> invalid then m.contentHost.opacity = 0.0
+    ClearStatusLabel()
+end sub
+
+sub ClearStatusLabel()
+    if m.statusLbl <> invalid then m.statusLbl.text = ""
+end sub
+
+function ClearStatusLabelFunc() as boolean
+    ClearStatusLabel()
+    return true
+end function
+
+' Prefetch phases only — apply label immediately; never rotate idle messages.
+sub OnStatusTextChanged()
+    ApplyStatusLabel()
+end sub
+
+sub ApplyStatusLabel()
+    if m.statusLbl = invalid then return
+    txt = m.top.statusText
+    if txt = invalid then txt = ""
+    if m.statusLbl.text <> txt then m.statusLbl.text = txt
 end sub
 
 sub OnArcTick()
@@ -87,20 +115,7 @@ sub OnArcTick()
     ApplyArcFrame()
 end sub
 
-sub OnStatusTick()
-    if m.statusMessages = invalid or m.statusMessages.Count() = 0 then return
-    m.statusIndex = m.statusIndex + 1
-    if m.statusIndex >= m.statusMessages.Count() then m.statusIndex = 0
-    ApplyStatusText()
-end sub
-
 sub ApplyArcFrame()
     if m.progressArc = invalid then return
     m.progressArc.uri = ProfileArcFrameUriForIndex(m.arcFrame)
-end sub
-
-sub ApplyStatusText()
-    if m.statusLbl = invalid then return
-    if m.statusMessages = invalid or m.statusMessages.Count() = 0 then return
-    m.statusLbl.text = m.statusMessages[m.statusIndex]
 end sub

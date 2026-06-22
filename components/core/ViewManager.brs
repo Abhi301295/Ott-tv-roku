@@ -6,8 +6,21 @@ sub init()
     m.shellMenuBuilt = false
     m.shellMenuReels = invalid
     m.top.overlayOpen = false
+    m.homeBootCache = invalid
     m.top.observeField("overlayDismiss", "OnOverlayDismissChanged")
 end sub
+
+function GetHomeBootCacheEntry() as object
+    return m.homeBootCache
+end function
+
+function SetHomeBootCacheEntry(entry as object) as void
+    m.homeBootCache = entry
+end function
+
+function ClearHomeBootCacheEntry() as void
+    m.homeBootCache = invalid
+end function
 
 ' Push a new screen (keeps stack).
 function NavigatePush(route as string, state = {} as object) as void
@@ -21,6 +34,8 @@ end function
 
 ' Tear down every screen in the stack and show a fresh route (logout / session reset).
 function NavigateClearAndReplace(route as string, state = {} as object) as void
+    ProfileTransitionHide(m.top)
+    ClearHomeBootCacheEntry()
     depth = m.stack.Count()
     ProfileSelectLog("NAV_CLEAR", "route=" + route + " stackDepth=" + ProfileSelectFmt(depth))
     while m.stack.Count() > 0

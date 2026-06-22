@@ -79,16 +79,41 @@ sub ApplyLoginTokens(deviceToken as object)
 end sub
 
 ' Refresh session (parity with checkRefreshToken in login/services/action.ts).
-function ApplyRefreshTokens(result as object) as boolean
+' API may return result as { authToken } or a raw JWT string in result.
+function ApplyRefreshTokens(result as dynamic) as boolean
     if result = invalid then return false
-    authToken = result.authToken
+
+    rt = type(result)
+    if rt = "roString" or rt = "String" then
+        tok = result
+        if tok = "" then return false
+        SetAccessToken(tok)
+        SetCognitoToken(tok)
+        print "[PROFILE_FETCH_DBG] refresh applied access token (string result)"
+        return true
+    end if
+
+    if rt <> "roAssociativeArray" and rt <> "AssocArray" then return false
+
+    authToken = invalid
+    if result.authToken <> invalid then authToken = result.authToken
+    if (authToken = invalid or authToken = "") and result.cognitoAccessToken <> invalid then
+        authToken = result.cognitoAccessToken
+    end if
     if authToken = invalid or authToken = "" then return false
+
     SetAccessToken(authToken)
     SetCognitoToken(authToken)
-    refreshToken = result.refreshToken
+
+    refreshToken = invalid
+    if result.refreshToken <> invalid then refreshToken = result.refreshToken
+    if (refreshToken = invalid or refreshToken = "") and result.cognitoRefreshToken <> invalid then
+        refreshToken = result.cognitoRefreshToken
+    end if
     if refreshToken <> invalid and refreshToken <> "" then
         SetRefreshToken(refreshToken)
     end if
+    print "[PROFILE_FETCH_DBG] refresh applied access token (object result)"
     return true
 end function
 

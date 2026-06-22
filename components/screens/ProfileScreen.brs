@@ -34,6 +34,14 @@ sub init()
     m.selectedProfile = invalid
     m.popup = ""               ' "" | "confirm" | "otp"
     m.selecting = false
+    m.prefetching = false
+    m.prefetchCwTask = invalid
+    m.prefetchCatTask = invalid
+    m.prefetchClock = invalid
+    m.prefetchStartMs = -1
+    m.prefetchDwellTimer = invalid
+    m.prefetchDwellStep = ""
+    m.prefetchCatalogHandled = false
     m.loggingOut = false
     m.AUTO_TOTAL_MS = 15000      ' progress ring reaches 100% at 15s (parity with React)
     m.AUTO_SELECT_MS = 15500     ' auto-select fires after 15s + a 500ms buffer
@@ -52,6 +60,9 @@ sub init()
     m.profileFetchRetriesLeft = 0
     m.profileFetchRefreshTried = false
     m.profileFetchAwaiting = false
+    m.profileFetchGivingUp = false
+    m.profileLoginShowToast = false
+    m.profileLoginDeferLogout = false
 
     m.title.text = CopyChooseProfile()
     m.logoutBtn.label = CopyLogout()
@@ -81,6 +92,12 @@ sub init()
     m.otpPopup.observeField("action", "OnOtpAction")
     if m.vm <> invalid then m.vm.observeField("overlayDismiss", "OnOverlayDismiss")
 
+    m.profileLoginDeferTimer = CreateObject("roSGNode", "Timer")
+    m.profileLoginDeferTimer.duration = 0.02
+    m.profileLoginDeferTimer.repeat = false
+    m.top.appendChild(m.profileLoginDeferTimer)
+    m.profileLoginDeferTimer.observeField("fire", "OnProfileLoginDefer")
+
     ShowLoading(true)
     FetchProfiles()
 
@@ -103,7 +120,14 @@ sub OnDispose()
     KillProfileTask(m.verifyTask)
     KillProfileTask(m.refreshTask)
     KillProfileTask(m.selectTask)
+    KillProfileTask(m.prefetchCwTask)
+    KillProfileTask(m.prefetchCatTask)
+    if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
+    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
+    m.prefetchDwellStep = ""
+    m.prefetchCatalogHandled = false
     if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
+    if m.profileLoginDeferTimer <> invalid then m.profileLoginDeferTimer.control = "stop"
     if m.listScrollAnimTimer <> invalid then m.listScrollAnimTimer.control = "stop"
     m.profilesTask = invalid
     m.selectTask = invalid
@@ -111,6 +135,7 @@ sub OnDispose()
     m.verifyTask = invalid
     m.refreshTask = invalid
     m.selecting = false
+    m.prefetching = false
     m.loggingOut = false
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")
@@ -496,25 +521,25 @@ sub ShowLoading(show as boolean)
 end sub
 
 sub BindSelectingOverlayProfile()
-    if m.selectingOverlay = invalid or m.selectedProfile = invalid then return
+    if m.selectedProfile = invalid or m.vm = invalid then return
     p = m.selectedProfile
     nm = ""
     if p.name <> invalid then nm = p.name
     uri = ""
     if p.avatar <> invalid then uri = p.avatar
-    m.selectingOverlay.profileName = nm
-    m.selectingOverlay.avatarUri = uri
-    m.selectingOverlay.initials = ProfileInitials(nm)
-    m.selectingOverlay.primaryColor = m.cPrimary500
-    m.selectingOverlay.neutral50 = m.cNeutral50
-    m.selectingOverlay.avatarBg = m.cAvatarBg
+    ProfileTransitionShow(m.vm, nm, uri, ProfileInitials(nm), m.cPrimary500, m.cNeutral50, m.cAvatarBg)
 end sub
 
 sub ShowSelectingOverlay(show as boolean)
+    if show then
+        BindSelectingOverlayProfile()
+    else
+        ProfileTransitionHide(m.vm)
+    end if
+    ' Local overlay unused — shell overlay on ViewManager survives navigate to Home.
     if m.selectingOverlay <> invalid then
-        if show then BindSelectingOverlayProfile()
-        m.selectingOverlay.running = show
-        m.selectingOverlay.visible = show
+        m.selectingOverlay.running = false
+        m.selectingOverlay.visible = false
     end if
     if m.profilesScrollHost <> invalid then m.profilesScrollHost.visible = not show
     if m.profileHeaderChrome <> invalid then m.profileHeaderChrome.visible = not show
@@ -574,10 +599,13 @@ end sub
 
 sub AttemptProfileFetchRefresh()
     if GetRefreshToken() = "" then
+        print "[PROFILE_FETCH_DBG] refresh skipped (no refresh token)"
         ProfileFetchGiveUp()
         return
     end if
+    m.profileFetchAwaiting = true
     ProfileSelectLogNode("PROFILE_FETCH", "refresh session", m.top)
+    print "[PROFILE_FETCH_DBG] refresh start"
     KillProfileTask(m.refreshTask)
     m.refreshTask = ApiGet(Endpoints().LOGIN.REFRESH_TOKEN)
     m.refreshTask.observeField("apiResult", "OnProfileFetchRefreshResponse")
@@ -588,27 +616,87 @@ sub OnProfileFetchRefreshResponse()
     if m.top.dispose = true then return
     if IsOrphaned() then return
     if m.refreshTask = invalid then return
+    m.profileFetchAwaiting = false
     api = m.refreshTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then return
+    http = -1
+    if api.httpStatus <> invalid then http = api.httpStatus
+    print "[PROFILE_FETCH_DBG] refresh response http="; http; " ok="; CwPerfBool(api.ok = true)
+
+    if ProfileHandleSessionExpiry(api) then return
 
     if api.ok and ApplyRefreshTokens(api.result) then
         ProfileSelectLogNode("PROFILE_FETCH", "refresh ok -> retry list", m.top)
+        print "[PROFILE_FETCH_DBG] refresh ok -> retry profiles"
         m.profileFetchRetriesLeft = m.PROFILE_FETCH_MAX_RETRIES
-        m.profileFetchAwaiting = false
         FireProfileFetch()
         return
     end if
 
     ProfileSelectLogNode("PROFILE_FETCH", "refresh failed httpStatus=" + ProfileSelectFmt(api.httpStatus), m.top)
+    print "[PROFILE_FETCH_DBG] refresh failed -> give up"
     ProfileFetchGiveUp()
 end sub
 
-sub ProfileFetchGiveUp()
+sub ProfileFetchAbort()
+    m.profileFetchAwaiting = false
+    if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
+    KillProfileTask(m.profilesTask)
+    KillProfileTask(m.refreshTask)
     ShowLoading(false)
+end sub
+
+function ProfileHandleSessionExpiry(api as object) as boolean
+    if HandleSessionExpiry(m.top, api) then
+        print "[PROFILE_FETCH_DBG] session expired -> login"
+        ProfileFetchAbort()
+        return true
+    end if
+    return false
+end function
+
+' React profile.tsx catch -> handleLogout: clear loading, then navigate login.
+sub ProfileFetchGiveUp()
+    if m.profileFetchGivingUp = true then return
+    m.profileFetchGivingUp = true
+    ProfileFetchAbort()
     ProfileSelectLogNode("PROFILE_FETCH", "give up -> login", m.top)
+    print "[PROFILE_FETCH_DBG] give up hasRefresh="; CwPerfBool(GetRefreshToken() <> "")
+    if GetRefreshToken() = "" then
+        m.profileLoginDeferLogout = false
+        m.profileLoginShowToast = false
+        ScheduleProfileLoginDefer()
+        return
+    end if
     ShowProfileError(MsgFailedLoadProfiles())
-    LogoutToLogin(false)
+    m.profileLoginDeferLogout = true
+    ScheduleProfileLoginDefer()
+end sub
+
+sub ScheduleProfileLoginDefer()
+    if m.profileLoginDeferTimer = invalid then return
+    m.profileLoginDeferTimer.control = "stop"
+    m.profileLoginDeferTimer.control = "start"
+end sub
+
+sub ScheduleProfileNavigateLogin(showToast as boolean)
+    m.profileLoginShowToast = showToast
+    m.profileLoginDeferLogout = false
+    ScheduleProfileLoginDefer()
+end sub
+
+sub OnProfileLoginDefer()
+    if m.top.dispose = true then return
+    if m.profileLoginDeferTimer <> invalid then m.profileLoginDeferTimer.control = "stop"
+    if m.profileLoginDeferLogout = true then
+        m.profileLoginDeferLogout = false
+        print "[PROFILE_FETCH_DBG] deferred logout session API"
+        DoLogout()
+        return
+    end if
+    if m.vm = invalid then m.vm = FindViewManager(m.top)
+    print "[PROFILE_FETCH_DBG] deferred navigate login"
+    LogoutToLogin(m.profileLoginShowToast = true)
 end sub
 
 sub OnProfilesResponse(event as object)
@@ -628,17 +716,28 @@ sub OnProfilesResponse(event as object)
     api = task.apiResult
     if api = invalid then return
 
-    if HandleSessionExpiry(m.top, api) then return
+    http = -1
+    if api.httpStatus <> invalid then http = api.httpStatus
+    print "[PROFILE_FETCH_DBG] profiles response http="; http; " ok="; CwPerfBool(api.ok = true); " refreshTried="; CwPerfBool(m.profileFetchRefreshTried = true)
+
+    if ProfileHandleSessionExpiry(api) then return
 
     if not api.ok or api.result = invalid then
+        if api.httpStatus = 401 and m.profileFetchRefreshTried = true then
+            print "[PROFILE_FETCH_DBG] 401 after refresh -> give up"
+            ProfileFetchGiveUp()
+            return
+        end if
         if api.httpStatus = 401 and m.profileFetchRefreshTried <> true then
             m.profileFetchRefreshTried = true
+            print "[PROFILE_FETCH_DBG] 401 -> try refresh"
             AttemptProfileFetchRefresh()
             return
         end if
         if ProfileFetchRetriable(api.httpStatus) and m.profileFetchRetriesLeft > 0 then
             m.profileFetchRetriesLeft = m.profileFetchRetriesLeft - 1
             ProfileSelectLogNode("PROFILE_FETCH", "retry httpStatus=" + ProfileSelectFmt(api.httpStatus) + " left=" + ProfileSelectFmt(m.profileFetchRetriesLeft), m.top)
+            print "[PROFILE_FETCH_DBG] transport retry left="; m.profileFetchRetriesLeft
             ScheduleProfileFetchRetry()
             return
         end if
@@ -987,20 +1086,8 @@ sub OnProfileSelectResponse()
 
     if ok then
         PersistSelectedProfile(profileId, avatar)
-        m.selecting = false
-        ShowSelectingOverlay(false)
-        m.pendingNavigateProfileId = ""
-        m.pendingNavigateAvatar = ""
-        ProfileSelectLogNode("PROFILE_SELECT", "select ok -> navigate Home", m.top)
-        SetValueByKey(SK_SelectedItem(), "Home", "app")
-        if m.vm <> invalid then
-            m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
-        else
-            ProfileSelectLogNode("PROFILE_SELECT_FAIL", "vm invalid id=" + profileId, m.top)
-            ShowAlert(m.top, 2, MsgFailedSelectProfile())
-            ResetAutoSelect()
-            ApplyProfileFocus()
-        end if
+        ProfileSelectLogNode("PROFILE_SELECT", "select ok -> prefetch home", m.top)
+        BeginHomePrefetch(profileId, avatar)
         return
     end if
 
@@ -1010,6 +1097,183 @@ sub OnProfileSelectResponse()
     m.pendingNavigateAvatar = ""
     ProfileSelectLogNode("PROFILE_SELECT_FAIL", "httpStatus=" + ProfileSelectFmt(api.httpStatus), m.top)
     ShowAlert(m.top, 2, MsgFailedSelectProfile())
+    ResetAutoSelect()
+    ApplyProfileFocus()
+end sub
+
+' ── Home catalog prefetch (welcome overlay; monotonic status phases) ───────────
+
+sub BeginHomePrefetch(profileId as string, avatar as string)
+    HomeBootCacheClear()
+    m.prefetching = true
+    m.prefetchCatalogHandled = false
+    m.prefetchDwellStep = ""
+    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
+    if m.prefetchClock = invalid then m.prefetchClock = CreateObject("roTimespan")
+    m.prefetchStartMs = m.prefetchClock.TotalMilliseconds()
+    m.pendingNavigateProfileId = profileId
+    m.pendingNavigateAvatar = avatar
+    HomeBootCacheBegin(profileId)
+    ' Phase 0 already set by ProfileTransitionShow; advance to preparing home.
+    AdvanceWelcomeStatus(m.vm, 1)
+    StartHomePrefetchFetches()
+    ArmPrefetchGate()
+end sub
+
+sub SchedulePrefetchDwell(dwellStep as string)
+    m.prefetchDwellStep = dwellStep
+    if m.prefetchDwellTimer = invalid then
+        m.prefetchDwellTimer = CreateObject("roSGNode", "Timer")
+        m.prefetchDwellTimer.duration = HC_WelcomePhaseDwellSec()
+        m.prefetchDwellTimer.repeat = false
+        m.top.appendChild(m.prefetchDwellTimer)
+        m.prefetchDwellTimer.observeField("fire", "OnPrefetchDwellTimer")
+    end if
+    m.prefetchDwellTimer.control = "stop"
+    m.prefetchDwellTimer.control = "start"
+end sub
+
+sub OnPrefetchDwellTimer()
+    if not m.prefetching then return
+    dwellStep = m.prefetchDwellStep
+    m.prefetchDwellStep = ""
+    if dwellStep = "phase3" then
+        AdvanceWelcomeStatus(m.vm, 3)
+        SchedulePrefetchDwell("navigate")
+        return
+    end if
+    if dwellStep = "navigate" then
+        FinishPrefetchNavigate()
+    end if
+end sub
+
+sub TryCompletePrefetchCatalog()
+    if not m.prefetching then return
+    if not HomeBootCacheIsReady() then return
+    if m.prefetchCatalogHandled = true then return
+    m.prefetchCatalogHandled = true
+    if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
+    AdvanceWelcomeStatus(m.vm, 2)
+    SchedulePrefetchDwell("phase3")
+end sub
+
+sub StartHomePrefetchFetches()
+    KillProfileTask(m.prefetchCwTask)
+    KillProfileTask(m.prefetchCatTask)
+    m.prefetchCwTask = invalid
+    m.prefetchCatTask = invalid
+    cwPath = Endpoints().HOME.CONTINUE_WATCHING
+    catPath = Endpoints().HOME.CATEGORY_LIST
+    WarmHttpConnections(cwPath)
+    WarmHttpConnections(catPath)
+    m.prefetchCwTask = ApiGet(cwPath)
+    m.prefetchCwTask.observeField("apiResult", "OnPrefetchCwResponse")
+    StartHttpTask(m.prefetchCwTask)
+    m.prefetchCatTask = ApiGet(catPath)
+    m.prefetchCatTask.observeField("apiResult", "OnPrefetchCatResponse")
+    StartHttpTask(m.prefetchCatTask)
+end sub
+
+sub OnPrefetchCwResponse()
+    if m.top.dispose = true then return
+    if not m.prefetching then return
+    if m.prefetchCwTask = invalid then return
+    api = m.prefetchCwTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then
+        CancelHomePrefetch()
+        return
+    end if
+    HomeBootCacheSetCw(api)
+    TryCompletePrefetchCatalog()
+end sub
+
+sub OnPrefetchCatResponse()
+    if m.top.dispose = true then return
+    if not m.prefetching then return
+    if m.prefetchCatTask = invalid then return
+    api = m.prefetchCatTask.apiResult
+    if api = invalid then return
+    if HandleSessionExpiry(m.top, api) then
+        CancelHomePrefetch()
+        return
+    end if
+    HomeBootCacheSetCategories(api)
+    TryCompletePrefetchCatalog()
+end sub
+
+sub ArmPrefetchGate()
+    if m.prefetchGateTimer = invalid then
+        m.prefetchGateTimer = CreateObject("roSGNode", "Timer")
+        m.prefetchGateTimer.duration = 0.1
+        m.prefetchGateTimer.repeat = true
+        m.top.appendChild(m.prefetchGateTimer)
+        m.prefetchGateTimer.observeField("fire", "OnPrefetchGateTick")
+    end if
+    m.prefetchGateTimer.control = "stop"
+    m.prefetchGateTimer.control = "start"
+end sub
+
+sub OnPrefetchGateTick()
+    if not m.prefetching then return
+    elapsed = PrefetchElapsedMs()
+    if elapsed >= HC_PrefetchMaxMs() then
+        HomeBootCacheForceComplete()
+        if m.prefetchCatalogHandled <> true then TryCompletePrefetchCatalog()
+        if m.prefetchCatalogHandled <> true then FinishPrefetchNavigate()
+        return
+    end if
+    if HomeBootCacheIsReady() then TryCompletePrefetchCatalog()
+end sub
+
+function PrefetchElapsedMs() as integer
+    if m.prefetchClock = invalid or m.prefetchStartMs < 0 then return 0
+    return m.prefetchClock.TotalMilliseconds() - m.prefetchStartMs
+end function
+
+sub FinishPrefetchNavigate()
+    if not m.prefetching then return
+    profileId = m.pendingNavigateProfileId
+    avatar = m.pendingNavigateAvatar
+    m.prefetching = false
+    m.selecting = false
+    if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
+    KillProfileTask(m.prefetchCwTask)
+    KillProfileTask(m.prefetchCatTask)
+    m.prefetchCwTask = invalid
+    m.prefetchCatTask = invalid
+    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
+    m.prefetchDwellStep = ""
+    m.prefetchClock = invalid
+    m.prefetchStartMs = -1
+    m.pendingNavigateProfileId = ""
+    m.pendingNavigateAvatar = ""
+    SetValueByKey(SK_SelectedItem(), "Home", "app")
+    if m.vm <> invalid then
+        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
+    else
+        HomeBootCacheClear()
+        ShowAlert(m.top, 2, MsgFailedSelectProfile())
+        ResetAutoSelect()
+        ApplyProfileFocus()
+    end if
+end sub
+
+sub CancelHomePrefetch()
+    m.prefetching = false
+    m.selecting = false
+    m.prefetchCatalogHandled = false
+    m.prefetchDwellStep = ""
+    if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
+    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
+    KillProfileTask(m.prefetchCwTask)
+    KillProfileTask(m.prefetchCatTask)
+    m.prefetchClock = invalid
+    m.prefetchStartMs = -1
+    HomeBootCacheClear()
+    ShowSelectingOverlay(false)
+    m.pendingNavigateProfileId = ""
+    m.pendingNavigateAvatar = ""
     ResetAutoSelect()
     ApplyProfileFocus()
 end sub
