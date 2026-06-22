@@ -174,10 +174,12 @@ sub ApplyGridViewport()
 end sub
 
 function SearchGridCols(panelW as integer) as integer
+    ' React searchgrid.tsx: repeat(auto-fill, minmax(300px, 1fr)).
     usable = panelW - SR_GridMarginLeft()
-    pitch = SR_CardColPitch()
-    if usable < pitch then return 1
-    cols = Int((usable + SR_GridGapX()) / pitch)
+    minColW = SR_GridMinCol()
+    gap = SR_GridGapX()
+    if usable < minColW then return 1
+    cols = Int((usable + gap) / (minColW + gap))
     if cols < 1 then cols = 1
     return cols
 end function

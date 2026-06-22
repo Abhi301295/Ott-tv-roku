@@ -228,7 +228,8 @@ function SR_GridScrollPad() as integer
 end function
 
 function SR_ResultCap() as integer
-    return 15
+    ' React search.tsx requests limit=30; display all listing items (not data.slice(15)).
+    return SR_ApiLimit()
 end function
 
 ' Pinned Tailwind neutrals — do NOT use API tertiary shades (see CardCommon.brs / VideoPlayerScreen).

@@ -20,6 +20,7 @@ end function
 function GL_PageHasMore(api as object, batchCount as integer) as boolean
     if api = invalid or api.result = invalid then return false
     if batchCount = 0 then return false
+    if batchCount < GL_CataloguePageLimit() then return false
     return true
 end function
 
