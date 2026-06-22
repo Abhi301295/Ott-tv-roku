@@ -21,6 +21,8 @@ sub init()
     m.scrollY = 0
     m.rowScrollX = []
     m.fetchGen = 0
+    m.viewportW = 1808
+    m.itemsPerRow = 6
 
     LoadMyListTokens()
     ApplyStaticColors()
@@ -130,6 +132,8 @@ end sub
 sub ApplyMyListShellLayout()
     header = FindAppHeader(m.top)
     offX = ShellContentOffsetX(header)
+    m.viewportW = ShellContentViewportW(header)
+    m.itemsPerRow = WL_ItemsPerRow(m.viewportW)
     if m.contentHost <> invalid then m.contentHost.translation = [offX, 0]
     ApplyEmptyLayout()
 end sub
@@ -167,7 +171,8 @@ end sub
 sub BuildSkeletonRow()
     if m.skeletonHost = invalid then return
     x = 0
-    n = WL_ItemsPerRow()
+    n = m.itemsPerRow
+    if n < 1 then n = WL_ItemsPerRow(m.viewportW)
     for i = 0 to n - 1
         card = m.skeletonHost.createChild("ListDetailCard")
         card.translation = [x, 0]
@@ -269,7 +274,7 @@ sub OnDetailResponse()
 
     ShowEmpty(false)
     m.hasMore = WL_DetailHasMore(api, count)
-    m.rows = SL_AppendRows(m.rows, items, WL_ItemsPerRow())
+    m.rows = SL_AppendRows(m.rows, items, m.itemsPerRow)
     AppendRowNodes(count)
     if m.rowsHost <> invalid then m.rowsHost.visible = true
     ApplyFocus()
@@ -375,7 +380,8 @@ sub ApplyScroll()
     end if
     if m.scrollY < 0 then m.scrollY = 0
 
-    viewW = 1808
+    viewW = m.viewportW
+    if viewW < 1 then viewW = 1808
     for i = 0 to m.rowNodes.Count() - 1
         entry = m.rowNodes[i]
         if entry = invalid or entry.group = invalid then continue for

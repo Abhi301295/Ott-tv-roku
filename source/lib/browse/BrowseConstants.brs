@@ -4,6 +4,11 @@ function BS_ItemsPerRow() as integer
     return 6
 end function
 
+' Parity VARAIBLE_CONSTANT.SERIES_LIST_PAGE.limit (27).
+function BS_SeriesPageLimit() as integer
+    return 27
+end function
+
 function BS_ListLeft() as integer
     return 56
 end function

@@ -91,8 +91,8 @@ function WL_RowStartY() as integer
     return 162
 end function
 
-function WL_ItemsPerRow() as integer
-    viewportW = 1808
+function WL_ItemsPerRow(viewportW as integer) as integer
+    if viewportW < 1 then viewportW = 1808
     pitch = WL_CardPitch()
     if pitch < 1 then return 4
     n = Int((viewportW + WL_CardGap()) / pitch)

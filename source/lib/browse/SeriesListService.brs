@@ -1,7 +1,7 @@
 ' SeriesListService.brs — GET contents/filter parity with features/series/.
 
 function SL_BuildQuery(page as integer, listType as string, categoryId as string, genreId as string) as object
-    q = { page: page, type: listType }
+    q = { page: page, type: listType, limit: BS_SeriesPageLimit() }
     if categoryId <> "" then q.category = categoryId
     if genreId <> "" then q.genre = genreId
     return q
@@ -36,5 +36,6 @@ function SL_PageHasMore(api as object, listingCount as integer) as boolean
     if api = invalid or api.result = invalid then return false
     if api.result.total <> invalid and api.result.total = 0 then return false
     if listingCount = 0 then return false
+    if listingCount < BS_SeriesPageLimit() then return false
     return true
 end function
