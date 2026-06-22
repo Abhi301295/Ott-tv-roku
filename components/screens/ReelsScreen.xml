@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Reels feed — parity with src/features/reels/index.tsx -->
+<component name="ReelsScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" onChange="OnNavStateReady" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="shellEnterContent" type="boolean" value="false" alwaysNotify="true" onChange="OnShellEnterContent" />
+    <field id="shellLayoutRev" type="integer" value="0" alwaysNotify="true" onChange="OnShellLayoutRev" />
+    <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
+    <field id="visible" type="boolean" value="false" alwaysNotify="true" onChange="OnReelsVisibleChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsDbg.brs" />
+  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/ReelsScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
+
+    <!-- Layer 1: meta + centered poster frame (Posters respect clipping). -->
+    <Group id="contentHost" translation="[0, 0]">
+      <Group id="metaHost" visible="false">
+        <Group id="creatorRow" visible="false">
+          <MaskGroup id="creatorMask" maskUri="pkg:/images/ui/avatar_circle.png" maskSize="[32, 32]">
+            <Poster id="creatorAvatar" width="32" height="32"
+              uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill" />
+            <Label id="creatorInitial" width="32" height="32" horizAlign="center" vertAlign="center">
+              <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="16" />
+            </Label>
+          </MaskGroup>
+          <Label id="creatorLbl" translation="[40, 2]" width="520" height="28">
+            <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="24" />
+          </Label>
+        </Group>
+        <Label id="contentTypeLbl" width="560" height="32" wrap="false">
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="29" />
+        </Label>
+        <Label id="titleLbl" width="560" height="128" wrap="true" maxLines="2">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="60" />
+        </Label>
+        <Label id="descLbl" width="560" height="64" wrap="true" maxLines="2">
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="29" />
+        </Label>
+        <Group id="pillHost" />
+      </Group>
+
+      <Group id="skeletonHost" visible="false" />
+
+      <Group id="videoColumn" visible="false">
+        <Group id="videoFrame">
+          <Rectangle id="videoBorder" width="616" height="1088" />
+          <Group id="videoClip" translation="[4, 4]" clippingRect="[0, 0, 608, 1080]"
+            clippingRectClipsChildren="true">
+            <Rectangle id="videoPlaceholder" width="608" height="1080" />
+            <Poster id="videoDummyArt" width="200" height="200" translation="[204, 440]"
+              uri="pkg:/images/ui/sk_base.png" loadDisplayMode="scaleToFit" visible="false" />
+            <Poster id="videoPoster" width="608" height="1080" loadDisplayMode="scaleToZoom"
+              visible="false" />
+          </Group>
+        </Group>
+      </Group>
+
+      <Group id="emptyHost" visible="false">
+        <Label id="emptyLbl" translation="[0, 480]" width="1920" height="120" text="No reels available right now."
+          horizAlign="center" wrap="true">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+        </Label>
+      </Group>
+    </Group>
+
+    <!-- Layer 2: Roku Video — scene coords, 608x1080 centered (ignores parent clip). -->
+    <Video id="videoNode" width="608" height="1080" translation="[660, 4]" enableUI="false"
+      loop="true" visible="false" />
+
+    <!-- Layer 3: play overlay + progress (above video). -->
+    <Group id="overlayHost" visible="false">
+      <Group id="overlaySpin" rotation="0">
+        <Poster id="overlayRing" translation="[-64, -64]" width="128" height="128"
+          uri="pkg:/images/ui/spinner_ring.png" />
+        <Poster id="overlayArc" translation="[-64, -64]" width="128" height="128"
+          uri="pkg:/images/ui/spinner_arc.png" />
+      </Group>
+      <Poster id="overlayCircle" translation="[-56, -56]" width="112" height="112"
+        uri="pkg:/images/ui/glass_circle.png" opacity="0.7" />
+      <Poster id="overlayPlay" translation="[-40, -40]" width="80" height="80"
+        uri="pkg:/images/ui/ic_v_play.png" visible="false" />
+      <Animation id="overlayAnim" duration="0.9" repeat="true" easeFunction="linear">
+        <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+          fieldToInterp="overlaySpin.rotation" />
+      </Animation>
+    </Group>
+
+    <Group id="progressHost" visible="false">
+      <Rectangle id="progressTrack" width="544" height="8" />
+      <Rectangle id="progressFill" width="0" height="8" />
+    </Group>
+
+    <Group id="seekPreview" visible="false">
+      <Rectangle id="seekPreviewBg" width="120" height="40" />
+      <Label id="seekPreviewLbl" width="120" height="40" horizAlign="center" vertAlign="center">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
+      </Label>
+    </Group>
+
+    <Timer id="seekPreviewTimer" duration="0.8" repeat="false" />
+    <Timer id="skeletonTimeout" duration="12" repeat="false" />
+  </children>
+</component>

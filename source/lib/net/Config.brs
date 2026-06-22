@@ -14,7 +14,7 @@ function AppConfig() as object
 
     cfg = {
         apiBaseUrl: "https://ottacceleratordev.appskeeper.in"
-        businessDomain: "ott-accelerator"
+        businessDomain: "roku-tv"
         basicAuthUser: "OTT_USR"
         basicAuthPassword: "OTT_PWD"
         appVersion: "1.0.0"
