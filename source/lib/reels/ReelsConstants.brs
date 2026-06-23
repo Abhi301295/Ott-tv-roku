@@ -46,9 +46,14 @@ function RL_ProgressBottom() as integer
     return 4
 end function
 
-function RL_MetaTop() as integer
-    ' Left metadata column — vertically centered in content (parity with React wide layout).
-    return 280
+function RL_MetaBottom() as integer
+    ' React absolute bottom-28 → 7rem @ 16px = 112px.
+    return 112
+end function
+
+function RL_MetaPadBottom() as integer
+    ' React inner p-b-80 → var(--p-80) = 5rem = 80px.
+    return 80
 end function
 
 function RL_MetaVideoGap() as integer
@@ -66,8 +71,8 @@ function RL_VideoProgressW(videoW as integer) as integer
     return inner
 end function
 
-function RL_MetaBottom() as integer
-    return 112
+function RL_MetaBottomReserve() as integer
+    return RL_MetaBottom() + RL_MetaPadBottom()
 end function
 
 function RL_MetaLeft() as integer
@@ -175,12 +180,13 @@ function RL_VideoSkeletonShapeUri() as string
     return "pkg:/images/ui/sk_base.png"
 end function
 
-function RL_DummyThumbArtUri() as string
-    return "pkg:/images/ui/sk_base.png"
+function RL_DummyThumbPosterUri() as string
+    ' Full-frame fallback — React posterUrl uses Images.THUMBNAIL when no vertical thumb.
+    return "pkg:/images/ui/reels_thumb_placeholder.png"
 end function
 
-function RL_DummyThumbArtSize() as integer
-    return 200
+function RL_DummyThumbBgHex() as string
+    return "#fafafb"
 end function
 
 function RL_OverlayCircleSize() as integer
@@ -189,6 +195,21 @@ end function
 
 function RL_OverlayPlaySize() as integer
     return 80
+end function
+
+function RL_OverlayPauseSize() as integer
+    ' React buffering pause SVG w-50 ht-50.
+    return 50
+end function
+
+' React reels play/pause SVG fill="blue" (not theme primary).
+function RL_OverlayIconBlue() as string
+    return "0x0000ffff"
+end function
+
+function RL_OverlayCircleOpacity() as float
+    ' React bg-black/70 on the inner disc.
+    return 0.7
 end function
 
 ' brs-desktop reports friendly name "BrightScript Simulator" — its HTML5 video plane

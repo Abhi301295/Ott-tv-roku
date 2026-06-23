@@ -26,7 +26,6 @@
   <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsService.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsDbg.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/ReelsScreen.brs" />
 
@@ -97,9 +96,11 @@
           uri="pkg:/images/ui/spinner_arc.png" />
       </Group>
       <Poster id="overlayCircle" translation="[-56, -56]" width="112" height="112"
-        uri="pkg:/images/ui/glass_circle.png" opacity="0.7" />
+        uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill" />
       <Poster id="overlayPlay" translation="[-40, -40]" width="80" height="80"
-        uri="pkg:/images/ui/ic_v_play.png" visible="false" />
+        uri="pkg:/images/ui/reels_play_80.png" loadDisplayMode="noScale" visible="false" />
+      <Poster id="overlayPause" translation="[-25, -25]" width="50" height="50"
+        uri="pkg:/images/ui/reels_pause_50.png" loadDisplayMode="noScale" visible="false" />
       <Animation id="overlayAnim" duration="0.9" repeat="true" easeFunction="linear">
         <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
           fieldToInterp="overlaySpin.rotation" />

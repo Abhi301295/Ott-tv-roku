@@ -18,6 +18,7 @@ sub init()
     m.overlayArc = m.top.findNode("overlayArc")
     m.overlayCircle = m.top.findNode("overlayCircle")
     m.overlayPlay = m.top.findNode("overlayPlay")
+    m.overlayPause = m.top.findNode("overlayPause")
     m.overlayAnim = m.top.findNode("overlayAnim")
     m.progressHost = m.top.findNode("progressHost")
     m.progressTrack = m.top.findNode("progressTrack")
@@ -59,6 +60,8 @@ sub init()
     m.metaX = 0
     m.metaY = 0
     m.metaColW = RL_MetaMaxW()
+    m.metaContentH = 0
+    m.pillBlockH = 0
     m.disposed = false
     m.reelsTask = invalid
     m.showingSkeleton = false
@@ -92,11 +95,9 @@ sub init()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
-    ReelsDbg("init", "ReelsScreen ready seed=" + Str(m.seed) + " sim=" + ReelsDbgStr(ReelsIsSimulator()) + " inlineVideo=" + ReelsDbgStr(m.useInlineVideo))
 end sub
 
 sub OnNavStateReady()
-    ReelsDbg("nav_ready", "route=reels")
     if m.vm <> invalid then ShellEnterContent(m.vm)
     ResetAndFetch()
 end sub
@@ -104,7 +105,6 @@ end sub
 sub OnShellEnterContent()
     if m.top.shellEnterContent <> true then return
     m.top.shellEnterContent = false
-    ReelsDbg("shell_content", "focus content index=" + Str(m.currentIndex))
 end sub
 
 sub OnShellLayoutRev()
@@ -115,7 +115,6 @@ sub OnReelsVisibleChanged()
     if m.top.visible <> true then return
     if m.disposed then return
     if m.reels.Count() = 0 then return
-    ReelsDbg("visible", "resume poster+play index=" + Str(m.currentIndex))
     m.isPlaying = false
     m.isBuffering = false
     m.playRequested = false
@@ -133,7 +132,6 @@ end sub
 sub OnDispose()
     if not m.top.dispose then return
     m.disposed = true
-    ReelsDbg("dispose", "stopping video + fetch")
     KillReelsTask()
     StopVideo()
     StopTimers()
@@ -183,6 +181,7 @@ sub LoadReelsTokens()
     m.cPageBg = TC("neutral-900", "#0a0a0a")
     m.cPrimary500 = TC("primary-500", "#0b75e0")
     m.cPrimary600 = TC("primary-600", "#0760bb")
+    m.cPrimary700 = TC("primary-700", "#04478b")
     m.cNeutral50 = TC("neutral-50", "#f5f5f5")
     m.cNeutral400 = TC("neutral-400", "#a3a3a3")
     m.cNeutral700 = TC("neutral-700", "#404040")
@@ -208,9 +207,9 @@ sub LoadReelsTokens()
     m.cMetaMuted = CompositeOverBg(mutedHex, 0.8, m.cPageBg)
     m.cMetaBody = CompositeOverBg(mutedHex, 0.85, m.cPageBg)
     m.cProgressTrack = CompositeOverBg(whiteHex, 0.2, m.cPageBg)
-    m.cOverlayCircle = CompositeOverBg("#0a0a0a", 0.7, m.cPageBg)
     m.cSeekPreviewBg = CompositeOverBg("#0a0a0a", 0.8, m.cPageBg)
-    ReelsDbg("colors", "category=" + m.cCategoryBg + " genre=" + m.cGenreBg)
+    m.cOverlayCircle = "0x000000ff"
+    m.cOverlayPlay = RL_OverlayIconBlue()
 end sub
 
 function ParseHexRgb(hex as string) as object
@@ -272,8 +271,13 @@ sub ApplyStaticColors()
     if m.progressTrack <> invalid then m.progressTrack.color = m.cProgressTrack
     if m.progressFill <> invalid then m.progressFill.color = m.cPrimary500
     if m.overlayArc <> invalid then m.overlayArc.blendColor = m.cPrimary500
-    if m.overlayCircle <> invalid then m.overlayCircle.blendColor = m.cOverlayCircle
-    if m.overlayPlay <> invalid then m.overlayPlay.blendColor = m.cPrimary500
+    if m.overlayCircle <> invalid then
+        m.overlayCircle.blendColor = m.cOverlayCircle
+        m.overlayCircle.opacity = RL_OverlayCircleOpacity()
+    end if
+    ' Icons are pre-rendered blue (#0000ff) at native size — no blendColor (keeps edges clean).
+    if m.overlayPlay <> invalid then m.overlayPlay.blendColor = "0xffffffff"
+    if m.overlayPause <> invalid then m.overlayPause.blendColor = "0xffffffff"
     if m.emptyLbl <> invalid then m.emptyLbl.color = m.cNeutral50
     if m.creatorAvatar <> invalid then m.creatorAvatar.blendColor = m.cPrimary600
     if m.creatorInitial <> invalid then m.creatorInitial.color = m.cNeutral50
@@ -300,7 +304,6 @@ sub ApplyReelsShellLayout()
     m.metaColW = m.videoX - m.metaX - RL_MetaVideoGap()
     if m.metaColW < 400 then m.metaColW = 400
     if m.metaColW > RL_MetaMaxW() then m.metaColW = RL_MetaMaxW()
-    m.metaY = RL_MetaTop()
 
     if m.videoColumn <> invalid then
         m.videoColumn.translation = [m.videoX, 0]
@@ -322,10 +325,9 @@ sub ApplyReelsShellLayout()
         m.seekPreview.translation = [absX + Int(vw / 2) - 60, py - 56]
     end if
 
-    if m.metaHost <> invalid then m.metaHost.translation = [m.metaX, m.metaY]
     ApplyMetaWidths()
-    LayoutMetaLabels()
-    ReelsDbg("layout", "offX=" + Str(m.shellOffX) + " viewportW=" + Str(m.viewportW) + " metaX=" + Str(m.metaX) + " metaW=" + Str(m.metaColW) + " videoX=" + Str(m.videoX) + " videoW=" + Str(RL_VideoW()) + " videoAbsX=" + Str(ReelsVideoAbsX()))
+    if m.metaContentH > 0 then LayoutMetaLabels()
+    PositionMetaHost()
 end sub
 
 function ReelsVideoAbsX() as integer
@@ -341,7 +343,6 @@ sub SyncVideoNodeLayout()
     m.videoNode.translation = [absX, bw]
     m.videoNode.width = vw
     m.videoNode.height = vh
-    ReelsDbg("video_layout", "absX=" + Str(absX) + " y=" + Str(bw) + " w=" + Str(vw) + " h=" + Str(vh))
 end sub
 
 sub ApplyMetaWidths()
@@ -373,7 +374,21 @@ sub LayoutMetaLabels()
         m.descLbl.translation = [0, y]
         y = y + 72
     end if
-    if m.pillHost <> invalid then m.pillHost.translation = [0, y]
+    if m.pillHost <> invalid then
+        m.pillHost.translation = [0, y]
+        if m.pillBlockH > 0 then y = y + m.pillBlockH
+    end if
+    m.metaContentH = y
+    PositionMetaHost()
+end sub
+
+' React reels index.tsx TV info overlay: absolute bottom-28 + inner p-b-80.
+sub PositionMetaHost()
+    if m.metaHost = invalid then return
+    reserve = RL_MetaBottomReserve()
+    m.metaY = RL_VideoH() - reserve - m.metaContentH
+    if m.metaY < 0 then m.metaY = 0
+    m.metaHost.translation = [m.metaX, m.metaY]
 end sub
 
 sub ResetAndFetch()
@@ -386,7 +401,7 @@ sub ResetAndFetch()
     StopVideo()
     HideContent()
     ShowEmpty(false)
-    ShowSkeleton(true, "boot")
+    ShowSkeleton(true)
     FetchPage(1)
 end sub
 
@@ -402,30 +417,30 @@ sub HideContent()
 end sub
 
 sub ShowEmpty(show as boolean)
-    ReelsDbg("empty", "visible=" + ReelsDbgStr(show))
     if m.emptyHost <> invalid then m.emptyHost.visible = show
     if m.emptyLbl <> invalid then m.emptyLbl.text = RL_EmptyCopy()
 end sub
 
-sub ShowSkeleton(show as boolean, reason as string)
+sub ShowSkeleton(show as boolean)
     m.showingSkeleton = show
     if m.skeletonHost = invalid then return
     m.skeletonHost.removeChildrenIndex(m.skeletonHost.getChildCount(), 0)
-    if show then BuildReelsSkeleton()
+    if show then
+        ApplyReelsShellLayout()
+        BuildReelsSkeleton()
+    end if
     m.skeletonHost.visible = show
     if show then
-        ReelsDbg("skeleton", "on reason=" + reason)
         if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "start"
     else
-        ReelsDbg("skeleton", "off reason=" + reason)
         if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     end if
 end sub
 
 sub BuildReelsSkeleton()
     if m.skeletonHost = invalid then return
-    base = CardContrastSkeletonBase(m.cPageBg, m.cNeutral800)
-    hi = CardSkeletonHighlightColor()
+    skBase = m.cPrimary700
+    skHi = m.cPrimary500
 
     tile = m.skeletonHost.createChild("Group")
     tile.translation = [m.videoX, 0]
@@ -433,10 +448,18 @@ sub BuildReelsSkeleton()
     sk.boxWidth = RL_VideoW()
     sk.boxHeight = RL_VideoH()
     sk.shapeUri = RL_VideoSkeletonShapeUri()
-    CardApplySkeleton(sk, base, hi)
+    CardApplySkeleton(sk, skBase, skHi)
+    sk.running = true
 
     meta = m.skeletonHost.createChild("Group")
-    meta.translation = [m.metaX, m.metaY]
+    skLines = [48, 28, 60, 48]
+    skGap = 16
+    skH = 0
+    for each lh in skLines
+        skH = skH + lh + skGap
+    end for
+    skH = skH - skGap
+    meta.translation = [m.metaX, RL_VideoH() - RL_MetaBottomReserve() - skH]
     skW1 = Int(m.metaColW * 0.4)
     skW2 = Int(m.metaColW * 0.7)
     skW3 = m.metaColW
@@ -450,14 +473,14 @@ sub BuildReelsSkeleton()
         ln.boxHeight = lines[i]
         ln.translation = [0, ly]
         ln.shapeUri = RL_VideoSkeletonShapeUri()
-        CardApplySkeleton(ln, base, hi)
+        CardApplySkeleton(ln, skBase, skHi)
+        ln.running = true
         ly = ly + lines[i] + 16
     end for
 end sub
 
 sub OnSkeletonTimeout()
-    ReelsDbg("skeleton", "timeout — force off")
-    ShowSkeleton(false, "timeout")
+    ShowSkeleton(false)
     if m.reels.Count() > 0 and m.videoColumn <> invalid and m.videoColumn.visible = false then
         ShowReelContent()
     end if
@@ -470,13 +493,6 @@ sub ApplyVideoPosterLayout()
     if m.videoPlaceholder <> invalid then
         m.videoPlaceholder.width = vw
         m.videoPlaceholder.height = vh
-    end if
-    if m.videoDummyArt <> invalid then
-        art = RL_DummyThumbArtSize()
-        m.videoDummyArt.width = art
-        m.videoDummyArt.height = art
-        m.videoDummyArt.translation = [Int((vw - art) / 2), Int((vh - art) / 2)]
-        m.videoDummyArt.uri = RL_DummyThumbArtUri()
     end if
     ring = RL_OverlayRingSize()
     circle = RL_OverlayCircleSize()
@@ -491,6 +507,12 @@ sub ApplyVideoPosterLayout()
         m.overlayPlay.height = playSz
         m.overlayPlay.translation = [-Int(playSz / 2), -Int(playSz / 2)]
     end if
+    pauseSz = RL_OverlayPauseSize()
+    if m.overlayPause <> invalid then
+        m.overlayPause.width = pauseSz
+        m.overlayPause.height = pauseSz
+        m.overlayPause.translation = [-Int(pauseSz / 2), -Int(pauseSz / 2)]
+    end if
     SyncVideoNodeLayout()
 end sub
 
@@ -498,18 +520,20 @@ sub ApplyReelPoster(reel as object)
     ApplyVideoPosterLayout()
     thumb = ReelsVerticalThumb(reel)
     useDummy = thumb = ""
-    ReelsDbg("poster", "dummy=" + ReelsDbgStr(useDummy) + " thumb=" + Left(thumb, 80))
+    posterUri = ReelsPosterUri(reel)
 
-    if m.videoPlaceholder <> invalid then m.videoPlaceholder.visible = true
-    if m.videoDummyArt <> invalid then m.videoDummyArt.visible = useDummy
-    if m.videoPoster <> invalid then
+    if m.videoPlaceholder <> invalid then
+        m.videoPlaceholder.visible = true
         if useDummy then
-            m.videoPoster.uri = ""
-            m.videoPoster.visible = false
+            m.videoPlaceholder.color = HexToRokuColor(RL_DummyThumbBgHex(), "ff")
         else
-            m.videoPoster.visible = true
-            m.videoPoster.uri = thumb
+            m.videoPlaceholder.color = m.cNeutral700
         end if
+    end if
+    if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
+    if m.videoPoster <> invalid then
+        m.videoPoster.visible = true
+        m.videoPoster.uri = posterUri
     end if
     if m.videoNode <> invalid then m.videoNode.visible = false
     if not m.useInlineVideo and m.videoNode <> invalid then
@@ -521,13 +545,15 @@ end sub
 sub OnReelPosterLoad()
     if m.disposed or m.videoPoster = invalid then return
     status = m.videoPoster.loadStatus
-    ReelsDbg("poster_load", "status=" + status)
     if status = "ready" then
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         m.videoPoster.visible = true
     else if status = "failed" then
-        m.videoPoster.visible = false
-        if m.videoDummyArt <> invalid then m.videoDummyArt.visible = true
+        m.videoPoster.uri = RL_DummyThumbPosterUri()
+        m.videoPoster.visible = true
+        if m.videoPlaceholder <> invalid then
+            m.videoPlaceholder.color = HexToRokuColor(RL_DummyThumbBgHex(), "ff")
+        end if
     end if
 end sub
 
@@ -538,11 +564,10 @@ sub FetchPage(pageNum as integer)
     m.loadingMore = true
     m.loading = true
     m.fetchingPage = pageNum
-    if pageNum = 1 then ShowSkeleton(true, "fetch")
+    if pageNum = 1 then ShowSkeleton(true)
 
     path = Endpoints().REELS_LIST
     q = ReelsBuildQuery(pageNum, RL_PageLimit(), m.seed)
-    ReelsDbg("fetch", "path=" + path + " page=" + Str(pageNum) + " seed=" + Str(m.seed))
     KillReelsTask()
     m.reelsTask = ApiGetQuery(path, q)
     m.reelsTask.observeField("apiResult", "OnReelsResponse")
@@ -559,12 +584,11 @@ sub OnReelsResponse()
     m.loading = false
     m.initialLoad = false
 
-    ReelsDbgApi("response", api)
     parsed = ReelsParseResponse(api)
     batch = parsed.items
     if api = invalid or api.ok <> true or (api.statusCode <> invalid and api.statusCode <> 200) then
         if m.reels.Count() = 0 then
-            ShowSkeleton(false, "fetch_fail")
+            ShowSkeleton(false)
             ShowEmpty(true)
             ShowAlert(m.top, 2, RL_ErrorCopy())
         end if
@@ -584,10 +608,9 @@ sub OnReelsResponse()
 
     accumulated = m.reels.Count()
     m.hasMore = ReelsPageHasMore(batch.Count(), accumulated, parsed.total)
-    ReelsDbg("response", "accumulated=" + Str(accumulated) + " hasMore=" + ReelsDbgStr(m.hasMore))
 
     if accumulated = 0 then
-        ShowSkeleton(false, "empty")
+        ShowSkeleton(false)
         ShowEmpty(true)
         return
     end if
@@ -603,7 +626,6 @@ sub MaybePrefetchPage()
     if not m.hasMore then return
     if m.reels.Count() = 0 then return
     if m.currentIndex < m.reels.Count() - RL_PrefetchThreshold() then return
-    ReelsDbg("prefetch_page", "index=" + Str(m.currentIndex) + " len=" + Str(m.reels.Count()) + " next=" + Str(m.page + 1))
     FetchPage(m.page + 1)
 end sub
 
@@ -615,11 +637,9 @@ sub LoadCurrentReel(isNew as boolean)
     StopVideo()
     m.playRequested = false
     m.pendingStreamUrl = ReelsStreamUrl(reel)
-    ReelsDbgThumbProbe(reel, m.currentIndex)
-    ReelsDbg("video_load", "index=" + Str(m.currentIndex) + " url=" + Left(m.pendingStreamUrl, 80) + " poster=" + ReelsDbgStr(ReelsHasPoster(reel)))
 
     ApplyMeta(reel)
-    ShowSkeleton(false, "reel_ready")
+    ShowSkeleton(false)
     ShowReelContent()
     ApplyReelPoster(reel)
 
@@ -631,7 +651,6 @@ sub LoadCurrentReel(isNew as boolean)
     UpdateOverlay()
 
     if m.pendingStreamUrl = "" then
-        ReelsDbg("video_load", "no stream url — poster only")
     end if
 end sub
 
@@ -647,7 +666,6 @@ sub EnsureVideoContent() as boolean
     if m.reels.Count() > 0 then reel = m.reels[m.currentIndex]
     if reel <> invalid and ReelsTitle(reel) <> "" then content.title = ReelsTitle(reel)
     m.videoNode.content = content
-    ReelsDbg("video_content", "attached url=" + Left(m.pendingStreamUrl, 80))
     return true
 end sub
 
@@ -678,10 +696,8 @@ end sub
 
 sub ApplyMeta(reel as object)
     if reel = invalid then return
-    ReelsDbg("meta", "start")
 
     creator = ReelsCreatorName(reel)
-    ReelsDbg("meta", "creator=" + Left(creator, 40))
     if m.creatorRow <> invalid then
         showCreator = creator <> ""
         m.creatorRow.visible = showCreator
@@ -695,7 +711,6 @@ sub ApplyMeta(reel as object)
 
     if m.contentTypeLbl <> invalid then m.contentTypeLbl.text = ReelsContentType(reel)
     title = ReelsTitle(reel)
-    ReelsDbg("meta", "title=" + Left(title, 60))
     if m.titleLbl <> invalid then
         m.titleLbl.text = title
         m.titleLbl.visible = title <> ""
@@ -709,9 +724,7 @@ sub ApplyMeta(reel as object)
             m.descLbl.visible = false
         end if
     end if
-    ReelsDbg("meta", "desc ok")
     BuildPills(reel)
-    ReelsDbg("meta", "pills ok")
     LayoutMetaLabels()
 end sub
 
@@ -774,6 +787,11 @@ sub BuildPills(reel as object)
         x = x + pw + RL_PillGap()
         if ph > rowH then rowH = ph
     end for
+
+    m.pillBlockH = 0
+    if cats.Count() > 0 or genres.Count() > 0 then
+        m.pillBlockH = y + rowH
+    end if
 end sub
 
 function CreatePill(text as string, bg as string, fg as string) as object
@@ -814,10 +832,8 @@ sub OnVideoState()
     if m.disposed or m.videoNode = invalid then return
     if not m.useInlineVideo then return
     state = m.videoNode.state
-    ReelsDbg("video_state", state + " playReq=" + ReelsDbgStr(m.playRequested))
 
     if (state = "buffering" or state = "playing") and m.playRequested <> true then
-        ReelsDbg("video_state", "blocked — no user play request")
         StopVideo()
         ShowPosterFrame()
         m.isPlaying = false
@@ -840,7 +856,7 @@ sub OnVideoState()
         if m.videoNode <> invalid then m.videoNode.visible = true
         if m.videoPoster <> invalid then m.videoPoster.visible = false
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
-        ShowSkeleton(false, "playing")
+        ShowSkeleton(false)
         UpdateOverlay()
     else if state = "paused" then
         m.isPlaying = false
@@ -851,10 +867,9 @@ sub OnVideoState()
         m.isBuffering = false
         UpdateOverlay()
     else if state = "error" then
-        ReelsDbg("video_state", "error — keep poster")
         m.isBuffering = false
         m.isPlaying = false
-        ShowSkeleton(false, "error")
+        ShowSkeleton(false)
         ShowPosterFrame()
         UpdateOverlay()
     end if
@@ -878,7 +893,7 @@ sub OnVideoPosition()
         if m.videoPoster <> invalid then m.videoPoster.visible = false
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         if m.videoNode <> invalid then m.videoNode.visible = true
-        ShowSkeleton(false, "position")
+        ShowSkeleton(false)
     end if
     UpdateProgressBar()
     UpdateOverlay()
@@ -909,11 +924,13 @@ sub UpdateOverlay()
     if m.overlayPlay <> invalid then
         m.overlayPlay.visible = not m.isPlaying and not m.isBuffering
     end if
+    if m.overlayPause <> invalid then
+        m.overlayPause.visible = m.isBuffering and m.isPlaying
+    end if
 end sub
 
 sub TogglePlayPause()
     if m.pendingStreamUrl = "" then
-        ReelsDbg("play", "ignored — no stream url")
         return
     end if
 
@@ -929,7 +946,6 @@ sub TogglePlayPause()
         m.playRequested = false
         m.videoNode.control = "pause"
         m.isPlaying = false
-        ReelsDbg("play", "pause")
     else
         if not EnsureVideoContent() then return
         m.playRequested = true
@@ -940,7 +956,6 @@ sub TogglePlayPause()
         m.videoNode.control = "play"
         m.isPlaying = true
         m.isBuffering = true
-        ReelsDbg("play", "play on OK")
     end if
     UpdateOverlay()
 end sub
@@ -950,11 +965,9 @@ sub PlayReelFullscreen()
     reel = m.reels[m.currentIndex]
     state = ReelsVideoPlayerPayload(reel)
     if state = invalid then
-        ReelsDbg("play", "fullscreen abort — bad payload")
         ShowAlert(m.top, 2, RL_ErrorCopy())
         return
     end if
-    ReelsDbg("play", "fullscreen route=video_player url=" + Left(m.pendingStreamUrl, 80))
     m.vm.callFunc("NavigatePush", RouteVideoPlayer(), state)
 end sub
 
@@ -968,7 +981,6 @@ sub SeekBy(delta as integer)
     m.position = target
     UpdateProgressBar()
     ShowSeekPreview(target)
-    ReelsDbg("seek", "delta=" + Str(delta) + " pos=" + Str(target))
 end sub
 
 sub ShowSeekPreview(secs as float)
@@ -982,12 +994,23 @@ sub OnSeekPreviewHide()
     if m.seekPreview <> invalid then m.seekPreview.visible = false
 end sub
 
+sub EnterReelsHeader()
+    StopVideo()
+    m.isPlaying = false
+    m.isBuffering = false
+    m.playRequested = false
+    UpdateOverlay()
+    if m.vm <> invalid then ShellEnterHeader(m.vm, invalid)
+end sub
+
 sub SwitchReel(dir as integer)
     if m.reels.Count() = 0 then return
-    old = m.currentIndex
+    if dir = -1 and m.currentIndex = 0 then
+        EnterReelsHeader()
+        return
+    end if
     n = m.reels.Count()
     m.currentIndex = (m.currentIndex + dir + n) mod n
-    ReelsDbg("nav", "dir=" + Str(dir) + " " + Str(old) + "->" + Str(m.currentIndex))
     LoadCurrentReel(true)
     MaybePrefetchPage()
 end sub
@@ -999,13 +1022,16 @@ sub OnKey()
 
     key = LCase(ev.key.ToStr())
     if m.vm <> invalid and m.vm.shellFocus = "header" then
-        ReelsDbg("key", "ignored shellFocus=header key=" + key)
         return
     end if
     if m.reels.Count() = 0 then return
 
     if key = "up" then
-        SwitchReel(-1)
+        if m.currentIndex = 0 then
+            EnterReelsHeader()
+        else
+            SwitchReel(-1)
+        end if
     else if key = "down" then
         SwitchReel(1)
     else if key = "back" then
@@ -1018,10 +1044,8 @@ sub OnKey()
         SeekBy(RL_SeekStepSec())
     else if key = "ok" or key = "play" or key = "select" or key = "enter" then
         if m.loading then
-            ReelsDbg("key", "play ignored — still loading")
             return
         end if
-        ReelsDbg("key", "play key=" + key)
         TogglePlayPause()
     end if
 end sub

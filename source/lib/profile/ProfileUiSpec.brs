@@ -16,7 +16,7 @@ function ProfileUiSpec() as object
         titleFont: 41                ' fs-34 * 1.2 (LARGE)
         titleX: 64                   ' p-x-40 + pl-24
         titleY: 152                  ' contentMarginTop + titleMarginTop
-        headerBackdropOpacity: 0.32   ' light black strip behind logo + title
+        headerBackdropOpacity: 0.30   ' bg-black/30 (profile.tsx header strip)
         headerBackdropPadX: 16
         headerBackdropPadY: 12
         logoY: 48

@@ -158,34 +158,15 @@ function ReelsVerticalThumb(reel as object) as string
     return ""
 end function
 
-sub ReelsDbgThumbProbe(reel as object, index as integer)
-    if reel = invalid then return
-    rootCnt = 0
-    contentCnt = 0
-    if reel.thumbnails <> invalid then rootCnt = ReelsCoerceList(reel.thumbnails).Count()
-    if reel.content <> invalid and reel.content.thumbnails <> invalid then
-        contentCnt = ReelsCoerceList(reel.content.thumbnails).Count()
-    end if
-    sample = ""
-    lists = ReelsCollectThumbnailLists(reel)
-    if lists.Count() > 0 then
-        list = ReelsCoerceList(lists[0])
-        if list.Count() > 0 then
-            t0 = list[0]
-            plat = ""
-            tp = ""
-            if t0.platform <> invalid then plat = ReelsDbgStr(t0.platform)
-            if t0.type <> invalid then tp = ReelsDbgStr(t0.type)
-            sample = " plat=" + plat + " type=" + tp + " path=" + Left(ReelsThumbPath(t0), 40)
-        end if
-    end if
-    url = ReelsVerticalThumb(reel)
-    ReelsDbg("thumb_probe", "index=" + Str(index) + " root=" + Str(rootCnt) + " content=" + Str(contentCnt) + " resolved=" + Left(url, 50) + sample)
-end sub
-
-' Parity with React posterUrl fallback (Images.THUMBNAIL SVG when no vertical thumb).
 function ReelsHasPoster(reel as object) as boolean
-    return ReelsVerticalThumb(reel) <> ""
+    ' React always supplies posterUrl (vertical thumb or Images.THUMBNAIL fallback).
+    return true
+end function
+
+function ReelsPosterUri(reel as object) as string
+    thumb = ReelsVerticalThumb(reel)
+    if thumb <> "" then return thumb
+    return RL_DummyThumbPosterUri()
 end function
 
 function ReelsFieldName(obj as object) as string
