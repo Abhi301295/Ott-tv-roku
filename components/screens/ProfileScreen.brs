@@ -20,8 +20,9 @@ sub init()
     m.otpPopup = m.top.findNode("otpPopup")
     m.selectingOverlay = m.top.findNode("selectingOverlay")
     m.autoSelectTimer = m.top.findNode("autoSelectTimer")
+    m.bg = m.top.findNode("bg")
     m.bgImage = m.top.findNode("bgImage")
-    m.bgOverlay = m.top.findNode("bgOverlay")
+    m.profileBgUri = "pkg:/images/ui/profile_default_bg_base.png"
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
     m.profileHeaderChrome = m.top.findNode("profileHeaderChrome")
@@ -161,18 +162,18 @@ sub LoadProfileTokens()
     m.cNeutral100 = TC("neutral-100", "#f8f8f8")
     m.cNeutral300 = TC("neutral-300", "#d6d6d6")
     m.cNeutral400 = TC("neutral-400", "#c8c8c8")
-    m.cAmber400 = "0xf59e0bff"
-    m.cNeutral500 = TC("neutral-500", "#e279ce")
     m.cNeutral600 = TC("neutral-600", "#3d3d3d")
+    m.cNeutral700 = TC("neutral-700", "#404040")
     m.cNeutral800 = TC("neutral-800", "#121212")
-    m.cNeutral700 = "0x404040ff"
+    m.cAmber400 = TC("amber-400", "#f59e0b")
+    m.cNeutral500 = TC("neutral-500", "#e279ce")
     ' neutral-900 (tertiary/background) drives the themed dialog surfaces, matching
     ' React's bg-neutral-900 on the confirm/OTP popups.
     m.cNeutral900 = TC("neutral-900", "#0a0a0a")
-    m.cBg = "0x141414ff"        ' dark backdrop (clean circular masking)
-    m.cCardBg = "0x171717ff"
-    ' Color behind the avatar corners; switches to a near-black scrim color when a
-    ' background image is shown so the corner-mask circle keeps blending cleanly.
+    m.cBg = m.cNeutral900
+    m.cCardBg = m.cNeutral900
+    ' Color behind the avatar corners; switches to a near-black scrim when the
+    ' focus backdrop is visible so the corner-mask circle keeps blending cleanly.
     m.cAvatarBg = m.cBg
 end sub
 
@@ -262,6 +263,13 @@ sub ApplyProfileSkeletonLayout()
 end sub
 
 sub ApplyProfileColors()
+    if m.bg <> invalid then m.bg.color = m.cNeutral900
+    if m.headerTextBackdrop <> invalid then
+        m.headerTextBackdrop.color = "0x000000ff"
+        if m.uiSpec <> invalid then
+            m.headerTextBackdrop.opacity = m.uiSpec.headerBackdropOpacity
+        end if
+    end if
     m.title.color = m.cNeutral50
     m.errorLabel.color = m.cPrimary500
     m.logoLabel.color = m.cPrimary500
@@ -484,25 +492,30 @@ end sub
 sub ApplyProfileBranding()
     resolved = invalid
     if m.global <> invalid then resolved = m.global.businessResolved
-    if resolved = invalid then return
 
-    logoUrl = resolved.brandingLogo
-    if logoUrl <> invalid and logoUrl <> "" then
-        m.logoPoster.uri = logoUrl
-        m.logoPoster.visible = true
-        m.logoLabel.visible = false
-    else if resolved.appName <> invalid and resolved.appName <> "" then
-        m.logoLabel.text = resolved.appName
-        m.logoLabel.visible = true
+    if resolved <> invalid then
+        logoUrl = resolved.brandingLogo
+        if logoUrl <> invalid and logoUrl <> "" then
+            m.logoPoster.uri = logoUrl
+            m.logoPoster.visible = true
+            m.logoLabel.visible = false
+        else if resolved.appName <> invalid and resolved.appName <> "" then
+            m.logoLabel.text = resolved.appName
+            m.logoLabel.visible = true
+        end if
+
+        url = resolved.loginBackgroundImage
+        if url <> invalid and url <> "" then
+            m.profileBgUri = url
+        else
+            m.profileBgUri = "pkg:/images/ui/profile_default_bg_base.png"
+        end if
+        m.cAvatarBg = m.cNeutral900
     end if
 
-    url = resolved.loginBackgroundImage
-    if url <> invalid and url <> "" then
-        m.bgImage.uri = url
+    if m.bgImage <> invalid then
+        m.bgImage.uri = m.profileBgUri
         m.bgImage.opacity = 1.0
-        m.bgOverlay.opacity = 0.55
-        ' Avatar corners now sit over the near-black scrim, not the solid page bg.
-        m.cAvatarBg = "0x080a0cff"
     end if
 end sub
 

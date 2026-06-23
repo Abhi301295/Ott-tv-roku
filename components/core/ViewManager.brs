@@ -162,6 +162,9 @@ function CreateScreenForRoute(route as string, state as object) as object
     if route = RouteSeries() or route = RouteNewRelease() then
         return CreateObject("roSGNode", "SeriesScreen")
     end if
+    if route = RouteReels() then
+        return CreateObject("roSGNode", "ReelsScreen")
+    end if
     return CreatePlaceholderScreen(route, state)
 end function
 
