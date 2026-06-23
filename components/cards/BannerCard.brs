@@ -32,7 +32,7 @@ sub ApplyAll()
     m.titleLabel.text = m.top.title
     m.titleLabel.color = m.top.cNeutral50
     m.fallback.color = m.top.cNeutral800
-    CardApplySkeleton(m.skeleton, m.top.cNeutral800, m.top.cNeutral700)
+    CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
 
     uri = m.top.thumbnailUri
     if uri <> invalid and uri <> "" then

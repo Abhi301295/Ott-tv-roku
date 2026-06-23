@@ -96,7 +96,7 @@ function VideoIsTrailer(detail as object) as boolean
 end function
 
 ' Subtitle tracks for the ContentNode (parity with the web <track> list built from
-' detail.subtitles[].{lang|value, path}). Returns [] when none.
+' detail.subtitles[].{lang|value|language, path|url}). Returns [] when none.
 function VideoSubtitleTracks(detail as object) as object
     out = []
     if detail = invalid or detail.subtitles = invalid then return out
@@ -105,11 +105,14 @@ function VideoSubtitleTracks(detail as object) as object
             lang = ""
             if s.lang <> invalid and s.lang <> "" then
                 lang = s.lang
+            else if s.language <> invalid and s.language <> "" then
+                lang = s.language
             else if s.value <> invalid and s.value <> "" then
                 lang = s.value
             end if
             path = ""
-            if s.path <> invalid then path = s.path
+            if s.path <> invalid and s.path <> "" then path = s.path
+            if path = "" and s.url <> invalid and s.url <> "" then path = s.url
             if lang <> "" and path <> "" then
                 out.Push({ lang: lang, url: path })
             end if
@@ -149,4 +152,23 @@ function VideoToNumber(v as dynamic) as float
         return v
     end if
     return 0.0
+end function
+
+' Skip Intro pill — literal parity with video/index.tsx className:
+' text-neutral-50 (dark.theme --neutral-50 = #ffffff), ring-white/70 when focused.
+function VideoSkipIntroTextColor() as string
+    return "0xffffffff"
+end function
+
+' Loose lang match (en / eng / English) for subtitle track selection.
+function VideoCaptionLangMatches(selected as string, candidate as string) as boolean
+    if selected = "" or candidate = "" then return false
+    s = LCase(selected)
+    c = LCase(candidate)
+    if s = c then return true
+    if Left(s, 2) = Left(c, 2) and Len(s) >= 2 and Len(c) >= 2 then return true
+  ' ISO 639-1 vs 639-2 (en vs eng).
+    if s = "en" and Left(c, 3) = "eng" then return true
+    if c = "en" and Left(s, 3) = "eng" then return true
+    return false
 end function

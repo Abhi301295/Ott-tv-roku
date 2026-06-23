@@ -17,7 +17,56 @@ function CardSkeletonBaseColor() as string
 end function
 
 function CardSkeletonHighlightColor() as string
-    return "0x262626ff"
+    return "0x525252ff"
+end function
+
+' Skeleton shimmer — colors from source/lib/theme/SkeletonConfig.brs (login excluded).
+
+function SkeletonDefaultPageBg() as string
+    return SK_DefaultPageBg()
+end function
+
+function SkeletonColorsForPage(pageBg as string, tokens as object) as object
+    colors = SkeletonResolveColors(tokens)
+    if pageBg = invalid or pageBg = "" then return colors
+    safe = CardContrastSkeletonBase(pageBg, colors.base)
+    if safe <> colors.base then
+        colors.base = safe
+        if CardAvgLum(colors.highlight) <= CardAvgLum(colors.base) then
+            colors.highlight = CardLightenHex(colors.base, 56)
+        end if
+    end if
+    return colors
+end function
+
+sub SkeletonApply(node as object, tokens as object, running as boolean, pageBg = "" as string)
+    if node = invalid then return
+    colors = SkeletonColorsForPage(pageBg, tokens)
+    CardApplySkeleton(node, colors.base, colors.highlight)
+    if node.hasField("running") then node.running = running
+end sub
+
+sub SkeletonApplyTree(node as object, tokens as object, running as boolean, pageBg = "" as string)
+    colors = SkeletonColorsForPage(pageBg, tokens)
+    CardApplySkeletonTree(node, colors.base, colors.highlight, running)
+end sub
+
+sub CardApplySkeletonFromConfig(skeleton as object, tokens as object, running = false as boolean)
+    if skeleton = invalid then return
+    colors = SkeletonResolveColors(tokens)
+    CardApplySkeleton(skeleton, colors.base, colors.highlight)
+    if running and skeleton.hasField("running") then skeleton.running = true
+end sub
+
+' Same theme token map as Profile / Detail — never per-card color overrides.
+function CardSkeletonThemeTokens(fromNode as object) as object
+    tm = invalid
+    if fromNode <> invalid then
+        scene = fromNode.getScene()
+        if scene <> invalid then tm = scene.findNode("themeManager")
+    end if
+    if tm <> invalid and tm.themeTokens <> invalid then return tm.themeTokens
+    return {}
 end function
 
 ' Lazily create a card's focus frame only when it is first needed (i.e. the card becomes

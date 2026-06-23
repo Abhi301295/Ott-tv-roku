@@ -10,6 +10,7 @@
     <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeChanged" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/HorizontalCard.brs" />
 

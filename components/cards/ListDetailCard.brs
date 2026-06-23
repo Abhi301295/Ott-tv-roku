@@ -219,11 +219,16 @@ sub ApplyAll()
     ApplyFocusVisual()
 end sub
 
+sub LD_ApplySkeleton(sk as object, running as boolean)
+    if sk = invalid then return
+    CardApplySkeletonFromConfig(sk, CardSkeletonThemeTokens(m.top), running)
+end sub
+
 sub ApplySkeletonMode(loading as boolean)
     if m.thumbSkel <> invalid then
         m.thumbSkel.visible = loading
-        m.thumbSkel.running = loading
-        if loading then CardApplySkeleton(m.thumbSkel, m.top.cNeutral700, m.top.cNeutral800)
+        if loading then LD_ApplySkeleton(m.thumbSkel, true)
+        else m.thumbSkel.running = false
     end if
     if m.thumb <> invalid then m.thumb.visible = not loading
     if m.grad <> invalid then m.grad.visible = not loading
@@ -233,14 +238,10 @@ sub ApplySkeletonMode(loading as boolean)
     if m.metaHost <> invalid then m.metaHost.visible = not loading
 
     if loading then
-        CardApplySkeleton(m.titleSkel, m.top.cNeutral700, m.top.cNeutral800)
-        CardApplySkeleton(m.typeSkel, m.top.cNeutral700, m.top.cNeutral800)
-        CardApplySkeleton(m.dotSkel, m.top.cNeutral700, m.top.cNeutral800)
-        CardApplySkeleton(m.langSkel, m.top.cNeutral700, m.top.cNeutral800)
-        if m.titleSkel <> invalid then m.titleSkel.running = true
-        if m.typeSkel <> invalid then m.typeSkel.running = true
-        if m.dotSkel <> invalid then m.dotSkel.running = true
-        if m.langSkel <> invalid then m.langSkel.running = true
+        LD_ApplySkeleton(m.titleSkel, true)
+        LD_ApplySkeleton(m.typeSkel, true)
+        LD_ApplySkeleton(m.dotSkel, true)
+        LD_ApplySkeleton(m.langSkel, true)
     end if
 end sub
 
@@ -278,16 +279,14 @@ sub ApplyContent()
             m.thumb.visible = true
             if m.thumbSkel <> invalid then
                 m.thumbSkel.visible = true
-                m.thumbSkel.running = true
-                CardApplySkeleton(m.thumbSkel, m.top.cNeutral700, m.top.cNeutral800)
+                LD_ApplySkeleton(m.thumbSkel, true)
             end if
         else
             m.thumb.uri = ""
             m.thumb.visible = false
             if m.thumbSkel <> invalid then
                 m.thumbSkel.visible = true
-                m.thumbSkel.running = true
-                CardApplySkeleton(m.thumbSkel, m.top.cNeutral700, m.top.cNeutral800)
+                LD_ApplySkeleton(m.thumbSkel, true)
             end if
         end if
     end if

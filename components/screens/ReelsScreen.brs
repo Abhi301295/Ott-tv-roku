@@ -95,9 +95,11 @@ sub init()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
+    ReelsDbg("init", "ReelsScreen ready seed=" + Str(m.seed) + " sim=" + ReelsDbgStr(ReelsIsSimulator()) + " inlineVideo=" + ReelsDbgStr(m.useInlineVideo))
 end sub
 
 sub OnNavStateReady()
+    ReelsDbg("nav_ready", "route=reels")
     if m.vm <> invalid then ShellEnterContent(m.vm)
     ResetAndFetch()
 end sub
@@ -105,6 +107,7 @@ end sub
 sub OnShellEnterContent()
     if m.top.shellEnterContent <> true then return
     m.top.shellEnterContent = false
+    ReelsDbg("shell_content", "focus content index=" + Str(m.currentIndex))
 end sub
 
 sub OnShellLayoutRev()
@@ -115,6 +118,7 @@ sub OnReelsVisibleChanged()
     if m.top.visible <> true then return
     if m.disposed then return
     if m.reels.Count() = 0 then return
+    ReelsDbg("visible", "resume poster+play index=" + Str(m.currentIndex))
     m.isPlaying = false
     m.isBuffering = false
     m.playRequested = false
@@ -132,6 +136,7 @@ end sub
 sub OnDispose()
     if not m.top.dispose then return
     m.disposed = true
+    ReelsDbg("dispose", "stopping video + fetch")
     KillReelsTask()
     StopVideo()
     StopTimers()
@@ -178,6 +183,8 @@ sub LoadReelsTokens()
     m.tokens = {}
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then m.tokens = tm.themeTokens
+
+    ' Theme — same tokens as React (bg-neutral-900, border-neutral-400, primary-*, text-neutral-50 empty state).
     m.cPageBg = TC("neutral-900", "#0a0a0a")
     m.cPrimary500 = TC("primary-500", "#0b75e0")
     m.cPrimary600 = TC("primary-600", "#0760bb")
@@ -185,71 +192,19 @@ sub LoadReelsTokens()
     m.cNeutral50 = TC("neutral-50", "#f5f5f5")
     m.cNeutral400 = TC("neutral-400", "#a3a3a3")
     m.cNeutral700 = TC("neutral-700", "#404040")
-    m.cNeutral800 = TC("neutral-800", "#262626")
-    ' React bg-blue-600/60 & bg-white/20 use alpha + backdrop-blur. Roku has no blur —
-    ' composite onto page bg as opaque colors so Poster blendColor stays sharp (no wash-out).
-    blueHex = "#2563eb"
-    if m.tokens <> invalid and m.tokens["blue-600"] <> invalid and m.tokens["blue-600"] <> "" then
-        blueHex = m.tokens["blue-600"]
-    end if
-    whiteHex = "#ffffff"
-    if m.tokens <> invalid and m.tokens["neutral-50"] <> invalid and m.tokens["neutral-50"] <> "" then
-        whiteHex = m.tokens["neutral-50"]
-    end if
-    mutedHex = "#f5f5f5"
-    if m.tokens <> invalid and m.tokens["neutral-50"] <> invalid and m.tokens["neutral-50"] <> "" then
-        mutedHex = m.tokens["neutral-50"]
-    end if
-    m.cCategoryBg = CompositeOverBg(blueHex, 0.6, m.cPageBg)
-    m.cCategoryFg = m.cNeutral50
-    m.cGenreBg = CompositeOverBg(whiteHex, 0.2, m.cPageBg)
-    m.cGenreFg = m.cNeutral50
-    m.cMetaMuted = CompositeOverBg(mutedHex, 0.8, m.cPageBg)
-    m.cMetaBody = CompositeOverBg(mutedHex, 0.85, m.cPageBg)
-    m.cProgressTrack = CompositeOverBg(whiteHex, 0.2, m.cPageBg)
-    m.cSeekPreviewBg = CompositeOverBg("#0a0a0a", 0.8, m.cPageBg)
-    m.cOverlayCircle = "0x000000ff"
-    m.cOverlayPlay = RL_OverlayIconBlue()
+
+    ' Hardcoded — React text-white / op-80 / opacity-85 (not theme tokens).
+    m.cTextWhite = HexToRokuColor("#ffffff", "ff")
+    m.cTextWhite80 = HexToRokuColor("#ffffff", "cc")
+    m.cTextWhite85 = HexToRokuColor("#ffffff", "d9")
+
+    ' Hardcoded — React bg-blue-600/60, bg-white/20, bg-black/80 (Tailwind literals).
+    m.cCategoryBg = HexToRokuColor("#2563eb", "99")
+    m.cGenreBg = HexToRokuColor("#ffffff", "33")
+    m.cProgressTrack = HexToRokuColor("#ffffff", "33")
+    m.cSeekPreviewBg = HexToRokuColor("#000000", "cc")
+    m.cOverlayCircle = HexToRokuColor("#000000", "ff")
 end sub
-
-function ParseHexRgb(hex as string) as object
-    s = hex
-    if Left(s, 1) = "#" then s = Mid(s, 2)
-    if Len(s) < 6 then return { r: 0, g: 0, b: 0 }
-    return {
-        r: Val(Mid(s, 1, 2), 16)
-        g: Val(Mid(s, 3, 2), 16)
-        b: Val(Mid(s, 5, 2), 16)
-    }
-end function
-
-function ParseRokuRgb(c as string) as object
-    s = c
-    if Left(s, 2) = "0x" then s = Mid(s, 3)
-    if Len(s) < 6 then return { r: 0, g: 0, b: 0 }
-    return {
-        r: Val(Mid(s, 1, 2), 16)
-        g: Val(Mid(s, 3, 2), 16)
-        b: Val(Mid(s, 5, 2), 16)
-    }
-end function
-
-' Flatten React /60 and /20 alphas onto the solid page fill (sim-safe, no backdrop-blur).
-function CompositeOverBg(fgHex as string, alpha as float, bgRoku as string) as string
-    fg = ParseHexRgb(fgHex)
-    bg = ParseRokuRgb(bgRoku)
-    inv = 1.0 - alpha
-    r = Int(fg.r * alpha + bg.r * inv + 0.5)
-    g = Int(fg.g * alpha + bg.g * inv + 0.5)
-    b = Int(fg.b * alpha + bg.b * inv + 0.5)
-    if r > 255 then r = 255
-    if g > 255 then g = 255
-    if b > 255 then b = 255
-    hex = Right("0" + StrI(r, 16).Trim(), 2)
-    hex = hex + Right("0" + StrI(g, 16).Trim(), 2)
-    hex = hex + Right("0" + StrI(b, 16).Trim(), 2)
-    return "0x" + hex + "ff"
-end function
 
 function TC(name as string, fallbackHex as string) as string
     return ThemeTokenColor(m.tokens, name, fallbackHex)
@@ -281,12 +236,12 @@ sub ApplyStaticColors()
     if m.emptyLbl <> invalid then m.emptyLbl.color = m.cNeutral50
     if m.creatorAvatar <> invalid then m.creatorAvatar.blendColor = m.cPrimary600
     if m.creatorInitial <> invalid then m.creatorInitial.color = m.cNeutral50
-    if m.creatorLbl <> invalid then m.creatorLbl.color = m.cMetaMuted
-    if m.contentTypeLbl <> invalid then m.contentTypeLbl.color = m.cMetaMuted
-    if m.titleLbl <> invalid then m.titleLbl.color = m.cNeutral50
-    if m.descLbl <> invalid then m.descLbl.color = m.cMetaBody
+    if m.creatorLbl <> invalid then m.creatorLbl.color = m.cTextWhite80
+    if m.contentTypeLbl <> invalid then m.contentTypeLbl.color = m.cTextWhite80
+    if m.titleLbl <> invalid then m.titleLbl.color = m.cTextWhite
+    if m.descLbl <> invalid then m.descLbl.color = m.cTextWhite85
     if m.seekPreviewBg <> invalid then m.seekPreviewBg.color = m.cSeekPreviewBg
-    if m.seekPreviewLbl <> invalid then m.seekPreviewLbl.color = m.cNeutral50
+    if m.seekPreviewLbl <> invalid then m.seekPreviewLbl.color = m.cTextWhite
 end sub
 
 sub ApplyReelsShellLayout()
@@ -328,6 +283,7 @@ sub ApplyReelsShellLayout()
     ApplyMetaWidths()
     if m.metaContentH > 0 then LayoutMetaLabels()
     PositionMetaHost()
+    ReelsDbg("layout", "offX=" + Str(m.shellOffX) + " viewportW=" + Str(m.viewportW) + " metaX=" + Str(m.metaX) + " metaW=" + Str(m.metaColW) + " metaY=" + Str(m.metaY) + " metaH=" + Str(m.metaContentH) + " videoX=" + Str(m.videoX))
 end sub
 
 function ReelsVideoAbsX() as integer
@@ -343,6 +299,7 @@ sub SyncVideoNodeLayout()
     m.videoNode.translation = [absX, bw]
     m.videoNode.width = vw
     m.videoNode.height = vh
+    ReelsDbg("video_layout", "absX=" + Str(absX) + " y=" + Str(bw) + " w=" + Str(vw) + " h=" + Str(vh))
 end sub
 
 sub ApplyMetaWidths()
@@ -389,6 +346,7 @@ sub PositionMetaHost()
     m.metaY = RL_VideoH() - reserve - m.metaContentH
     if m.metaY < 0 then m.metaY = 0
     m.metaHost.translation = [m.metaX, m.metaY]
+    ReelsDbg("meta_pos", "y=" + Str(m.metaY) + " h=" + Str(m.metaContentH) + " reserve=" + Str(reserve))
 end sub
 
 sub ResetAndFetch()
@@ -401,7 +359,7 @@ sub ResetAndFetch()
     StopVideo()
     HideContent()
     ShowEmpty(false)
-    ShowSkeleton(true)
+    ShowSkeleton(true, "boot")
     FetchPage(1)
 end sub
 
@@ -417,11 +375,12 @@ sub HideContent()
 end sub
 
 sub ShowEmpty(show as boolean)
+    ReelsDbg("empty", "visible=" + ReelsDbgStr(show))
     if m.emptyHost <> invalid then m.emptyHost.visible = show
     if m.emptyLbl <> invalid then m.emptyLbl.text = RL_EmptyCopy()
 end sub
 
-sub ShowSkeleton(show as boolean)
+sub ShowSkeleton(show as boolean, reason as string)
     m.showingSkeleton = show
     if m.skeletonHost = invalid then return
     m.skeletonHost.removeChildrenIndex(m.skeletonHost.getChildCount(), 0)
@@ -431,16 +390,20 @@ sub ShowSkeleton(show as boolean)
     end if
     m.skeletonHost.visible = show
     if show then
+        ReelsDbg("skeleton", "on reason=" + reason)
         if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "start"
     else
+        ReelsDbg("skeleton", "off reason=" + reason)
         if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     end if
 end sub
 
 sub BuildReelsSkeleton()
     if m.skeletonHost = invalid then return
-    skBase = m.cPrimary700
-    skHi = m.cPrimary500
+    colors = SkeletonResolveColors(m.tokens)
+    skBase = colors.base
+    skHi = colors.highlight
+    ReelsDbg("skeleton", "palette base=" + skBase)
 
     tile = m.skeletonHost.createChild("Group")
     tile.translation = [m.videoX, 0]
@@ -477,10 +440,12 @@ sub BuildReelsSkeleton()
         ln.running = true
         ly = ly + lines[i] + 16
     end for
+    ReelsDbg("skeleton", "built pulse=on videoX=" + Str(m.videoX) + " metaY=" + Str(meta.translation[1]))
 end sub
 
 sub OnSkeletonTimeout()
-    ShowSkeleton(false)
+    ReelsDbg("skeleton", "timeout — force off")
+    ShowSkeleton(false, "timeout")
     if m.reels.Count() > 0 and m.videoColumn <> invalid and m.videoColumn.visible = false then
         ShowReelContent()
     end if
@@ -521,6 +486,7 @@ sub ApplyReelPoster(reel as object)
     thumb = ReelsVerticalThumb(reel)
     useDummy = thumb = ""
     posterUri = ReelsPosterUri(reel)
+    ReelsDbg("poster", "dummy=" + ReelsDbgStr(useDummy) + " uri=" + Left(posterUri, 80))
 
     if m.videoPlaceholder <> invalid then
         m.videoPlaceholder.visible = true
@@ -545,10 +511,12 @@ end sub
 sub OnReelPosterLoad()
     if m.disposed or m.videoPoster = invalid then return
     status = m.videoPoster.loadStatus
+    ReelsDbg("poster_load", "status=" + status)
     if status = "ready" then
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         m.videoPoster.visible = true
     else if status = "failed" then
+        ReelsDbg("poster_load", "failed -> dummy placeholder")
         m.videoPoster.uri = RL_DummyThumbPosterUri()
         m.videoPoster.visible = true
         if m.videoPlaceholder <> invalid then
@@ -564,10 +532,11 @@ sub FetchPage(pageNum as integer)
     m.loadingMore = true
     m.loading = true
     m.fetchingPage = pageNum
-    if pageNum = 1 then ShowSkeleton(true)
+    if pageNum = 1 then ShowSkeleton(true, "fetch")
 
     path = Endpoints().REELS_LIST
     q = ReelsBuildQuery(pageNum, RL_PageLimit(), m.seed)
+    ReelsDbg("fetch", "path=" + path + " page=" + Str(pageNum) + " seed=" + Str(m.seed))
     KillReelsTask()
     m.reelsTask = ApiGetQuery(path, q)
     m.reelsTask.observeField("apiResult", "OnReelsResponse")
@@ -584,11 +553,12 @@ sub OnReelsResponse()
     m.loading = false
     m.initialLoad = false
 
+    ReelsDbgApi("response", api)
     parsed = ReelsParseResponse(api)
     batch = parsed.items
     if api = invalid or api.ok <> true or (api.statusCode <> invalid and api.statusCode <> 200) then
         if m.reels.Count() = 0 then
-            ShowSkeleton(false)
+            ShowSkeleton(false, "fetch_fail")
             ShowEmpty(true)
             ShowAlert(m.top, 2, RL_ErrorCopy())
         end if
@@ -608,9 +578,10 @@ sub OnReelsResponse()
 
     accumulated = m.reels.Count()
     m.hasMore = ReelsPageHasMore(batch.Count(), accumulated, parsed.total)
+    ReelsDbg("response", "accumulated=" + Str(accumulated) + " hasMore=" + ReelsDbgStr(m.hasMore))
 
     if accumulated = 0 then
-        ShowSkeleton(false)
+        ShowSkeleton(false, "empty")
         ShowEmpty(true)
         return
     end if
@@ -626,6 +597,7 @@ sub MaybePrefetchPage()
     if not m.hasMore then return
     if m.reels.Count() = 0 then return
     if m.currentIndex < m.reels.Count() - RL_PrefetchThreshold() then return
+    ReelsDbg("prefetch_page", "index=" + Str(m.currentIndex) + " len=" + Str(m.reels.Count()) + " next=" + Str(m.page + 1))
     FetchPage(m.page + 1)
 end sub
 
@@ -637,9 +609,11 @@ sub LoadCurrentReel(isNew as boolean)
     StopVideo()
     m.playRequested = false
     m.pendingStreamUrl = ReelsStreamUrl(reel)
+    ReelsDbgThumbProbe(reel, m.currentIndex)
+    ReelsDbg("video_load", "index=" + Str(m.currentIndex) + " url=" + Left(m.pendingStreamUrl, 80) + " poster=" + ReelsDbgStr(ReelsHasPoster(reel)))
 
     ApplyMeta(reel)
-    ShowSkeleton(false)
+    ShowSkeleton(false, "reel_ready")
     ShowReelContent()
     ApplyReelPoster(reel)
 
@@ -651,6 +625,7 @@ sub LoadCurrentReel(isNew as boolean)
     UpdateOverlay()
 
     if m.pendingStreamUrl = "" then
+        ReelsDbg("video_load", "no stream url — poster only")
     end if
 end sub
 
@@ -666,6 +641,7 @@ sub EnsureVideoContent() as boolean
     if m.reels.Count() > 0 then reel = m.reels[m.currentIndex]
     if reel <> invalid and ReelsTitle(reel) <> "" then content.title = ReelsTitle(reel)
     m.videoNode.content = content
+    ReelsDbg("video_content", "attached url=" + Left(m.pendingStreamUrl, 80))
     return true
 end sub
 
@@ -696,8 +672,10 @@ end sub
 
 sub ApplyMeta(reel as object)
     if reel = invalid then return
+    ReelsDbg("meta", "start")
 
     creator = ReelsCreatorName(reel)
+    ReelsDbg("meta", "creator=" + Left(creator, 40))
     if m.creatorRow <> invalid then
         showCreator = creator <> ""
         m.creatorRow.visible = showCreator
@@ -711,6 +689,7 @@ sub ApplyMeta(reel as object)
 
     if m.contentTypeLbl <> invalid then m.contentTypeLbl.text = ReelsContentType(reel)
     title = ReelsTitle(reel)
+    ReelsDbg("meta", "title=" + Left(title, 60))
     if m.titleLbl <> invalid then
         m.titleLbl.text = title
         m.titleLbl.visible = title <> ""
@@ -724,7 +703,9 @@ sub ApplyMeta(reel as object)
             m.descLbl.visible = false
         end if
     end if
+    ReelsDbg("meta", "desc ok")
     BuildPills(reel)
+    ReelsDbg("meta", "pills ok")
     LayoutMetaLabels()
 end sub
 
@@ -742,7 +723,7 @@ sub BuildPills(reel as object)
         if c = invalid then continue for
         catName = ReelsFieldName(c)
         if catName = "" then continue for
-        pill = CreatePill(catName, m.cCategoryBg, m.cCategoryFg)
+        pill = CreatePill(catName, m.cCategoryBg, m.cTextWhite)
         if pill = invalid then continue for
         pw = pill["w"]
         ph = pill["h"]
@@ -771,7 +752,7 @@ sub BuildPills(reel as object)
         gName = ReelsFieldName(g)
         if gName = "" then continue for
         label = "#" + gName
-        pill = CreatePill(label, m.cGenreBg, m.cGenreFg)
+        pill = CreatePill(label, m.cGenreBg, m.cTextWhite)
         if pill = invalid then continue for
         pw = pill["w"]
         ph = pill["h"]
@@ -832,8 +813,10 @@ sub OnVideoState()
     if m.disposed or m.videoNode = invalid then return
     if not m.useInlineVideo then return
     state = m.videoNode.state
+    ReelsDbg("video_state", state + " playReq=" + ReelsDbgStr(m.playRequested))
 
     if (state = "buffering" or state = "playing") and m.playRequested <> true then
+        ReelsDbg("video_state", "blocked — no user play request")
         StopVideo()
         ShowPosterFrame()
         m.isPlaying = false
@@ -856,7 +839,7 @@ sub OnVideoState()
         if m.videoNode <> invalid then m.videoNode.visible = true
         if m.videoPoster <> invalid then m.videoPoster.visible = false
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
-        ShowSkeleton(false)
+        ShowSkeleton(false, "playing")
         UpdateOverlay()
     else if state = "paused" then
         m.isPlaying = false
@@ -867,9 +850,10 @@ sub OnVideoState()
         m.isBuffering = false
         UpdateOverlay()
     else if state = "error" then
+        ReelsDbg("video_state", "error — keep poster")
         m.isBuffering = false
         m.isPlaying = false
-        ShowSkeleton(false)
+        ShowSkeleton(false, "error")
         ShowPosterFrame()
         UpdateOverlay()
     end if
@@ -893,7 +877,7 @@ sub OnVideoPosition()
         if m.videoPoster <> invalid then m.videoPoster.visible = false
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         if m.videoNode <> invalid then m.videoNode.visible = true
-        ShowSkeleton(false)
+        ShowSkeleton(false, "position")
     end if
     UpdateProgressBar()
     UpdateOverlay()
@@ -931,6 +915,7 @@ end sub
 
 sub TogglePlayPause()
     if m.pendingStreamUrl = "" then
+        ReelsDbg("play", "ignored — no stream url")
         return
     end if
 
@@ -946,6 +931,7 @@ sub TogglePlayPause()
         m.playRequested = false
         m.videoNode.control = "pause"
         m.isPlaying = false
+        ReelsDbg("play", "pause")
     else
         if not EnsureVideoContent() then return
         m.playRequested = true
@@ -956,6 +942,7 @@ sub TogglePlayPause()
         m.videoNode.control = "play"
         m.isPlaying = true
         m.isBuffering = true
+        ReelsDbg("play", "play on OK")
     end if
     UpdateOverlay()
 end sub
@@ -965,9 +952,11 @@ sub PlayReelFullscreen()
     reel = m.reels[m.currentIndex]
     state = ReelsVideoPlayerPayload(reel)
     if state = invalid then
+        ReelsDbg("play", "fullscreen abort — bad payload")
         ShowAlert(m.top, 2, RL_ErrorCopy())
         return
     end if
+    ReelsDbg("play", "fullscreen route=video_player url=" + Left(m.pendingStreamUrl, 80))
     m.vm.callFunc("NavigatePush", RouteVideoPlayer(), state)
 end sub
 
@@ -981,6 +970,7 @@ sub SeekBy(delta as integer)
     m.position = target
     UpdateProgressBar()
     ShowSeekPreview(target)
+    ReelsDbg("seek", "delta=" + Str(delta) + " pos=" + Str(target))
 end sub
 
 sub ShowSeekPreview(secs as float)
@@ -995,6 +985,7 @@ sub OnSeekPreviewHide()
 end sub
 
 sub EnterReelsHeader()
+    ReelsDbg("nav", "enter header from index=" + Str(m.currentIndex))
     StopVideo()
     m.isPlaying = false
     m.isBuffering = false
@@ -1010,7 +1001,9 @@ sub SwitchReel(dir as integer)
         return
     end if
     n = m.reels.Count()
+    old = m.currentIndex
     m.currentIndex = (m.currentIndex + dir + n) mod n
+    ReelsDbg("nav", "dir=" + Str(dir) + " " + Str(old) + "->" + Str(m.currentIndex))
     LoadCurrentReel(true)
     MaybePrefetchPage()
 end sub
@@ -1022,6 +1015,7 @@ sub OnKey()
 
     key = LCase(ev.key.ToStr())
     if m.vm <> invalid and m.vm.shellFocus = "header" then
+        ReelsDbg("key", "ignored shellFocus=header key=" + key)
         return
     end if
     if m.reels.Count() = 0 then return
@@ -1044,8 +1038,10 @@ sub OnKey()
         SeekBy(RL_SeekStepSec())
     else if key = "ok" or key = "play" or key = "select" or key = "enter" then
         if m.loading then
+            ReelsDbg("key", "play ignored — still loading")
             return
         end if
+        ReelsDbg("key", "play key=" + key)
         TogglePlayPause()
     end if
 end sub

@@ -88,14 +88,9 @@ sub KillDetailTask(task as object)
 end sub
 
 sub StopDetailSkeletons()
-    if m.skeletonGroup = invalid then return
-    for each sk in m.skeletonGroup.getChildren(-1, 0)
-        if sk <> invalid and sk.hasField("running") then sk.running = false
-    end for
+    SetDetailSkeletonRunning(false)
     if m.moreLikeSkeletonHost = invalid then return
-    for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
-        if sk <> invalid and sk.hasField("running") then sk.running = false
-    end for
+    SkeletonApplyTree(m.moreLikeSkeletonHost, m.tokens, false)
 end sub
 
 sub OnBusinessResolved()
@@ -159,19 +154,16 @@ sub ApplyContentColors()
     if m.descLabel <> invalid then m.descLabel.color = m.cNeutral300
 end sub
 
-' React's detail skeleton uses bg-neutral-700; in this brand that token resolves light,
-' matching the (light) Watch Now button. Drive the placeholders from the same token so the
-' shimmer is identical to React rather than a hardcoded grey.
-sub ApplySkeletonColors()
+' Detail skeleton — SkeletonConfig.brs palette (same as Profile).
+sub SetDetailSkeletonRunning(running as boolean)
     if m.skeletonGroup = invalid then return
-    base = m.cNeutral700
-    hi = CardLightenHex(base, 26)
-    for each sk in m.skeletonGroup.getChildren(-1, 0)
-        if sk <> invalid and sk.hasField("baseColor") then
-            sk.baseColor = base
-            sk.highlightColor = hi
-        end if
-    end for
+    SkeletonApplyTree(m.skeletonGroup, m.tokens, running)
+end sub
+
+sub ApplySkeletonColors()
+    running = false
+    if m.skeletonGroup <> invalid and m.skeletonGroup.visible = true then running = true
+    SetDetailSkeletonRunning(running)
 end sub
 
 function LightenHexColor(hex as string, amount as integer) as string
@@ -186,11 +178,9 @@ sub ShowLoading(show as boolean)
     m.gradLeft.visible = not show
     m.gradBottom.visible = not show
     if show then
-        for each sk in m.skeletonGroup.getChildren(-1, 0)
-            if sk <> invalid and sk.hasField("running") then sk.running = true
-        end for
+        SetDetailSkeletonRunning(true)
     else
-        StopDetailSkeletons()
+        SetDetailSkeletonRunning(false)
     end if
 end sub
 
@@ -638,9 +628,8 @@ end sub
 
 sub ApplyMoreLikeSkeletonColors()
     if m.moreLikeSkeletonHost = invalid then return
-    base = m.cNeutral700
-    hi = CardLightenHex(base, 26)
-    CardApplySkeletonTree(m.moreLikeSkeletonHost, base, hi, true)
+    running = m.moreLikeSkeletonHost.visible = true
+    SkeletonApplyTree(m.moreLikeSkeletonHost, m.tokens, running)
 end sub
 
 sub OnMoreLikeResponse()

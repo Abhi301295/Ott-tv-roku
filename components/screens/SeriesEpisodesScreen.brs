@@ -139,31 +139,23 @@ sub ApplyStaticColors()
     if m.sectionSubtitle <> invalid then m.sectionSubtitle.color = m.cNeutral300
 end sub
 
-function SE_SkeletonBaseColor() as string
-    return CardContrastSkeletonBase(m.cNeutral800, m.cNeutral700)
-end function
-
-sub ApplySkeletonToTree(node as object, base as string, hi as string, running as boolean)
-    CardApplySkeletonTree(node, base, hi, running)
+sub ApplySkeletonToTree(node as object, running as boolean)
+    SkeletonApplyTree(node, m.tokens, running)
 end sub
 
-' Skeleton shimmer — contrast-safe base; pulse kept on (≤20 nodes after ep row trim).
+' Skeleton shimmer — unified neutral-700 palette (≤20 nodes after ep row trim).
 sub ApplySkeletonColors()
-    base = SE_SkeletonBaseColor()
-    hi = CardLightenHex(base, 26)
-    ApplySkeletonToTree(m.leftHeaderSkeleton, base, hi, true)
-    ApplySkeletonToTree(m.seasonSkeletonHost, base, hi, true)
-    ApplySkeletonToTree(m.rightHeaderSkeleton, base, hi, true)
-    ApplySkeletonToTree(m.episodeSkeletonHost, base, hi, true)
+    ApplySkeletonToTree(m.leftHeaderSkeleton, true)
+    ApplySkeletonToTree(m.seasonSkeletonHost, true)
+    ApplySkeletonToTree(m.rightHeaderSkeleton, true)
+    ApplySkeletonToTree(m.episodeSkeletonHost, true)
 end sub
 
 sub SetSkeletonRunning(running as boolean)
-    base = SE_SkeletonBaseColor()
-    hi = CardLightenHex(base, 26)
-    ApplySkeletonToTree(m.leftHeaderSkeleton, base, hi, running)
-    ApplySkeletonToTree(m.seasonSkeletonHost, base, hi, running)
-    ApplySkeletonToTree(m.rightHeaderSkeleton, base, hi, running)
-    ApplySkeletonToTree(m.episodeSkeletonHost, base, hi, running)
+    ApplySkeletonToTree(m.leftHeaderSkeleton, running)
+    ApplySkeletonToTree(m.seasonSkeletonHost, running)
+    ApplySkeletonToTree(m.rightHeaderSkeleton, running)
+    ApplySkeletonToTree(m.episodeSkeletonHost, running)
 end sub
 
 ' Brand logo / app-name fallback in the left header (parity with getLogoSvg(resolved.brandingLogo

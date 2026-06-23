@@ -10,6 +10,11 @@
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
@@ -25,6 +30,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/browse/SeriesListService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SeriesScreen.brs" />
 

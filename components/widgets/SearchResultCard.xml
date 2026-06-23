@@ -12,6 +12,7 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/SearchResultCard.brs" />
 

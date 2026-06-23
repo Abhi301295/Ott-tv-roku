@@ -24,7 +24,9 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/DetailScreen.brs" />
 

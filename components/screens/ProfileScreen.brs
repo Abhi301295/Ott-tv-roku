@@ -40,8 +40,6 @@ sub init()
     m.prefetchCatTask = invalid
     m.prefetchClock = invalid
     m.prefetchStartMs = -1
-    m.prefetchDwellTimer = invalid
-    m.prefetchDwellStep = ""
     m.prefetchCatalogHandled = false
     m.loggingOut = false
     m.AUTO_TOTAL_MS = 15000      ' progress ring reaches 100% at 15s (parity with React)
@@ -124,8 +122,6 @@ sub OnDispose()
     KillProfileTask(m.prefetchCwTask)
     KillProfileTask(m.prefetchCatTask)
     if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
-    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
-    m.prefetchDwellStep = ""
     m.prefetchCatalogHandled = false
     if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
     if m.profileLoginDeferTimer <> invalid then m.profileLoginDeferTimer.control = "stop"
@@ -274,12 +270,13 @@ sub ApplyProfileColors()
     m.errorLabel.color = m.cPrimary500
     m.logoLabel.color = m.cPrimary500
 
-    ' Skeleton shimmer = primary-700 base, primary-500 highlight (parity with SkeletonBox).
+    ' Profile shimmer — same palette as SkeletonConfig.brs (React SkeletonBox).
+    skColors = SkeletonResolveColors(m.tokens)
     for each id in ["sk0a", "sk0b", "sk1a", "sk1b", "sk2a", "sk2b"]
         sk = m.top.findNode(id)
         if sk <> invalid then
-            sk.baseColor = m.cPrimary700
-            sk.highlightColor = m.cPrimary500
+            sk.baseColor = skColors.base
+            sk.highlightColor = skColors.highlight
         end if
     end for
 
@@ -1114,14 +1111,15 @@ sub OnProfileSelectResponse()
     ApplyProfileFocus()
 end sub
 
-' ── Home catalog prefetch (welcome overlay; monotonic status phases) ───────────
+' ── Home catalog prefetch (welcome overlay) ───────────────────────────────────
+' Keep: shell overlay + CW/categories prefetch into boot cache + status phases
+' while APIs are in flight. Navigate as soon as both responses land (no artificial
+' dwell). Home dismisses the overlay when row 0 mediaReady (see HomeScreen.brs).
 
 sub BeginHomePrefetch(profileId as string, avatar as string)
     HomeBootCacheClear()
     m.prefetching = true
     m.prefetchCatalogHandled = false
-    m.prefetchDwellStep = ""
-    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
     if m.prefetchClock = invalid then m.prefetchClock = CreateObject("roTimespan")
     m.prefetchStartMs = m.prefetchClock.TotalMilliseconds()
     m.pendingNavigateProfileId = profileId
@@ -1133,33 +1131,6 @@ sub BeginHomePrefetch(profileId as string, avatar as string)
     ArmPrefetchGate()
 end sub
 
-sub SchedulePrefetchDwell(dwellStep as string)
-    m.prefetchDwellStep = dwellStep
-    if m.prefetchDwellTimer = invalid then
-        m.prefetchDwellTimer = CreateObject("roSGNode", "Timer")
-        m.prefetchDwellTimer.duration = HC_WelcomePhaseDwellSec()
-        m.prefetchDwellTimer.repeat = false
-        m.top.appendChild(m.prefetchDwellTimer)
-        m.prefetchDwellTimer.observeField("fire", "OnPrefetchDwellTimer")
-    end if
-    m.prefetchDwellTimer.control = "stop"
-    m.prefetchDwellTimer.control = "start"
-end sub
-
-sub OnPrefetchDwellTimer()
-    if not m.prefetching then return
-    dwellStep = m.prefetchDwellStep
-    m.prefetchDwellStep = ""
-    if dwellStep = "phase3" then
-        AdvanceWelcomeStatus(m.vm, 3)
-        SchedulePrefetchDwell("navigate")
-        return
-    end if
-    if dwellStep = "navigate" then
-        FinishPrefetchNavigate()
-    end if
-end sub
-
 sub TryCompletePrefetchCatalog()
     if not m.prefetching then return
     if not HomeBootCacheIsReady() then return
@@ -1167,7 +1138,7 @@ sub TryCompletePrefetchCatalog()
     m.prefetchCatalogHandled = true
     if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
     AdvanceWelcomeStatus(m.vm, 2)
-    SchedulePrefetchDwell("phase3")
+    FinishPrefetchNavigate()
 end sub
 
 sub StartHomePrefetchFetches()
@@ -1255,8 +1226,6 @@ sub FinishPrefetchNavigate()
     KillProfileTask(m.prefetchCatTask)
     m.prefetchCwTask = invalid
     m.prefetchCatTask = invalid
-    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
-    m.prefetchDwellStep = ""
     m.prefetchClock = invalid
     m.prefetchStartMs = -1
     m.pendingNavigateProfileId = ""
@@ -1276,9 +1245,7 @@ sub CancelHomePrefetch()
     m.prefetching = false
     m.selecting = false
     m.prefetchCatalogHandled = false
-    m.prefetchDwellStep = ""
     if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
-    if m.prefetchDwellTimer <> invalid then m.prefetchDwellTimer.control = "stop"
     KillProfileTask(m.prefetchCwTask)
     KillProfileTask(m.prefetchCatTask)
     m.prefetchClock = invalid

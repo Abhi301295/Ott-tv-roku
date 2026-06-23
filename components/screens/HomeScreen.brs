@@ -1671,23 +1671,15 @@ sub OnRowsForceHideTimer()
     end if
 end sub
 
-' Theme-aware skeleton fill — base must contrast page bg; animation breathes base opacity.
+' Skeleton bars — same palette as Profile / SkeletonConfig.brs (login excluded).
 sub ApplyHomeSkeletonColors()
     if m.homeSkeleton = invalid then return
+    colors = SkeletonResolveColors(CardSkeletonThemeTokens(m.top))
+    m.homeSkeleton.boxColor = colors.base
+    m.homeSkeleton.shineColor = colors.highlight
     bg = HomeRowPageBg()
-    if bg = invalid or bg = "" then bg = HC_HomeCinematicBg()
-    base = CardContrastSkeletonBase(bg, m.cNeutral700)
-    if CardAvgLum(base) < 80 then base = "0x404040ff"
-    shine = CardLightenHex(base, 56)
-    if CardAvgLum(shine) <= CardAvgLum(base) then shine = CardLightenHex(base, 72)
-    backdrop = "0x141414ff"
-    if ThemeIsOttHome() and CardAvgLum(bg) > 160 then
-        backdrop = m.cNeutral200
-        if backdrop = invalid or backdrop = "" then backdrop = "0xe5e5e5ff"
-    end if
-    m.homeSkeleton.boxColor = base
-    m.homeSkeleton.shineColor = shine
-    m.homeSkeleton.backdropColor = backdrop
+    if bg = invalid or bg = "" then bg = SK_DefaultPageBg()
+    m.homeSkeleton.backdropColor = bg
 end sub
 
 sub ShowHeroSkeleton(show as boolean)
@@ -1857,7 +1849,7 @@ sub OnRowBuildTick()
     m.rowBuildCostMs = m.rowBuildCostMs + rowMs
     print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
 
-    ' Keep the rows shimmer up until the FIRST row has painted its thumbnails.
+    ' Drop welcome overlay as soon as row 0 media resolves; paintedReady is a fallback.
     if m.rowBuildIndex = 0 then
         row.rowPeekVisible = true
         if row.cardCount = 0 then
@@ -1865,7 +1857,9 @@ sub OnRowBuildTick()
         else
             DetachFirstRowWatch()
             m.firstRowWatch = row
+            row.observeField("mediaReady", "OnFirstRowMediaReady")
             row.observeField("paintedReady", "OnFirstRowPainted")
+            if row.hasField("mediaReady") and row.mediaReady = true then OnFirstRowMediaReady()
         end if
     end if
 
@@ -1890,8 +1884,22 @@ sub OnRowBuildTick()
     end if
 end sub
 
+' Row 0 cards resolved (media loaded) — dismiss welcome overlay; paintedReady is fallback.
+sub OnFirstRowMediaReady()
+    if m.top.dispose = true then return
+    row = invalid
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
+    if row = invalid then return
+    if row.hasField("mediaReady") and row.mediaReady <> true then return
+
+    HomeBootLog(m.bootSpan, "row0 mediaReady", "hide welcome overlay")
+    if ProfileTransitionActive() then HideProfileWelcomeTransition()
+    if not m.rowsRevealed then PrepareFirstRowReveal()
+end sub
+
 ' The Continue Watching row finished painting — drop the shimmer over real cards.
 sub OnFirstRowPainted()
+    if m.rowsRevealed then return
     row = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
     if row <> invalid and row.hasField("paintedReady") and row.paintedReady <> true then return
@@ -1924,6 +1932,10 @@ end sub
 ' Cut the HomeSkeleton row strip before revealing real cards so the two shimmer
 ' systems (HomeSkeleton rectangles vs per-card Skeleton widgets) never overlap.
 sub PrepareFirstRowReveal()
+    if m.rowsRevealed then
+        if ProfileTransitionActive() then HideProfileWelcomeTransition()
+        return
+    end if
     m.rowsRevealed = true
     HomeBootLog(m.bootSpan, "rows revealed", "shimmer off")
     LogCwRowState("cards painted -> hide shimmer")

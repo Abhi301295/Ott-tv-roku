@@ -29,12 +29,12 @@ sub ApplyAll()
         m.thumb.visible = true
         m.skeleton.visible = true
         m.skeleton.running = true
-        CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
+        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
     else
         m.thumb.visible = false
         m.skeleton.visible = true
         m.skeleton.running = true
-        CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
+        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
     end if
     ApplyFocusVisual()
 end sub

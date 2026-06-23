@@ -32,6 +32,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/browse/GenreListService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/GenreNav.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseDebug.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/GenreListScreen.brs" />
 
