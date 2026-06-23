@@ -9,6 +9,7 @@
     <field id="highlightColor" type="string" value="0xf3f3f3ff" onChange="OnColorsChanged" />
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
     <field id="animate" type="boolean" value="true" onChange="OnRunningChanged" />
+    <!-- Colors: set in source/lib/theme/SkeletonConfig.brs (login excluded). -->
     <!-- Swap the placeholder shape (e.g. a circle for radius-full dots). -->
     <field id="shapeUri" type="string" value="pkg:/images/ui/sk_base.png" onChange="OnShapeChanged" />
   </interface>
@@ -16,8 +17,7 @@
   <script type="text/brightscript" uri="pkg:/components/widgets/Skeleton.brs" />
 
   <children>
-    <!-- Rounded base (primary-700) with a highlight overlay (primary-500) that pulses
-         its opacity — fully contained within the rounded box. Base stays opaque. -->
+    <!-- Rounded neutral-700 base with a lighter highlight overlay that pulses opacity. -->
     <Poster id="base" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
       loadDisplayMode="scaleToFill" blendColor="0xffffffff" />
     <Poster id="shine" width="150" height="150" uri="pkg:/images/ui/sk_base.png"

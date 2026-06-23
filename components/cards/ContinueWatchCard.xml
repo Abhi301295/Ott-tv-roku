@@ -15,6 +15,7 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/ContinueWatchCard.brs" />
 

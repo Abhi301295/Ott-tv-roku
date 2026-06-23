@@ -21,6 +21,7 @@ sub init()
     m.skipIntroBtn = m.top.findNode("skipIntroBtn")
     m.skipIntroBg = m.top.findNode("skipIntroBg")
     m.skipIntroLabel = m.top.findNode("skipIntroLabel")
+    m.skipIntroRing = m.top.findNode("skipIntroRing")
     m.bingeCard = m.top.findNode("bingeCard")
     m.bingeThumb = m.top.findNode("bingeThumb")
     m.bingeTitle = m.top.findNode("bingeTitle")
@@ -70,6 +71,7 @@ sub init()
 
     m.capOptions = []             ' [{ label, lang }] — off + each subtitle lang
     m.selectedSubtitle = "off"
+    m.captionRetryPending = false
 
     m.masterUrl = ""
     m.qualityOptions = []         ' [{ label, url, height }] — Auto + parsed variant ladder
@@ -91,6 +93,10 @@ sub init()
     m.advancing = false           ' guards against double auto-advance (finished + countdown)
     m.progressInFlight = false
     m.progressTask = invalid
+    m.playbackKey = ""
+    m.playbackInitialized = false
+    m.subtitlesAttached = false
+    m.ignoredSpuriousFinish = false
 
     m.vm = FindViewManager(m.top)
     LoadVideoTokens()
@@ -126,14 +132,31 @@ end sub
 sub OnNavStateReady()
     state = m.top.navState
     if state = invalid then return
+    key = VideoPlaybackKey(state)
+    if key <> "" and key = m.playbackKey and m.playbackInitialized = true then
+        return
+    end if
     if state.detail <> invalid then m.detail = state.detail
     if state.contentId <> invalid then m.contentId = state.contentId
     if state.nextVideoList <> invalid then m.nextList = state.nextVideoList
     if state.currentIndex <> invalid then m.currentIndex = state.currentIndex
     if state.startOver <> invalid then m.startOver = (state.startOver = true)
     if m.detail = invalid then return
+    m.playbackKey = key
+    m.playbackInitialized = true
+    m.subtitlesAttached = false
+    m.ignoredSpuriousFinish = false
     LoadAndPlay()
 end sub
+
+function VideoPlaybackKey(state as object) as string
+    id = ""
+    if state.contentId <> invalid and state.contentId <> "" then id = state.contentId
+    if id = "" and state.detail <> invalid and state.detail._id <> invalid then id = state.detail._id
+    so = "0"
+    if state.startOver = true then so = "1"
+    return id + ":so" + so
+end function
 
 sub LoadVideoTokens()
     m.tokens = {}
@@ -180,6 +203,7 @@ sub ApplyControlColors()
         if b <> invalid then b.blendColor = m.cNeutral50
     end for
     ApplyControlFocus()
+    ApplySkipIntroColors()
 end sub
 
 ' ── Load / play ──────────────────────────────────────────────────────────────
@@ -215,15 +239,16 @@ sub LoadAndPlay()
     m.selectedSubtitle = "off"
 
     ShowSpinner(true)
-    m.videoNode.content = BuildContent(url, m.resumeSecs)
+    m.videoNode.content = BuildContent(url, m.resumeSecs, false)
     m.videoNode.control = "play"
 
     if fmt = "hls" then FetchQualityLadder(url)
 end sub
 
-' Build the playback ContentNode (url + resume + subtitle tracks). Shared by initial
-' load, episode auto-advance, and quality-variant reload.
-function BuildContent(url as string, startSecs as integer) as object
+' Build the playback ContentNode (url + resume + optional subtitle tracks).
+' Sidecar VTT is deferred (includeSubtitles=false) until the user picks a caption —
+' attaching tracks on initial load can make the Roku player fetch VTT and restart HLS.
+function BuildContent(url as string, startSecs as integer, includeSubtitles as boolean) as object
     content = CreateObject("roSGNode", "ContentNode")
     content.url = url
     content.streamFormat = VideoStreamFormat(url)
@@ -234,16 +259,31 @@ function BuildContent(url as string, startSecs as integer) as object
     else
         m.pendingSeek = -1
     end if
-    tracks = VideoSubtitleTracks(m.detail)
-    if tracks.Count() > 0 then
-        subs = []
-        for each tk in tracks
-            subs.Push({ Url: tk.url, Language: tk.lang, Description: tk.lang, TrackName: tk.lang })
-        end for
-        content.subtitleTracks = subs
+    if includeSubtitles then
+        tracks = VideoSubtitleTracks(m.detail)
+        if tracks.Count() > 0 then
+            subs = []
+            for each tk in tracks
+                ' Sideloaded WebVTT: TrackName MUST be the VTT URL (not the lang code).
+                subs.Push({ Language: tk.lang, Description: tk.lang, TrackName: tk.url })
+            end for
+            content.subtitleTracks = subs
+        end if
     end if
     return content
 end function
+
+sub AttachSubtitlesAtPosition()
+    if m.videoNode = invalid or m.masterUrl = "" then return
+    resumeAt = Int(m.position)
+    if resumeAt < 0 then resumeAt = 0
+    m.reloading = true
+    m.pendingSeek = resumeAt
+    ShowSpinner(true)
+    m.videoNode.control = "stop"
+    m.videoNode.content = BuildContent(m.masterUrl, resumeAt, true)
+    m.videoNode.control = "play"
+end sub
 
 ' Apply a pending resume offset once the stream is actually playing. Devices honor
 ' content.playStart (so position is already at the offset and we no-op); when playStart
@@ -348,9 +388,32 @@ sub OnVideoPosition()
     UpdateScrubber()
     EvaluateSkipIntro()
     EvaluateBinge()
+    MaybeRetryCaptionSelection()
+end sub
+
+sub MaybeRetryCaptionSelection()
+    if not m.captionRetryPending then return
+    if m.selectedSubtitle = "" or m.selectedSubtitle = "off" then
+        m.captionRetryPending = false
+        return
+    end if
+    if m.videoNode = invalid then return
+    avail = m.videoNode.availableSubtitleTracks
+    if avail = invalid or avail.Count() = 0 then return
+    ApplyCaptionSelection(m.selectedSubtitle)
 end sub
 
 sub OnVideoFinished()
+    ' HLS sim sometimes fires finished after the first segment while duration is still
+    ' wrong — resume instead of treating it as end-of-video.
+    d = m.duration
+    if m.videoNode <> invalid and m.videoNode.duration > d then d = m.videoNode.duration
+    if not m.ignoredSpuriousFinish and d > 0 and d < 30 and m.position >= d - 1 then
+        m.ignoredSpuriousFinish = true
+        m.videoNode.control = "play"
+        return
+    end if
+
     ShowSpinner(false)
     m.playing = false
     m.progressTimer.control = "stop"
@@ -514,7 +577,7 @@ sub ReplayFrom(startSecs as integer)
     ShowSpinner(true)
     m.videoNode.control = "stop"
     m.videoNode.content = invalid
-    m.videoNode.content = BuildContent(m.masterUrl, startSecs)
+    m.videoNode.content = BuildContent(m.masterUrl, startSecs, m.subtitlesAttached)
     m.videoNode.control = "play"
     UpdatePlayIcon()
     UpdateScrubber()
@@ -529,21 +592,24 @@ sub EvaluateSkipIntro()
     m.skipVisible = inIntro
     if m.skipIntroBtn <> invalid then m.skipIntroBtn.visible = inIntro
     if inIntro then
+        ' Auto-focus skip when it appears (parity with React focusSkipIntro on show).
         m.focusMode = "skip"
-        HighlightSkip(true)
+        ApplySkipFocus()
     else
-        HighlightSkip(false)
         if m.focusMode = "skip" then RestoreControlsFocus()
+        ApplySkipFocus()
     end if
 end sub
 
-sub HighlightSkip(on as boolean)
-    if m.skipIntroLabel = invalid then return
-    if on then
-        m.skipIntroLabel.color = m.cPrimary500
-    else
-        m.skipIntroLabel.color = m.cNeutral50
-    end if
+' Skip pill focus ring (parity with skipIntroFocused ring-2 ring-white/70).
+sub ApplySkipFocus()
+    focused = (m.focusMode = "skip" and m.skipVisible)
+    if m.skipIntroRing <> invalid then m.skipIntroRing.visible = focused
+    ApplySkipIntroColors()
+end sub
+
+sub ApplySkipIntroColors()
+    if m.skipIntroLabel <> invalid then m.skipIntroLabel.color = VideoSkipIntroTextColor()
 end sub
 
 sub DoSkipIntro()
@@ -605,6 +671,8 @@ end sub
 
 sub RestoreControlsFocus()
     m.focusMode = "controls"
+    ApplySkipFocus()
+    if not m.controlsVisible then ShowControls(true)
     ApplyControlFocus()
 end sub
 
@@ -708,7 +776,12 @@ sub OnKey()
 end sub
 
 sub HandleControlsKey(key as string)
-    if key = "left" then
+    if key = "up" then
+        if m.skipVisible then
+            m.focusMode = "skip"
+            ApplySkipFocus()
+        end if
+    else if key = "left" then
         if m.controlIndex > 0 then m.controlIndex = m.controlIndex - 1
         ApplyControlFocus()
     else if key = "right" then
@@ -1025,7 +1098,7 @@ sub ReloadVariant(url as string)
     m.playing = false
     m.videoNode.control = "stop"
     m.videoNode.content = invalid
-    m.videoNode.content = BuildContent(url, resumeAt)
+    m.videoNode.content = BuildContent(url, resumeAt, m.subtitlesAttached)
     m.videoNode.control = "play"
 end sub
 
@@ -1033,7 +1106,18 @@ sub SelectCaption(optIdx as integer)
     if optIdx < 0 or optIdx >= m.capOptions.Count() then return
     opt = m.capOptions[optIdx]
     m.selectedSubtitle = opt.lang
-    ApplyCaptionSelection(opt.lang)
+    if opt.lang = "off" then
+        m.captionRetryPending = false
+        ApplyCaptionSelection("off")
+        return
+    end if
+    m.captionRetryPending = true
+    if not m.subtitlesAttached then
+        m.subtitlesAttached = true
+        AttachSubtitlesAtPosition()
+    else
+        ApplyCaptionSelection(opt.lang)
+    end if
 end sub
 
 sub ApplyCaptionSelection(lang as string)
@@ -1041,18 +1125,34 @@ sub ApplyCaptionSelection(lang as string)
     if lang = "off" then
         m.videoNode.globalCaptionMode = "Off"
         m.videoNode.subtitleTrack = ""
+        m.captionRetryPending = false
         return
     end if
+    ' Simulator shows a purple "Caption mode changed to: On" toast — not our UI.
     m.videoNode.globalCaptionMode = "On"
-    ' Match the chosen language to an available track and enable it.
     avail = m.videoNode.availableSubtitleTracks
-    if avail <> invalid then
-        for each tk in avail
-            if tk <> invalid and tk.Language = lang then
-                m.videoNode.subtitleTrack = tk.TrackName
-                return
-            end if
-        end for
+    count = 0
+    if avail <> invalid then count = avail.Count()
+    if avail = invalid or count = 0 then
+        return
+    end if
+    for each tk in avail
+        if tk = invalid then continue for
+        trackLang = ""
+        trackName = ""
+        if tk.Language <> invalid then trackLang = tk.Language
+        if tk.TrackName <> invalid then trackName = tk.TrackName
+        if VideoCaptionLangMatches(lang, trackLang) or VideoCaptionLangMatches(lang, trackName) then
+            m.videoNode.subtitleTrack = trackName
+            m.captionRetryPending = false
+            return
+        end if
+    end for
+    ' Fallback: single sidecar track from API metadata.
+    if count = 1 and avail[0] <> invalid and avail[0].TrackName <> invalid then
+        m.videoNode.subtitleTrack = avail[0].TrackName
+        m.captionRetryPending = false
+        return
     end if
 end sub
 

@@ -57,11 +57,13 @@
     <!-- Skip Intro pill (bottom-right, above the control bar). -->
     <Group id="skipIntroBtn" translation="[1620, 850]" visible="false">
       <Poster id="skipIntroBg" uri="pkg:/images/ui/video_pill.png" width="220" height="64" />
+      <!-- ring-2 ring-white/70 when focused (skip_intro_ring.png). -->
+      <Poster id="skipIntroRing" uri="pkg:/images/ui/skip_intro_ring.png" width="220" height="64"
+        visible="false" />
       <Label id="skipIntroLabel" text="Skip Intro" width="220" height="64"
-        horizAlign="center" vertAlign="center" color="0xf5f5f5ff">
-        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="24" />
+        horizAlign="center" vertAlign="center" color="0xffffffff">
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="20" />
       </Label>
-      <Rectangle id="skipIntroRing" width="220" height="64" color="0x00000000" visible="false" />
     </Group>
 
     <!-- Binge / Next Episode card (bottom-right). -->

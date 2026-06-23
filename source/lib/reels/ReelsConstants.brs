@@ -229,3 +229,19 @@ end function
 function ReelsUseInlineVideo() as boolean
     return not ReelsIsSimulator()
 end function
+
+sub ReelsDbg(tag as string, msg as string)
+end sub
+
+function ReelsDbgStr(val as dynamic) as string
+    if val = invalid then return "invalid"
+    if val = true then return "true"
+    if val = false then return "false"
+    return Str(val).Trim()
+end function
+
+sub ReelsDbgApi(tag as string, api as object)
+end sub
+
+sub ReelsDbgThumbProbe(reel as object, index as integer)
+end sub

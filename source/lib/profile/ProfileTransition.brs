@@ -1,6 +1,5 @@
-' ProfileTransition.brs — shell-level welcome overlay (Profile → Home handoff).
-' Survives NavigateReplace; dismiss when Home row cards paint. Legacy arcTimer only —
-' never set continuousMode or restart running on status/profile refresh.
+' Profile → Home welcome overlay — survives NavigateReplace; dismissed when Home row 0
+' mediaReady (or paintedReady fallback). 15s safety timer in HomeScreen init.
 
 function ProfileTransitionNode(vm as object) as object
     if vm = invalid then return invalid

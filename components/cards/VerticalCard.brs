@@ -63,7 +63,7 @@ sub ApplyAll()
         m.skeleton.visible = true
         m.skeleton.running = true
     end if
-    CardApplySkeleton(m.skeleton, m.top.cNeutral700, m.top.cNeutral800)
+    CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
     ApplyFocusVisual()
 end sub
 

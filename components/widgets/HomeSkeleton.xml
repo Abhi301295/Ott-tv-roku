@@ -13,6 +13,7 @@
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/HomeSkeleton.brs" />
 

@@ -26,6 +26,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/SeriesEpisodesService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SeriesEpisodesScreen.brs" />
 

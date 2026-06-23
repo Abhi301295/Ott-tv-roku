@@ -176,9 +176,10 @@ sub SetupAppHeader(vm as object, route as string, state as object)
     if scene <> invalid then tm = scene.findNode("themeManager")
     if tm <> invalid and tm.reelsEnabled = true then reels = true
 
+    ' shellMenuBuilt / shellMenuReels live on ViewManager's m (not interface fields).
     menuBuilt = false
-    if vm.shellMenuBuilt = true then menuBuilt = true
-    if vm.shellMenuReels <> reels then menuBuilt = false
+    if m.shellMenuBuilt = true then menuBuilt = true
+    if m.shellMenuReels <> reels then menuBuilt = false
 
     if not menuBuilt then
         menuItems = HeaderMenuItems(reels)
@@ -192,8 +193,8 @@ sub SetupAppHeader(vm as object, route as string, state as object)
             end for
             header.menuTexts = texts
         end if
-        vm.shellMenuReels = reels
-        vm.shellMenuBuilt = true
+        m.shellMenuReels = reels
+        m.shellMenuBuilt = true
         LoadAppHeaderTheme(header)
         ApplyAppHeaderBranding(header)
     end if

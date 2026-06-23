@@ -192,11 +192,9 @@ end sub
 
 sub ApplySkeletonColors()
     if m.genreSkeleton = invalid then return
-    base = CardContrastSkeletonBase("0x0a0a0aff", m.cNeutral700)
-    hi = m.cNeutral800
-    if hi = invalid or hi = "" then hi = "0x262626ff"
-    m.genreSkeleton.baseColor = base
-    m.genreSkeleton.highlightColor = hi
+    colors = SkeletonResolveColors(m.tokens)
+    m.genreSkeleton.baseColor = colors.base
+    m.genreSkeleton.highlightColor = colors.highlight
 end sub
 
 sub ResetAndFetch()
@@ -762,6 +760,25 @@ sub MaybeLoadMore()
     if m.rowIndex = m.rowWidgets.Count() - 1 then FetchNextPage()
 end sub
 
+function GenreEmptyVisible() as boolean
+    if m.emptyLabel = invalid then return false
+    return m.emptyLabel.visible = true
+end function
+
+sub EnterGenreHeader()
+    if m.vm = invalid then return
+    menuItems = m.vm.menuItems
+    if menuItems = invalid or menuItems.Count() = 0 then
+        reels = false
+        tm = m.top.getScene().findNode("themeManager")
+        if tm <> invalid and tm.reelsEnabled = true then reels = true
+        menuItems = HeaderMenuItems(reels)
+    end if
+    navState = { type: m.listType }
+    idx = HeaderSelectedIndexForNav(menuItems, RouteGenere(), navState)
+    ShellEnterHeader(m.vm, idx)
+end sub
+
 sub TryLoadMoreFromDown()
     if not m.hasMore or m.loading then return
     if m.rowIndex = m.rowWidgets.Count() - 1 then FetchNextPage()
@@ -773,10 +790,14 @@ sub OnKey()
     if not ev.press then return
     if m.vm <> invalid and m.vm.shellFocus = "header" then return
 
+    key = ev.key
+    if GenreEmptyVisible() then
+        if key = "up" then EnterGenreHeader()
+        return
+    end if
+
     if not m.rowsRevealed then return
     if m.categories.Count() = 0 then return
-
-    key = ev.key
     if key = "up" then
         if m.rowIndex = 0 then
             ShellEnterHeader(m.vm, invalid)

@@ -26,6 +26,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/ReelsScreen.brs" />
 

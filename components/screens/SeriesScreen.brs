@@ -295,15 +295,47 @@ sub MaybeLoadMore()
     if m.rowIdx = m.rows.Count() - 1 then FetchNextPage()
 end sub
 
+function SeriesEmptyVisible() as boolean
+    if m.emptyLabel = invalid then return false
+    return m.emptyLabel.visible = true
+end function
+
+sub EnterSeriesHeader()
+    if m.vm = invalid then return
+    menuItems = m.vm.menuItems
+    if menuItems = invalid or menuItems.Count() = 0 then
+        reels = false
+        tm = m.top.getScene().findNode("themeManager")
+        if tm <> invalid and tm.reelsEnabled = true then reels = true
+        menuItems = HeaderMenuItems(reels)
+    end if
+    navState = { type: m.listType }
+    idx = HeaderSelectedIndexForNav(menuItems, RouteGenere(), navState)
+    if idx = 0 and m.listType = "" then
+        idx = HeaderSelectedIndex(menuItems, RouteSeries())
+    end if
+    ShellEnterHeader(m.vm, idx)
+end sub
+
 sub OnKey()
     ev = m.top.keyEvent
     if ev = invalid or ev.key = invalid or ev.press = invalid then return
     if not ev.press then return
     if m.loading and m.initialLoad then return
-    if m.rows.Count() = 0 then return
+    if m.vm <> invalid and m.vm.shellFocus = "header" then return
 
     key = ev.key
+    if SeriesEmptyVisible() then
+        if key = "up" then EnterSeriesHeader()
+        return
+    end if
+    if m.rows.Count() = 0 then return
+
     if key = "up" then
+        if m.rowIdx = 0 then
+            EnterSeriesHeader()
+            return
+        end if
         if m.rowIdx > 0 then m.rowIdx = m.rowIdx - 1
         ClampCol()
         ApplyFocus()

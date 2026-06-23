@@ -271,9 +271,7 @@ end sub
 sub BuildSkeletonGrid()
     if m.skeletonHost = invalid then return
     ClearSkeletonGrid()
-    base = CardContrastSkeletonBase(m.cPageBg, m.cKeyBorder)
-    hi = m.cKeyBorder
-    if hi = invalid or hi = "" then hi = "0x404040ff"
+    skColors = SkeletonResolveColors(SearchThemeTokens(m.top))
     rows = SR_SkeletonRows()
     count = m.gridCols * rows
     for i = 0 to count - 1
@@ -285,7 +283,7 @@ sub BuildSkeletonGrid()
         skThumb.boxWidth = SR_CardW()
         skThumb.boxHeight = SR_CardH()
         skThumb.shapeUri = SR_SkeletonThumbShapeUri()
-        CardApplySkeleton(skThumb, base, hi)
+        CardApplySkeleton(skThumb, skColors.base, skColors.highlight)
         skThumb.running = true
         titleY = SR_CardTitleMarginTop() + SR_CardH() + SR_CardTitleMarginTop()
         skTitle = tile.createChild("Skeleton")
@@ -293,7 +291,7 @@ sub BuildSkeletonGrid()
         skTitle.boxWidth = SR_CardTitleMaxW()
         skTitle.boxHeight = SR_CardTitleH()
         skTitle.shapeUri = SR_SkeletonTitleShapeUri()
-        CardApplySkeleton(skTitle, base, hi)
+        CardApplySkeleton(skTitle, skColors.base, skColors.highlight)
         skTitle.running = true
     end for
 end sub
