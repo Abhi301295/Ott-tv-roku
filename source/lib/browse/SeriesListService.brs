@@ -32,10 +32,35 @@ function SL_AppendRows(rows as object, items as object, itemsPerRow as integer) 
     return rows
 end function
 
-function SL_PageHasMore(api as object, listingCount as integer) as boolean
+' Pick the fuller array — API often returns both listing (partial) and data (page).
+function SL_ParseSeriesListing(api as object) as object
+    items = []
+    if api = invalid or api.result = invalid then return items
+    result = api.result
+    dataItems = []
+    listingItems = []
+    if result.data <> invalid then dataItems = result.data
+    if result.listing <> invalid then listingItems = result.listing
+    if dataItems.Count() >= listingItems.Count() then return dataItems
+    return listingItems
+end function
+
+function SL_FlatItemCount(rows as object) as integer
+    count = 0
+    if rows = invalid then return 0
+    for each row in rows
+        if row <> invalid and row.items <> invalid then count = count + row.items.Count()
+    end for
+    return count
+end function
+
+function SL_PageHasMore(api as object, listingCount as integer, loadedCount as integer) as boolean
     if api = invalid or api.result = invalid then return false
-    if api.result.total <> invalid and api.result.total = 0 then return false
     if listingCount = 0 then return false
+    result = api.result
+    if result.total <> invalid and result.total > 0 then
+        return loadedCount < result.total
+    end if
     if listingCount < BS_SeriesPageLimit() then return false
     return true
 end function

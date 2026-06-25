@@ -467,6 +467,12 @@ sub PrepareGenreReveal()
     ShowRowsSkeleton(false)
     ScheduleGenrePrefetchWarmup()
     ApplyGenreFocus()
+    if m.vm <> invalid and m.categories.Count() > 0 and not GenreEmptyVisible() then
+        wasHeader = false
+        if m.vm.shellFocus = "header" then wasHeader = true
+        ShellEnterContent(m.vm)
+        print "[BROWSE_DBG] genre_focus handoff_to_rows categories="; m.categories.Count(); " fromHeader="; wasHeader
+    end if
     BrowseDbg("genre_reveal", "rows visible focus applied")
 end sub
 
@@ -826,6 +832,7 @@ sub OnKey()
     else if key = "right" then
         row = m.rowWidgets[m.rowIndex]
         if row <> invalid and m.cardIndex < row.cardCount - 1 then m.cardIndex = m.cardIndex + 1
+        print "[BROWSE_DBG] genre_key right cardIndex="; m.cardIndex
         ApplyGenreFocus()
     else if key = "OK" or key = "ok" then
         OpenFocusedCard()

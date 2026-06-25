@@ -41,6 +41,10 @@ sub init()
     m.prefetchClock = invalid
     m.prefetchStartMs = -1
     m.prefetchCatalogHandled = false
+    m.prefetchCwRetriesLeft = 0
+    m.prefetchCatRetriesLeft = 0
+    m.prefetchCwRetryTimer = invalid
+    m.prefetchCatRetryTimer = invalid
     m.loggingOut = false
     m.AUTO_TOTAL_MS = 15000      ' progress ring reaches 100% at 15s (parity with React)
     m.AUTO_SELECT_MS = 15500     ' auto-select fires after 15s + a 500ms buffer
@@ -100,11 +104,9 @@ sub init()
     ShowLoading(true)
     FetchProfiles()
 
-    ' Pre-open keep-alive connections on the rest of the pool while the user picks a
-    ' profile, so the home screen's burst of requests right after select are all warm.
-    ' MUST use a Bearer path (same auth as select-profile). CHECK_UPDATE uses Basic auth
-    ' and poisons the pooled connection — select-profile then 404s until app reload.
-    WarmHttpConnections(Endpoints().PROFILE.GET_LOGIN_PROFILES)
+    ' Pre-open keep-alive on the pool (cheap profiles/list GET per worker) while the
+    ' user picks a profile — never warm home/CW here (those are real prefetch fetches).
+    WarmHttpPool()
     ProfileSelectLog("PROFILE_INIT", "mounted")
 end sub
 
@@ -122,6 +124,8 @@ sub OnDispose()
     KillProfileTask(m.prefetchCwTask)
     KillProfileTask(m.prefetchCatTask)
     if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
+    if m.prefetchCwRetryTimer <> invalid then m.prefetchCwRetryTimer.control = "stop"
+    if m.prefetchCatRetryTimer <> invalid then m.prefetchCatRetryTimer.control = "stop"
     m.prefetchCatalogHandled = false
     if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
     if m.profileLoginDeferTimer <> invalid then m.profileLoginDeferTimer.control = "stop"
@@ -1064,7 +1068,7 @@ sub DoSelectProfile(profileId as string)
         m.pendingNavigateAvatar = m.selectedProfile.avatar
     end if
     ProfileSelectLogNode("PROFILE_SELECT", "api select id=" + profileId, m.top)
-    WarmHttpConnections(SelectProfilePath())
+    WarmHttpConnection(SelectProfilePath())
     KillProfileTask(m.selectTask)
     m.selectTask = ApiPost(SelectProfilePath(), SelectProfilePayload(profileId))
     m.selectTask.observeField("apiResult", "OnProfileSelectResponse")
@@ -1120,6 +1124,8 @@ sub BeginHomePrefetch(profileId as string, avatar as string)
     HomeBootCacheClear()
     m.prefetching = true
     m.prefetchCatalogHandled = false
+    m.prefetchCwRetriesLeft = HC_PrefetchMaxRetries()
+    m.prefetchCatRetriesLeft = HC_PrefetchMaxRetries()
     if m.prefetchClock = invalid then m.prefetchClock = CreateObject("roTimespan")
     m.prefetchStartMs = m.prefetchClock.TotalMilliseconds()
     m.pendingNavigateProfileId = profileId
@@ -1127,6 +1133,7 @@ sub BeginHomePrefetch(profileId as string, avatar as string)
     HomeBootCacheBegin(profileId)
     ' Phase 0 already set by ProfileTransitionShow; advance to preparing home.
     AdvanceWelcomeStatus(m.vm, 1)
+    print "[PREFETCH_DBG] start profileId="; profileId; " max_ms="; HC_PrefetchMaxMs(); " retries="; HC_PrefetchMaxRetries()
     StartHomePrefetchFetches()
     ArmPrefetchGate()
 end sub
@@ -1142,21 +1149,80 @@ sub TryCompletePrefetchCatalog()
 end sub
 
 sub StartHomePrefetchFetches()
+    StartPrefetchCwFetch()
+    StartPrefetchCatFetch()
+end sub
+
+sub StartPrefetchCwFetch()
+    if not m.prefetching then return
     KillProfileTask(m.prefetchCwTask)
-    KillProfileTask(m.prefetchCatTask)
     m.prefetchCwTask = invalid
-    m.prefetchCatTask = invalid
     cwPath = Endpoints().HOME.CONTINUE_WATCHING
-    catPath = Endpoints().HOME.CATEGORY_LIST
-    WarmHttpConnections(cwPath)
-    WarmHttpConnections(catPath)
+    print "[PREFETCH_DBG] cw_fetch outbound"
     m.prefetchCwTask = ApiGet(cwPath)
     m.prefetchCwTask.observeField("apiResult", "OnPrefetchCwResponse")
     StartHttpTask(m.prefetchCwTask)
+end sub
+
+sub StartPrefetchCatFetch()
+    if not m.prefetching then return
+    KillProfileTask(m.prefetchCatTask)
+    m.prefetchCatTask = invalid
+    catPath = Endpoints().HOME.CATEGORY_LIST
+    print "[PREFETCH_DBG] home_fetch outbound"
     m.prefetchCatTask = ApiGet(catPath)
     m.prefetchCatTask.observeField("apiResult", "OnPrefetchCatResponse")
     StartHttpTask(m.prefetchCatTask)
 end sub
+
+sub SchedulePrefetchCwRetry()
+    if m.prefetchCwRetryTimer = invalid then
+        m.prefetchCwRetryTimer = CreateObject("roSGNode", "Timer")
+        m.prefetchCwRetryTimer.duration = HC_PrefetchRetryDelaySec()
+        m.prefetchCwRetryTimer.repeat = false
+        m.top.appendChild(m.prefetchCwRetryTimer)
+        m.prefetchCwRetryTimer.observeField("fire", "OnPrefetchCwRetry")
+    end if
+    m.prefetchCwRetryTimer.control = "stop"
+    m.prefetchCwRetryTimer.control = "start"
+end sub
+
+sub SchedulePrefetchCatRetry()
+    if m.prefetchCatRetryTimer = invalid then
+        m.prefetchCatRetryTimer = CreateObject("roSGNode", "Timer")
+        m.prefetchCatRetryTimer.duration = HC_PrefetchRetryDelaySec()
+        m.prefetchCatRetryTimer.repeat = false
+        m.top.appendChild(m.prefetchCatRetryTimer)
+        m.prefetchCatRetryTimer.observeField("fire", "OnPrefetchCatRetry")
+    end if
+    m.prefetchCatRetryTimer.control = "stop"
+    m.prefetchCatRetryTimer.control = "start"
+end sub
+
+sub OnPrefetchCwRetry()
+    if not m.prefetching then return
+    StartPrefetchCwFetch()
+end sub
+
+sub OnPrefetchCatRetry()
+    if not m.prefetching then return
+    StartPrefetchCatFetch()
+end sub
+
+sub PrefetchMarkCwDone(api as object)
+    HomeBootCacheSetCw(api)
+    TryCompletePrefetchCatalog()
+end sub
+
+sub PrefetchMarkCatDone(api as object)
+    HomeBootCacheSetCategories(api)
+    TryCompletePrefetchCatalog()
+end sub
+
+function PrefetchApiOk(api as object) as boolean
+    if api = invalid then return false
+    return api.ok = true
+end function
 
 sub OnPrefetchCwResponse()
     if m.top.dispose = true then return
@@ -1168,8 +1234,19 @@ sub OnPrefetchCwResponse()
         CancelHomePrefetch()
         return
     end if
-    HomeBootCacheSetCw(api)
-    TryCompletePrefetchCatalog()
+    if PrefetchApiOk(api) then
+        print "[PREFETCH_DBG] cw_response ok=true"
+        PrefetchMarkCwDone(api)
+        return
+    end if
+    if m.prefetchCwRetriesLeft > 0 then
+        m.prefetchCwRetriesLeft = m.prefetchCwRetriesLeft - 1
+        print "[PREFETCH_DBG] cw_response ok=false retry_left="; m.prefetchCwRetriesLeft
+        SchedulePrefetchCwRetry()
+        return
+    end if
+    print "[PREFETCH_DBG] cw_response ok=false retries_exhausted mark_done"
+    PrefetchMarkCwDone(api)
 end sub
 
 sub OnPrefetchCatResponse()
@@ -1182,8 +1259,19 @@ sub OnPrefetchCatResponse()
         CancelHomePrefetch()
         return
     end if
-    HomeBootCacheSetCategories(api)
-    TryCompletePrefetchCatalog()
+    if PrefetchApiOk(api) then
+        print "[PREFETCH_DBG] home_response ok=true"
+        PrefetchMarkCatDone(api)
+        return
+    end if
+    if m.prefetchCatRetriesLeft > 0 then
+        m.prefetchCatRetriesLeft = m.prefetchCatRetriesLeft - 1
+        print "[PREFETCH_DBG] home_response ok=false retry_left="; m.prefetchCatRetriesLeft
+        SchedulePrefetchCatRetry()
+        return
+    end if
+    print "[PREFETCH_DBG] home_response ok=false retries_exhausted mark_done"
+    PrefetchMarkCatDone(api)
 end sub
 
 sub ArmPrefetchGate()
@@ -1202,6 +1290,7 @@ sub OnPrefetchGateTick()
     if not m.prefetching then return
     elapsed = PrefetchElapsedMs()
     if elapsed >= HC_PrefetchMaxMs() then
+        print "[PREFETCH_DBG] gate_timeout elapsed_ms="; elapsed; " navigate_anyway=true"
         HomeBootCacheForceComplete()
         if m.prefetchCatalogHandled <> true then TryCompletePrefetchCatalog()
         if m.prefetchCatalogHandled <> true then FinishPrefetchNavigate()
@@ -1222,6 +1311,8 @@ sub FinishPrefetchNavigate()
     m.prefetching = false
     m.selecting = false
     if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
+    if m.prefetchCwRetryTimer <> invalid then m.prefetchCwRetryTimer.control = "stop"
+    if m.prefetchCatRetryTimer <> invalid then m.prefetchCatRetryTimer.control = "stop"
     KillProfileTask(m.prefetchCwTask)
     KillProfileTask(m.prefetchCatTask)
     m.prefetchCwTask = invalid
@@ -1230,6 +1321,7 @@ sub FinishPrefetchNavigate()
     m.prefetchStartMs = -1
     m.pendingNavigateProfileId = ""
     m.pendingNavigateAvatar = ""
+    print "[PREFETCH_DBG] navigate_home profileId="; profileId
     SetValueByKey(SK_SelectedItem(), "Home", "app")
     if m.vm <> invalid then
         m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
@@ -1246,11 +1338,15 @@ sub CancelHomePrefetch()
     m.selecting = false
     m.prefetchCatalogHandled = false
     if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
+    if m.prefetchCwRetryTimer <> invalid then m.prefetchCwRetryTimer.control = "stop"
+    if m.prefetchCatRetryTimer <> invalid then m.prefetchCatRetryTimer.control = "stop"
     KillProfileTask(m.prefetchCwTask)
     KillProfileTask(m.prefetchCatTask)
     m.prefetchClock = invalid
     m.prefetchStartMs = -1
     HomeBootCacheClear()
+    print "[PREFETCH_DBG] cancelled return_to_profiles"
+    ProfileTransitionHide(m.vm)
     ShowSelectingOverlay(false)
     m.pendingNavigateProfileId = ""
     m.pendingNavigateAvatar = ""

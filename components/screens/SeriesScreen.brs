@@ -2,10 +2,11 @@
 
 sub init()
     m.bg = m.top.findNode("bg")
+    m.contentHost = m.top.findNode("contentHost")
+    m.skeletonHost = m.top.findNode("skeletonHost")
     m.titleLabel = m.top.findNode("titleLabel")
     m.emptyLabel = m.top.findNode("emptyLabel")
     m.rowsHost = m.top.findNode("rowsHost")
-    m.loadingHost = m.top.findNode("loadingHost")
 
     m.listType = ""
     m.categoryId = ""
@@ -14,12 +15,18 @@ sub init()
     m.hasMore = true
     m.loading = false
     m.initialLoad = true
+    m.contentRevealed = false
     m.rows = []
     m.rowNodes = []
     m.rowIdx = 0
     m.colIdx = 0
     m.scrollY = 0
     m.rowScrollX = []
+
+    m.vScrollAnim = m.top.findNode("vScrollAnim")
+    m.vScrollInterp = m.top.findNode("vScrollInterp")
+    m.hScrollAnim = m.top.findNode("hScrollAnim")
+    m.hScrollInterp = m.top.findNode("hScrollInterp")
 
     m.vm = FindViewManager(m.top)
     LoadBrowseTokens()
@@ -60,6 +67,16 @@ sub OnNavStateReady()
     ResetAndFetch()
 end sub
 
+sub OnShellEnterContent()
+    if m.top.shellEnterContent <> true then return
+    m.top.shellEnterContent = false
+    if m.rows.Count() = 0 or SeriesEmptyVisible() then return
+    m.rowIdx = 0
+    m.colIdx = 0
+    ApplyFocus()
+    BrowseDbg("series_focus", "shell_enter_content row=0 col=0")
+end sub
+
 sub OnDispose()
     if not m.top.dispose then return
     KillListTask(m.listTask)
@@ -79,6 +96,9 @@ sub OnBusinessResolved()
     LoadBrowseTokens()
     ApplyStaticColors()
     RefreshCardThemes()
+    if m.skeletonHost <> invalid and m.skeletonHost.visible = true then
+        SkeletonApplyTree(m.skeletonHost, m.tokens, true)
+    end if
 end sub
 
 sub LoadBrowseTokens()
@@ -103,32 +123,53 @@ sub ApplyStaticColors()
     if m.emptyLabel <> invalid then m.emptyLabel.color = m.cNeutral50
 end sub
 
+sub ShowSkeleton(show as boolean)
+    if m.skeletonHost = invalid then return
+    m.skeletonHost.visible = show
+    SkeletonApplyTree(m.skeletonHost, m.tokens, show)
+    BrowseDbg("series_skeleton", "visible=" + BrowseDbgStr(show))
+    if show then
+        if m.contentHost <> invalid then m.contentHost.opacity = 0.0
+        if m.titleLabel <> invalid then m.titleLabel.opacity = 0.0
+        m.contentRevealed = false
+    end if
+end sub
+
+sub RevealContent()
+    if m.contentRevealed then return
+    ShowSkeleton(false)
+    if m.contentHost <> invalid then m.contentHost.opacity = 1.0
+    if m.titleLabel <> invalid then m.titleLabel.opacity = 1.0
+    m.contentRevealed = true
+    BrowseDbg("series_reveal", "content visible title=" + m.titleLabel.text)
+end sub
+
 sub ResetAndFetch()
     m.page = 0
     m.hasMore = true
+    m.initialLoad = true
+    m.contentRevealed = false
     m.rows = []
     m.rowIdx = 0
     m.colIdx = 0
     m.scrollY = 0
     m.rowScrollX = []
     ClearRows()
-    m.emptyLabel.visible = false
+    ShowEmpty(false)
+    if m.contentHost <> invalid then m.contentHost.opacity = 0.0
+    if m.titleLabel <> invalid then m.titleLabel.opacity = 0.0
+    ShowSkeleton(true)
     FetchNextPage()
-end sub
-
-sub ShowLoading(show as boolean)
-    m.loading = show
-    if m.loadingHost <> invalid then m.loadingHost.visible = show
 end sub
 
 sub FetchNextPage()
     if m.loading then return
     if not m.hasMore then return
     m.page = m.page + 1
-    ShowLoading(true)
+    m.loading = true
+    if m.page = 1 then ShowSkeleton(true)
     path = Endpoints().SERIES.SERIES_LIST
     q = SL_BuildQuery(m.page, m.listType, m.categoryId, m.genreId)
-    BrowseDbg("series_fetch", "path=" + path + " page=" + Str(m.page) + " type=" + m.listType + " category=" + m.categoryId + " genre=" + m.genreId)
     KillListTask(m.listTask)
     m.listTask = ApiGetQuery(path, q)
     m.listTask.observeField("apiResult", "OnListResponse")
@@ -141,40 +182,58 @@ sub OnListResponse()
     m.listTask.unobserveField("apiResult")
     api = m.listTask.apiResult
     m.listTask = invalid
+    m.loading = false
     m.initialLoad = false
-    ShowLoading(false)
 
     BrowseDbgApi("series_response", api)
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 then
+        msg = ""
+        status = 0
+        if api <> invalid then
+            if api.message <> invalid then msg = api.message
+            if api.statusCode <> invalid then status = api.statusCode
+        end if
         BrowseDbg("series_response", "fail: bad status — show empty=" + BrowseDbgStr(m.rows.Count() = 0))
         m.hasMore = false
+        ShowSkeleton(false)
         if m.rows.Count() = 0 then ShowEmpty(true)
         return
     end if
 
-    listing = []
-    if api.result <> invalid and api.result.listing <> invalid then
-        listing = api.result.listing
-    end if
+    listing = SL_ParseSeriesListing(api)
 
-    m.hasMore = SL_PageHasMore(api, listing.Count())
-    BrowseDbg("series_response", "listingCount=" + Str(listing.Count()) + " hasMore=" + BrowseDbgStr(m.hasMore) + " existingRows=" + Str(m.rows.Count()))
     if listing.Count() = 0 and m.rows.Count() = 0 then
+        m.hasMore = false
         BrowseDbg("series_response", "empty listing — show empty state")
+        ShowSkeleton(false)
         ShowEmpty(true)
         return
     end if
 
     ShowEmpty(false)
     m.rows = SL_AppendRows(m.rows, listing, BS_ItemsPerRow())
-    AppendRowNodes(listing.Count())
-    ApplyFocus()
+    m.hasMore = SL_PageHasMore(api, listing.Count(), SL_FlatItemCount(m.rows))
+    BrowseDbg("series_response", "listingCount=" + Str(listing.Count()) + " hasMore=" + BrowseDbgStr(m.hasMore) + " loaded=" + Str(SL_FlatItemCount(m.rows)))
+    RebuildSeriesGrid()
+    RevealContent()
+    if m.page = 1 then
+        SeriesHandoffContentFocus()
+    else
+        ClampCol()
+        ApplyFocus()
+        if m.vm <> invalid and m.vm.shellFocus = "header" then ShellEnterContent(m.vm)
+    end if
 end sub
 
 sub ShowEmpty(show as boolean)
     BrowseDbg("series_empty", "visible=" + BrowseDbgStr(show))
+    if show then ShowSkeleton(false)
     if m.emptyLabel <> invalid then m.emptyLabel.visible = show
     if m.rowsHost <> invalid then m.rowsHost.visible = not show
+    if show then
+        if m.contentHost <> invalid then m.contentHost.opacity = 0.0
+        m.contentRevealed = false
+    end if
 end sub
 
 sub ClearRows()
@@ -185,43 +244,46 @@ sub ClearRows()
     m.rowNodes = []
 end sub
 
-sub AppendRowNodes(newItemCount as integer)
-    if newItemCount <= 0 then return
-    startFlat = 0
+sub RebuildSeriesGrid()
+    savedRowIdx = m.rowIdx
+    savedColIdx = m.colIdx
+    ClearRows()
+    m.rowScrollX = []
+
     for i = 0 to m.rows.Count() - 1
         row = m.rows[i]
-        if row = invalid then continue for
-        if i < m.rowNodes.Count() then continue for
+        if row = invalid or row.items = invalid then continue for
 
         rowGroup = m.rowsHost.createChild("Group")
+        rowGroup.id = "seriesRow" + Str(i)
         rowY = i * BS_RowPitch()
         rowGroup.translation = [0, rowY]
 
         cards = []
-        frames = []
         x = 0
-        if row.items <> invalid then
-            for j = 0 to row.items.Count() - 1
-                item = row.items[j]
-                card = rowGroup.createChild("VerticalCard")
-                card.translation = [x, 0]
-                CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800, m.cNeutral700)
-                card.listType = true
-                uri = ""
-                if item.thumbnails <> invalid then
-                    uri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
-                end if
-                card.thumbnailUri = uri
-                card.focusedState = false
-                cards.Push(card)
-                frames.Push(invalid)
-                x = x + BS_ListCardPitch()
-            end for
-        end if
+        for j = 0 to row.items.Count() - 1
+            item = row.items[j]
+            card = rowGroup.createChild("VerticalCard")
+            card.translation = [x, 0]
+            CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800, m.cNeutral700)
+            card.listType = true
+            uri = ""
+            if item.thumbnails <> invalid then
+                uri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
+            end if
+            card.thumbnailUri = uri
+            card.focusedState = false
+            cards.Push(card)
+            x = x + BS_ListCardPitch()
+        end for
 
-        m.rowNodes.Push({ group: rowGroup, cards: cards, frames: frames })
-        if m.rowScrollX.Count() <= i then m.rowScrollX.Push(0)
+        m.rowNodes.Push({ group: rowGroup, cards: cards })
+        m.rowScrollX.Push(0)
     end for
+
+    m.rowIdx = savedRowIdx
+    m.colIdx = savedColIdx
+    ClampCol()
 end sub
 
 sub RefreshCardThemes()
@@ -234,20 +296,30 @@ sub RefreshCardThemes()
     end for
 end sub
 
+' Hand off shell key routing from the header to the grid once cards are ready.
+sub SeriesHandoffContentFocus()
+    if m.rows.Count() = 0 then return
+    if SeriesEmptyVisible() then return
+    m.rowIdx = 0
+    m.colIdx = 0
+    ApplyFocus()
+    if m.vm <> invalid then
+        wasHeader = false
+        if m.vm.shellFocus = "header" then wasHeader = true
+        ShellEnterContent(m.vm)
+        BrowseDbg("series_focus", "handoff_to_grid rows=" + Str(m.rows.Count()) + " fromHeader=" + BrowseDbgStr(wasHeader))
+    end if
+end sub
+
 sub ApplyFocus()
     for i = 0 to m.rowNodes.Count() - 1
         entry = m.rowNodes[i]
         if entry = invalid or entry.cards = invalid then continue for
         for j = 0 to entry.cards.Count() - 1
             card = entry.cards[j]
-            focused = (i = m.rowIdx and j = m.colIdx)
-            card.focusedState = focused
-            frame = entry.frames[j]
-            frame = CardEnsureFocusFrame(card, frame, -3, -3, BS_ListCardW() + 6, BS_ListCardH() + 6, m.cPrimary600)
-            entry.frames[j] = frame
-            CardApplyFocusBorder(frame, focused, m.cPrimary600)
+            if card = invalid then continue for
+            card.focusedState = (i = m.rowIdx and j = m.colIdx)
         end for
-        m.rowNodes[i] = entry
     end for
     ApplyScroll()
     MaybeLoadMore()
@@ -265,7 +337,6 @@ sub ApplyScroll()
         m.scrollY = rowBottom - BS_ViewHeight()
     end if
     if m.scrollY < 0 then m.scrollY = 0
-    m.rowsHost.translation = [BS_ListLeft(), BS_RowStartY() - m.scrollY]
 
     viewW = 1808
     for i = 0 to m.rowNodes.Count() - 1
@@ -283,9 +354,52 @@ sub ApplyScroll()
             if scrollX < 0 then scrollX = 0
             m.rowScrollX[i] = scrollX
         end if
-        entry.group.translation = [-scrollX, i * BS_RowPitch()]
-        m.rowNodes[i] = entry
+        rowY = i * BS_RowPitch()
+        if i <> m.rowIdx then
+            entry.group.translation = [-scrollX, rowY]
+            m.rowNodes[i] = entry
+        end if
     end for
+
+    AnimateRowsHostVertical()
+    AnimateFocusedRowHorizontal()
+end sub
+
+' Vertical list scroll — parity GenreListScreen AnimateRowsHost (inOutCubic).
+sub AnimateRowsHostVertical()
+    if m.rowsHost = invalid then return
+    target = [BS_ListLeft(), BS_RowStartY() - m.scrollY]
+    from = m.rowsHost.translation
+    if from[0] = target[0] and from[1] = target[1] then return
+    if m.vScrollAnim = invalid or m.vScrollInterp = invalid then
+        m.rowsHost.translation = target
+        return
+    end if
+    if m.vScrollAnim.state = "running" then m.vScrollAnim.control = "stop"
+    m.vScrollInterp.keyValue = [from, target]
+    m.vScrollAnim.control = "start"
+end sub
+
+' Horizontal row scroll — animate the focused row strip.
+sub AnimateFocusedRowHorizontal()
+    if m.rowIdx < 0 or m.rowIdx >= m.rowNodes.Count() then return
+    entry = m.rowNodes[m.rowIdx]
+    if entry = invalid or entry.group = invalid then return
+
+    scrollX = 0
+    if m.rowScrollX.Count() > m.rowIdx then scrollX = m.rowScrollX[m.rowIdx]
+    target = [-scrollX, m.rowIdx * BS_RowPitch()]
+    from = entry.group.translation
+    if from[0] = target[0] and from[1] = target[1] then return
+
+    if m.hScrollAnim = invalid or m.hScrollInterp = invalid then
+        entry.group.translation = target
+        return
+    end if
+    if m.hScrollAnim.state = "running" then m.hScrollAnim.control = "stop"
+    m.hScrollInterp.fieldToInterp = entry.group.id + ".translation"
+    m.hScrollInterp.keyValue = [from, target]
+    m.hScrollAnim.control = "start"
 end sub
 
 sub MaybeLoadMore()
@@ -310,10 +424,7 @@ sub EnterSeriesHeader()
         menuItems = HeaderMenuItems(reels)
     end if
     navState = { type: m.listType }
-    idx = HeaderSelectedIndexForNav(menuItems, RouteGenere(), navState)
-    if idx = 0 and m.listType = "" then
-        idx = HeaderSelectedIndex(menuItems, RouteSeries())
-    end if
+    idx = HeaderSelectedIndexForNav(menuItems, RouteSeries(), navState)
     ShellEnterHeader(m.vm, idx)
 end sub
 

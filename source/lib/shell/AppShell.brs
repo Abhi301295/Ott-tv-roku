@@ -94,6 +94,21 @@ function HeaderSelectedIndexForNav(items as object, route as string, state as ob
         end for
     end if
 
+    ' See All / new-release — keep last header tab (parity React localStorage SelectedItem).
+    if route = RouteSeries() or route = RouteNewRelease() then
+        saved = RegistryRead(SK_SelectedItem(), "app")
+        if saved <> invalid and saved <> "" then
+            for i = 0 to items.Count() - 1
+                it = items[i]
+                if it <> invalid and it.text = saved then return i
+            end for
+        end if
+        for i = 0 to items.Count() - 1
+            it = items[i]
+            if it <> invalid and it.route = RouteHome() then return i
+        end for
+    end if
+
     if route = RouteHome() then
         for i = 0 to items.Count() - 1
             it = items[i]

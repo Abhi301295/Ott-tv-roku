@@ -1,5 +1,6 @@
 sub init()
     m.focusBorder = invalid
+    m.body = m.top.findNode("body")
     m.thumbClip = m.top.findNode("thumbClip")
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
@@ -68,15 +69,42 @@ sub ApplyAll()
 end sub
 
 sub ApplyFocusVisual()
-    fw = 226
-    fh = 306
-    if m.focusW <> invalid then fw = m.focusW
-    if m.focusH <> invalid then fh = m.focusH
+    border = 3
+    ' React verticalCard.tsx: radius-16, p-2 inside border, bw-3 when focused.
+    pad = 2
+    offX = 0
+    offY = 0
+    radius = 16
+    w = 220
+    h = 300
+    if m.top.listType = true then
+        w = 272
+        h = 340
+        offX = -border
+        offY = -border
+    end if
+    if m.body <> invalid then m.body.translation = [pad, pad]
+    fw = w + 2 * pad + 2 * border
+    fh = h + 2 * pad + 2 * border
+    if not m.top.listType then
+        fw = w + 6
+        fh = h + 6
+    end if
+    m.focusW = fw
+    m.focusH = fh
     if m.top.focusedState = true then
-        m.focusBorder = CardEnsureFocusFrame(m.top, m.focusBorder, 0, 0, fw, fh, m.top.cPrimary500)
+        m.focusBorder = CardEnsureFocusFrame(m.top, m.focusBorder, offX, offY, fw, fh, m.top.cPrimary500)
+        if m.focusBorder <> invalid and m.top.listType = true then
+            m.focusBorder.radius = radius
+            m.focusBorder.thickness = border
+        end if
     else if m.focusBorder <> invalid then
         m.focusBorder.boxWidth = fw
         m.focusBorder.boxHeight = fh
     end if
     CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary500)
+    if m.top.focusedState = true and m.focusBorder <> invalid and m.top.listType = true then
+        m.top.removeChild(m.focusBorder)
+        m.top.appendChild(m.focusBorder)
+    end if
 end sub
