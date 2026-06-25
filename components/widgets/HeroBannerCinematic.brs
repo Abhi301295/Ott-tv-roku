@@ -24,6 +24,7 @@ sub init()
     m.swipeTimer = m.top.findNode("swipeTimer")
     m.fadeAnim = m.top.findNode("fadeAnim")
     m.zoomAnim = m.top.findNode("zoomAnim")
+    m.nextZoomAnim = m.top.findNode("nextZoomAnim")
     m.barAnim = m.top.findNode("barAnim")
     m.barInterp = m.top.findNode("barInterp")
     m.metaAnim = m.top.findNode("metaAnim")
@@ -62,6 +63,7 @@ sub init()
     m.swipeTimer.duration = HC_HeroSwipeMs() / 1000.0
     m.fadeAnim.duration = HC_HeroCrossfadeSec()
     m.zoomAnim.duration = HC_HeroZoomSec()
+    if m.nextZoomAnim <> invalid then m.nextZoomAnim.duration = HC_HeroZoomSec()
     m.barAnim.duration = HC_HeroSwipeMs() / 1000.0
     m.trailerTimer.duration = HC_HeroTrailerDelaySec()
 
@@ -290,7 +292,19 @@ sub ApplySlides()
         m.nextPoster.scale = [1.0, 1.0]
         m.nextPoster.translation = [0, 0]
     end if
-    StartKenBurns()
+    ' Ken Burns must not run while the poster is invisible (first skeleton handoff) — the
+    ' 8s zoom would finish before the fade-in and the image looks static (no React glow).
+    if not m.firstReveal and not m.crossfadeLanding then
+        StartKenBurns()
+    end if
+    MaybeCompletePosterLoad()
+end sub
+
+' Cached posters can report loadStatus=ready before the observer fires — complete the
+' first-reveal glow + Ken Burns without waiting on a second event.
+sub MaybeCompletePosterLoad()
+    if m.activePoster = invalid then return
+    if m.activePoster.loadStatus = "ready" then OnActivePosterLoad()
 end sub
 
 ' Complete the crossfade handoff: the active poster now holds the new image too, so reveal
@@ -300,6 +314,7 @@ sub FinishCrossfadeLanding()
     m.crossfadeLanding = false
     if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
     if m.nextLayer <> invalid then m.nextLayer.opacity = 0.0
+    StopNextKenBurns()
     if m.nextPoster <> invalid and m.pendingNextUri <> invalid then
         m.nextPoster.uri = m.pendingNextUri
         m.nextPoster.scale = [1.0, 1.0]
@@ -322,11 +337,14 @@ sub OnActivePosterLoad()
             ' Active poster now holds the new slide's bitmap — swap layers in one frame.
             FinishCrossfadeLanding()
         else if m.firstReveal then
-            ' Glow the first poster in (fade 0 → 1); later slides are already opaque.
+            ' Glow the first poster in (fade 0 → 1); Ken Burns starts once visible.
             m.firstReveal = false
             GlowPosterIn()
+            StartKenBurns()
+            print "[HERO_DBG] poster_glow_in ken_burns=start"
         else
             m.activePoster.opacity = 1.0
+            if not m.isVideoPlaying then StartKenBurns()
         end if
         ' Signal the home screen the moment the first slide's poster has painted, so the
         ' loading skeleton can drop straight onto a real hero (no black flash).
@@ -339,6 +357,7 @@ sub OnActivePosterLoad()
         if m.crossfadeLanding then FinishCrossfadeLanding()
         m.firstReveal = false
         m.activePoster.opacity = 1.0
+        if not m.isVideoPlaying then StartKenBurns()
     end if
 end sub
 
@@ -572,10 +591,24 @@ sub PlayMetaEntrance()
 end sub
 
 sub StartKenBurns()
+    if m.isVideoPlaying then return
     if m.zoomAnim = invalid or m.activePoster = invalid then return
     m.activePoster.scale = [1.0, 1.0]
     m.zoomAnim.control = "stop"
     m.zoomAnim.control = "start"
+end sub
+
+sub StartNextKenBurns()
+    if m.isVideoPlaying then return
+    if m.nextZoomAnim = invalid or m.nextPoster = invalid then return
+    m.nextPoster.scale = [1.0, 1.0]
+    m.nextZoomAnim.control = "stop"
+    m.nextZoomAnim.control = "start"
+end sub
+
+sub StopNextKenBurns()
+    if m.nextZoomAnim <> invalid then m.nextZoomAnim.control = "stop"
+    if m.nextPoster <> invalid then m.nextPoster.scale = [1.0, 1.0]
 end sub
 
 ' The slide runs for a FIXED duration (HC_HeroSwipeMs). The timer keeps running even
@@ -633,6 +666,7 @@ sub BeginCrossfade()
     ' Reveal the preloaded next slide underneath so fading the active layer crossfades to it.
     if m.nextLayer <> invalid then m.nextLayer.opacity = 1.0
     if m.metaHost <> invalid then m.metaHost.opacity = 0.0
+    StartNextKenBurns()
     m.fadeAnim.control = "stop"
     m.fadeAnim.control = "start"
 end sub
