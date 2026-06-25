@@ -180,6 +180,12 @@
         keyValue="[[1.0, 1.0], [1.05, 1.05]]" fieldToInterp="activePoster.scale" />
     </Animation>
 
+    <!-- Ken Burns on the incoming slide during crossfade (parity with next-layer img animation). -->
+    <Animation id="nextZoomAnim" duration="8" repeat="false" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="nextZoomInterp" key="[0.0, 1.0]"
+        keyValue="[[1.0, 1.0], [1.05, 1.05]]" fieldToInterp="nextPoster.scale" />
+    </Animation>
+
     <!-- Active-slide progress fill (0 → 48px over the swipe interval). -->
     <Animation id="barAnim" duration="15" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="barInterp" key="[0.0, 1.0]" keyValue="[0.0, 48.0]"

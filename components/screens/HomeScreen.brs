@@ -306,7 +306,9 @@ end sub
 
 sub OnTransitionSafetyTimer()
     if not ProfileTransitionActive() then return
-    ProfileTransitionHide(m.vm)
+    print "[WELCOME_DBG] safety_timeout hide_overlay boot_started="; m.bootStarted; " content_boot="; m.contentBootStarted
+    HideProfileWelcomeTransition()
+    if not m.contentBootStarted then BootHomeContent()
 end sub
 
 sub HideProfileWelcomeTransition()
@@ -1190,8 +1192,11 @@ end sub
 
 sub BootHomeContent()
     if m.contentBootStarted then return
+    ' Prefetch may finish after BeginHomeBootWork when select-profile ran in parallel.
+    if not m.categoriesPrefetched then ConsumeHomeBootCacheIfReady()
     m.contentBootStarted = true
     if m.categoriesPrefetched = true then
+        print "[HOME_BOOT_DBG] content_boot prefetch_hit skip_fetch=true"
         HomeBootLog(m.bootSpan, "content boot", "prefetch hit skip CW+categories")
         if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "stop"
         m.continueLoading = false
@@ -1201,6 +1206,7 @@ sub BootHomeContent()
         MaybeBuildRows()
         return
     end if
+    print "[HOME_BOOT_DBG] content_boot prefetch_hit skip_fetch=false fetch_cw_and_home=true"
     HomeBootLog(m.bootSpan, "content boot", "fetch CW + categories parallel")
     ' The profile was just selected on the previous screen, so the active profile
     ' identity is already persisted — only re-fetch profiles if it is somehow missing
@@ -1239,11 +1245,8 @@ sub DoHomeSelect()
         m.selectWatchdog.control = "stop"
         m.selectWatchdog.control = "start"
     end if
-    ' Re-open a keep-alive connection to the (Bearer-auth) select endpoint: the profile
-    ' screen warmed the pool, but a long auto-select wait can let that socket idle out, so
-    ' the POST would otherwise pay a fresh TLS handshake. SelectProfilePath() is post-login
-    ' Bearer here, so this never poisons the pool with Basic-auth (see WarmHttpConnections).
-    WarmHttpConnections(SelectProfilePath())
+    ' One keep-alive refresh before POST — not a full-pool warm (select is a single request).
+    WarmHttpConnection(SelectProfilePath())
     FireHomeSelectRequest()
 end sub
 

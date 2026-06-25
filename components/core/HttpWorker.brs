@@ -130,8 +130,14 @@ sub FinishCurrent(status as integer, responseText as string, errMsg as string)
     elapsed = 0
     if m.timer <> invalid then elapsed = m.timer.TotalMilliseconds()
     p = ""
-    if job <> invalid then p = job.path
-    print "[HTTP] " + m.top.id + " " + Str(elapsed).Trim() + "ms  " + Str(status).Trim() + "  " + p
+    warmOnly = false
+    if job <> invalid then
+        p = job.path
+        if job.warmOnly = true then warmOnly = true
+    end if
+    tag = "[HTTP]"
+    if warmOnly then tag = "[HTTP_WARM]"
+    print tag + " " + m.top.id + " " + Str(elapsed).Trim() + "ms  " + Str(status).Trim() + "  " + p
 
     m.curJob = invalid
     m.timer = invalid

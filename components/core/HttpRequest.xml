@@ -12,5 +12,7 @@
     <field id="httpStatus" type="integer" alwaysNotify="true" />
     <field id="errorMessage" type="string" alwaysNotify="true" />
     <field id="shouldLogout" type="boolean" alwaysNotify="true" />
+  <!-- warmOnly: keep-alive probe — response discarded, tagged [HTTP_WARM] in logs. -->
+    <field id="warmOnly" type="boolean" value="false" />
   </interface>
 </component>

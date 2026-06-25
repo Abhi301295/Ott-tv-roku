@@ -51,6 +51,14 @@ function HC_PrefetchMaxMs() as integer
     return 12000
 end function
 
+function HC_PrefetchMaxRetries() as integer
+    return 2
+end function
+
+function HC_PrefetchRetryDelaySec() as float
+    return 0.6
+end function
+
 ' Cinematic hero timing (parity with heroBannerCinematic.tsx).
 function HC_HeroHeight() as integer
     return 918

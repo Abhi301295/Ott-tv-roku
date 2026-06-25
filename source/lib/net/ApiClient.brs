@@ -34,17 +34,32 @@ function GetHttpClient() as object
     return CreateObject("roSGNode", "HttpClient")
 end function
 
-' Pre-open keep-alive connections on every pooled worker so the next screen's
-' requests skip the TLS handshake. Pass a Bearer-auth path on post-login screens
-' (e.g. GET_LOGIN_PROFILES). Default CHECK_UPDATE uses Basic auth and must NOT be
-' warmed after login — it poisons the pool and select-profile 404s until reload.
-function WarmHttpConnections(path = "" as string) as void
+function WarmHttpBearerPath() as string
+    ' Small Bearer GET — never use home/CW/catalogue for keep-alive (full payloads).
+    return Endpoints().PROFILE.GET_LOGIN_PROFILES
+end function
+
+' Warm every pool worker with one cheap Bearer GET (profile picker idle time).
+sub WarmHttpPool()
+    warmPath = WarmHttpBearerPath()
+    if warmPath = "" then return
     client = GetHttpClient()
     if client = invalid then return
-    warmPath = path
-    if warmPath = "" then warmPath = Endpoints().LOGIN.CHECK_UPDATE
-    client.callFunc("WarmAll", warmPath)
-end function
+    client.callFunc("WarmAll", { path: warmPath, warmOnly: true })
+end sub
+
+' Warm a single worker before a lone POST/GET (e.g. select-profile).
+sub WarmHttpConnection(path as string)
+    if path = invalid or path = "" then return
+    client = GetHttpClient()
+    if client = invalid then return
+    client.callFunc("WarmAll", { path: path, workerCount: 1, warmOnly: true })
+end sub
+
+' Legacy alias — routes to WarmHttpPool (never duplicate heavy catalogue GETs).
+sub WarmHttpConnections(path = "" as string)
+    WarmHttpPool()
+end sub
 
 function ApiGet(path as string) as object
     return CreateHttpTask("GET", path)
