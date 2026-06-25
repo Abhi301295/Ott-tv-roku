@@ -7,8 +7,6 @@ function TE_EventPlaybackStart() as string: return "playback_start": end functio
 function TE_EventBuffering() as string: return "buffering": end function
 function TE_EventPlaybackError() as string: return "playback_error": end function
 
-function TE_MinBufferMs() as integer: return 500: end function
-
 function TelemetryEndpointUrl() as string
     cfg = AppConfig()
     base = cfg.telemetryBaseUrl

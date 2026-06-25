@@ -227,23 +227,15 @@ end function
 
 sub TelemetryOnBuffering()
     if m.ended or m.isTrailer then return
+    ' One event per buffering episode (Roku may emit buffering repeatedly).
     if m.telemetryBufferStartMs >= 0 then return
     m.telemetryBufferStartMs = CreateObject("roTimespan").TotalMilliseconds()
     m.telemetryBufferPosMs = TelemetryPositionMs()
-    print "[TELEMETRY_DBG] buffer_start pos_ms="; m.telemetryBufferPosMs
+    TelemetryTrackBuffering(m.top, TelemetryCurrentContentId(), m.telemetryBufferPosMs, 0)
 end sub
 
 sub TelemetryOnPlaying()
-    if m.telemetryBufferStartMs >= 0 then
-        elapsed = CreateObject("roTimespan").TotalMilliseconds() - m.telemetryBufferStartMs
-        m.telemetryBufferStartMs = -1
-        minMs = TE_MinBufferMs()
-        willSend = elapsed >= minMs
-        print "[TELEMETRY_DBG] buffer_end elapsed_ms="; elapsed; " min_ms="; minMs; " send="; willSend
-        if willSend then
-            TelemetryTrackBuffering(m.top, TelemetryCurrentContentId(), m.telemetryBufferPosMs, elapsed)
-        end if
-    end if
+    if m.telemetryBufferStartMs >= 0 then m.telemetryBufferStartMs = -1
     if m.telemetryPlaybackSent or m.isTrailer then return
     m.telemetryPlaybackSent = true
     TelemetryTrackPlaybackStart(m.top, TelemetryCurrentContentId(), TelemetryPositionMs())
@@ -388,7 +380,6 @@ end sub
 sub OnVideoState()
     if m.videoNode = invalid or m.disposed then return
     state = m.videoNode.state
-    print "[TELEMETRY_DBG] video_state="; state
 
     if state = "buffering" then
         ' Genuine buffering only — never while we're sitting at the finished end.
