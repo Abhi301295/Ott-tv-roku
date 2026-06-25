@@ -35,6 +35,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/ScreenLifecycle.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/ViewManager.brs" />
 
   <children>

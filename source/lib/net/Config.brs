@@ -14,6 +14,7 @@ function AppConfig() as object
 
     cfg = {
         apiBaseUrl: "https://ottacceleratordev.appskeeper.in"
+        cdnBaseUrl: "https://ott-accelerator-bucket-output.s3.us-east-1.amazonaws.com"
         businessDomain: "ott-accelerator"
         basicAuthUser: "OTT_USR"
         basicAuthPassword: "OTT_PWD"

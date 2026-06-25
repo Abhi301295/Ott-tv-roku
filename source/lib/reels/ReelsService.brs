@@ -64,15 +64,17 @@ end function
 
 function ReelsStreamUrl(reel as object) as string
     if reel = invalid then return ""
+    raw = ""
     pl = reel.playList
     if pl <> invalid and type(pl) = "roAssociativeArray" then
         hls = pl.hls
         if hls <> invalid and type(hls) = "roAssociativeArray" then
-            if hls.url <> invalid and hls.url <> "" then return hls.url.ToStr()
+            if hls.url <> invalid and hls.url <> "" then raw = hls.url.ToStr()
         end if
     end if
-    if reel.path <> invalid then return reel.path.ToStr()
-    return ""
+    if raw = "" and reel.path <> invalid then raw = reel.path.ToStr()
+    if raw = "" then return ""
+    return MediaStreamUrl(raw)
 end function
 
 function ReelsIsTvPlatform(plat as dynamic) as boolean

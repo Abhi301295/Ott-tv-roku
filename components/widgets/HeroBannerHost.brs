@@ -6,6 +6,10 @@ sub init()
     m.activeHero = invalid
     ApplyHeroSelection()
     WireHeroObservers()
+    ' HomeScreen hides this host (visible=false) when another tab/screen covers Home. The
+    ' active hero child keeps visible=true unless we clear it — swipe/trailer timers then
+    ' keep firing contents/view fetches while the user is on Reels or VideoPlayer.
+    m.top.observeField("visible", "OnHostVisibleChanged")
 end sub
 
 sub ApplyHeroSelection()
@@ -29,6 +33,16 @@ sub HideAllHeroes()
     for each h in [m.heroCinematic, m.heroPageFlip, m.heroParallax, m.heroOtt]
         if h <> invalid then h.visible = false
     end for
+end sub
+
+' Mirror host visibility onto hero children so each widget's OnVisibleChanged runs
+' StopTrailer / CancelDetailFetch when Home is covered or disposed.
+sub OnHostVisibleChanged()
+    if m.top.visible = true then
+        ApplyHeroSelection()
+    else
+        HideAllHeroes()
+    end if
 end sub
 
 sub WireHeroObservers()

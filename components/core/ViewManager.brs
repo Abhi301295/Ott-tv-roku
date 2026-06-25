@@ -41,8 +41,7 @@ function NavigateClearAndReplace(route as string, state = {} as object) as void
     while m.stack.Count() > 0
         entry = m.stack[m.stack.Count() - 1]
         if entry.screen <> invalid then
-            if entry.screen.hasField("visible") then entry.screen.visible = false
-            if entry.screen.hasField("dispose") then entry.screen.dispose = true
+            ScreenDestroy(entry.screen)
             m.screenHost.removeChild(entry.screen)
         end if
         m.stack.Pop()
@@ -59,7 +58,7 @@ function NavigatePop() as boolean
 
     top = m.stack[m.stack.Count() - 1]
     if top.screen <> invalid then
-        if top.screen.hasField("dispose") then top.screen.dispose = true
+        ScreenDestroy(top.screen)
         m.screenHost.removeChild(top.screen)
     end if
     m.stack.Pop()
@@ -88,10 +87,8 @@ sub ShowRoute(route as string, state as object, replace as boolean)
         TeardownReplacedScreen(entry.screen)
         m.stack.Pop()
     else if not replace and m.stack.Count() > 0 then
-        ' Push: pause the screen being covered so its timers/video/hero stop ticking in
-        ' the background. Its visibility observer handles the actual teardown.
         covered = m.stack[m.stack.Count() - 1]
-        if covered.screen <> invalid then covered.screen.visible = false
+        if covered.screen <> invalid then ScreenPause(covered.screen)
     end if
 
     screen = CreateScreenForRoute(route, state)
@@ -125,8 +122,7 @@ end function
 ' boot fetches the user abandoned mid-load.
 sub TeardownReplacedScreen(screen as object)
     if screen = invalid then return
-    if screen.hasField("visible") then screen.visible = false
-    if screen.hasField("dispose") then screen.dispose = true
+    ScreenDestroy(screen)
     DrainHttpQueueForNavigation()
     m.screenHost.removeChild(screen)
 end sub

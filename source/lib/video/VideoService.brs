@@ -5,11 +5,13 @@
 ' Stream URL from the play payload (detail.playList.hls.url).
 function VideoStreamUrl(detail as object) as string
     if detail = invalid then return ""
+    raw = ""
     if detail.playList <> invalid and detail.playList.hls <> invalid then
-        if detail.playList.hls.url <> invalid then return detail.playList.hls.url
+        if detail.playList.hls.url <> invalid then raw = detail.playList.hls.url
     end if
-    if detail.videoUrl <> invalid then return detail.videoUrl
-    return ""
+    if raw = "" and detail.videoUrl <> invalid then raw = detail.videoUrl
+    if raw = "" then return ""
+    return MediaStreamUrl(raw)
 end function
 
 ' Roku streamFormat from the URL extension (parity with the web isHls check:
