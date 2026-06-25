@@ -92,6 +92,7 @@ sub init()
     if m.videoPoster <> invalid then m.videoPoster.observeField("loadStatus", "OnReelPosterLoad")
 
     m.top.observeField("keyEvent", "OnKey")
+    m.top.observeField("visible", "OnReelsVisibleChanged")
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
@@ -115,8 +116,14 @@ sub OnShellLayoutRev()
 end sub
 
 sub OnReelsVisibleChanged()
-    if m.top.visible <> true then return
     if m.disposed then return
+    if m.top.visible <> true then
+        ReelsDbg("visible", "paused — stop video + fetch")
+        KillReelsTask()
+        StopVideo()
+        StopTimers()
+        return
+    end if
     if m.reels.Count() = 0 then return
     ReelsDbg("visible", "resume poster+play index=" + Str(m.currentIndex))
     m.isPlaying = false
@@ -144,6 +151,7 @@ sub OnDispose()
         m.global.unobserveField("businessResolved")
     end if
     m.top.unobserveField("keyEvent")
+    m.top.unobserveField("visible")
     if m.videoNode <> invalid then
         m.videoNode.unobserveField("state")
         m.videoNode.unobserveField("position")

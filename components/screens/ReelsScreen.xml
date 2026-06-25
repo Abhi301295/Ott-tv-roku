@@ -7,7 +7,6 @@
     <field id="shellEnterContent" type="boolean" value="false" alwaysNotify="true" onChange="OnShellEnterContent" />
     <field id="shellLayoutRev" type="integer" value="0" alwaysNotify="true" onChange="OnShellLayoutRev" />
     <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
-    <field id="visible" type="boolean" value="false" alwaysNotify="true" onChange="OnReelsVisibleChanged" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
@@ -20,6 +19,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/MediaUrl.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
