@@ -93,6 +93,9 @@ sub init()
     m.advancing = false           ' guards against double auto-advance (finished + countdown)
     m.progressInFlight = false
     m.progressTask = invalid
+    m.telemetryPlaybackSent = false
+    m.telemetryBufferStartMs = -1
+    m.telemetryBufferPosMs = 0
     m.playbackKey = ""
     m.playbackInitialized = false
     m.subtitlesAttached = false
@@ -206,6 +209,47 @@ sub ApplyControlColors()
     ApplySkipIntroColors()
 end sub
 
+' ── Telemetry (Dynatrace POC bridge) ─────────────────────────────────────────
+
+sub TelemetryResetPlaybackMarkers()
+    m.telemetryPlaybackSent = false
+    m.telemetryBufferStartMs = -1
+    m.telemetryBufferPosMs = 0
+end sub
+
+function TelemetryCurrentContentId() as string
+    return TelemetryContentId(m.contentId, m.detail)
+end function
+
+function TelemetryPositionMs() as integer
+    return Int(m.position * 1000)
+end function
+
+sub TelemetryOnBuffering()
+    if m.ended or m.isTrailer then return
+    if m.telemetryBufferStartMs >= 0 then return
+    m.telemetryBufferStartMs = CreateObject("roTimespan").TotalMilliseconds()
+    m.telemetryBufferPosMs = TelemetryPositionMs()
+end sub
+
+sub TelemetryOnPlaying()
+    if m.telemetryBufferStartMs >= 0 then
+        elapsed = CreateObject("roTimespan").TotalMilliseconds() - m.telemetryBufferStartMs
+        m.telemetryBufferStartMs = -1
+        if elapsed >= TE_MinBufferMs() then
+            TelemetryTrackBuffering(m.top, TelemetryCurrentContentId(), m.telemetryBufferPosMs, elapsed)
+        end if
+    end if
+    if m.telemetryPlaybackSent or m.isTrailer then return
+    m.telemetryPlaybackSent = true
+    TelemetryTrackPlaybackStart(m.top, TelemetryCurrentContentId(), TelemetryPositionMs())
+end sub
+
+sub TelemetryOnPlaybackError(errorCode as string, errorMessage as string)
+    if m.isTrailer then return
+    TelemetryTrackPlaybackError(m.top, TelemetryCurrentContentId(), TelemetryPositionMs(), errorCode, errorMessage)
+end sub
+
 ' ── Load / play ──────────────────────────────────────────────────────────────
 
 sub LoadAndPlay()
@@ -213,9 +257,12 @@ sub LoadAndPlay()
 
     url = VideoStreamUrl(m.detail)
     if url = "" then
+        TelemetryOnPlaybackError("NO_STREAM_URL", "Video stream URL missing")
         ShowAlert(m.top, 2, CopyVideoLoadFailed())
         return
     end if
+
+    TelemetryResetPlaybackMarkers()
 
     m.isTrailer = VideoIsTrailer(m.detail)
     m.resumeSecs = VideoResumeSeconds(m.detail, m.startOver)
@@ -339,12 +386,16 @@ sub OnVideoState()
 
     if state = "buffering" then
         ' Genuine buffering only — never while we're sitting at the finished end.
-        if not m.ended then ShowSpinner(true)
+        if not m.ended then
+            ShowSpinner(true)
+            TelemetryOnBuffering()
+        end if
     else if state = "playing" then
         ShowSpinner(false)
         m.reloading = false
         m.advancing = false
         m.ended = false
+        TelemetryOnPlaying()
         if not m.playing then
             m.playing = true
             m.progressTimer.control = "start"
@@ -366,6 +417,7 @@ sub OnVideoState()
         ShowSpinner(false)
         m.reloading = false
         m.playing = false
+        TelemetryOnPlaybackError("ROKU_PLAYER_ERROR", CopyVideoLoadFailed())
         EnterEndedState()
         ShowAlert(m.top, 2, CopyVideoLoadFailed())
     end if
@@ -569,6 +621,7 @@ end sub
 ' for recovering from a finished/stopped state where control="resume" won't restart).
 sub ReplayFrom(startSecs as integer)
     if m.videoNode = invalid or m.masterUrl = "" then return
+    TelemetryResetPlaybackMarkers()
     m.ended = false
     m.reloading = true
     m.advancing = false

@@ -13,6 +13,8 @@ Usage:
   scripts/sim.py text "hello"                  # type literal characters
   scripts/sim.py shot [out.png]                # screenshot -> crop channel (default /tmp/sim_shot.png)
   scripts/sim.py log [seconds]                 # capture telnet console output (default 6s)
+  scripts/sim.py log since-boot [seconds]      # only output from the latest channel launch
+  scripts/sim.py log tail N [seconds]          # only the last N lines of captured output
   scripts/sim.py info                          # ECP device-info
 
 Key names: Up Down Left Right Select Back Home Play Rev Fwd InstantReplay Info Backspace Enter
@@ -165,7 +167,34 @@ def cmd_shot(out):
     print(f"saved {out} {crop.size}  (window x[{left},{right}] channel rect L{L} T{channel_top} R{R} B{bottom})")
 
 
-def cmd_log(seconds):
+BOOT_MARKERS = (
+    "------ Running dev ",
+    "[scrpt.ctx.run.enter]",
+    "------ Running 'OTT Accelerator' main ------",
+)
+
+
+def _is_boot_marker(line: str) -> bool:
+    return any(m in line for m in BOOT_MARKERS)
+
+
+def _filter_since_boot(text: str) -> str:
+    lines = text.splitlines(keepends=True)
+    start = 0
+    for i, line in enumerate(lines):
+        if _is_boot_marker(line):
+            start = i
+    return "".join(lines[start:])
+
+
+def _filter_tail(text: str, n: int) -> str:
+    lines = text.splitlines(keepends=True)
+    if n <= 0 or len(lines) <= n:
+        return text
+    return "".join(lines[-n:])
+
+
+def cmd_log(seconds, mode="all", tail_lines=0):
     s = socket.create_connection((HOST, TELNET_PORT), timeout=5)
     s.settimeout(1.0)
     end = time.time() + seconds
@@ -176,11 +205,16 @@ def cmd_log(seconds):
             if not data:
                 break
             buf += data
-            sys.stdout.write(data.decode("utf-8", "replace"))
-            sys.stdout.flush()
         except socket.timeout:
             pass
     s.close()
+    text = buf.decode("utf-8", "replace")
+    if mode == "since-boot":
+        text = _filter_since_boot(text)
+    if tail_lines > 0:
+        text = _filter_tail(text, tail_lines)
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 
 def main():
@@ -194,7 +228,22 @@ def main():
     elif cmd == "shot":
         cmd_shot(sys.argv[2] if len(sys.argv) > 2 else "/tmp/sim_shot.png")
     elif cmd == "log":
-        cmd_log(int(sys.argv[2]) if len(sys.argv) > 2 else 6)
+        args = sys.argv[2:]
+        seconds = 6
+        mode = "all"
+        tail_lines = 0
+        if args and args[0] == "since-boot":
+            mode = "since-boot"
+            args = args[1:]
+        elif args and args[0] == "tail":
+            if len(args) < 2:
+                print("usage: scripts/sim.py log tail N [seconds]", file=sys.stderr)
+                return
+            tail_lines = int(args[1])
+            args = args[2:]
+        if args:
+            seconds = int(args[0])
+        cmd_log(seconds, mode, tail_lines)
     elif cmd == "info":
         print(ecp_get("query/device-info"))
     else:

@@ -10,6 +10,8 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/telemetry/TelemetryService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
@@ -19,6 +21,7 @@
     <Rectangle id="bootBg" width="1920" height="1080" color="0x0b1120" />
     <ThemeManager id="themeManager" />
     <ViewManager id="viewManager" visible="false" />
+    <TelemetryClient id="telemetryClient" />
 
     <!-- Last child = top z-order; toast floats above all screens. Parity with Toast:
          bg rgba(40,40,40,0.7), rounded-8, px-30 py-15, 22px text, circle-X icon (mr-10),

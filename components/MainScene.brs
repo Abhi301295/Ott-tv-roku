@@ -103,6 +103,7 @@ sub OnThemeReady()
     m.viewManager.callFunc("NavigateReplace", initialRoute, {})
     m.viewManager.setFocus(true)
     m.bootBg.visible = false
+    TelemetryTrackAppStart(m.top)
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean

@@ -1,7 +1,9 @@
 {
   "apiBaseUrl": "https://ottacceleratordev.appskeeper.in",
-  "businessDomain": "roku-tv",
+  "businessDomain": "ott-accelerator",
   "basicAuthUser": "REPLACE_ME",
   "basicAuthPassword": "REPLACE_ME",
-  "appVersion": "1.0.0"
+  "appVersion": "1.0.0",
+  "telemetryBaseUrl": "https://dynatrace-poc.onrender.com",
+  "telemetryEnabled": true
 }

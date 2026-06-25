@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="TelemetryWorker" extends="Task">
+  <interface>
+    <field id="job" type="assocarray" alwaysNotify="true" />
+    <field id="available" type="boolean" value="false" />
+    <field id="completed" type="integer" value="0" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/core/TelemetryWorker.brs" />
+</component>

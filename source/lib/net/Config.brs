@@ -14,10 +14,12 @@ function AppConfig() as object
 
     cfg = {
         apiBaseUrl: "https://ottacceleratordev.appskeeper.in"
-        businessDomain: "roku-tv"
+        businessDomain: "ott-accelerator"
         basicAuthUser: "OTT_USR"
         basicAuthPassword: "OTT_PWD"
         appVersion: "1.0.0"
+        telemetryBaseUrl: "https://dynatrace-poc.onrender.com"
+        telemetryEnabled: true
     }
 
     overrides = ReadConfigJson()
