@@ -11,14 +11,11 @@
     <field id="neutral50" type="string" value="0xf8f1f7ff" onChange="OnColorsChanged" />
     <field id="avatarBg" type="string" value="0x404040ff" onChange="OnColorsChanged" />
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
-    <!-- Set during prefetch; label queues to next arc tick (never blocks spinner). -->
     <field id="statusText" type="string" value="" onChange="OnStatusTextChanged" />
     <function name="ClearStatusLabelFunc" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileArcTheme.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/ProfileSelectingOverlay.brs" />
 
   <children>
@@ -30,7 +27,13 @@
       <Group id="avatarStack" translation="[-110, -118]">
         <Poster id="progressTrack" width="220" height="220" uri="pkg:/images/ui/avatar_ring.png"
           blendColor="0xffffffff" opacity="0.28" />
-        <ProfileArcRing id="progressArcRing" ringSize="220" />
+        <!-- SceneGraph rotation — stays smooth while Home boot runs underneath. -->
+        <Group id="spinnerSpin" translation="[110, 110]" rotation="0.0">
+          <Poster id="loaderRing" translation="[-110, -110]" width="220" height="220"
+            uri="pkg:/images/ui/spinner_ring.png" />
+          <Poster id="loaderArc" translation="[-110, -110]" width="220" height="220"
+            uri="pkg:/images/ui/spinner_arc.png" blendColor="0x0b75e0ff" />
+        </Group>
         <MaskGroup id="avatarMask" maskUri="pkg:/images/ui/avatar_circle.png"
           maskSize="[192, 192]" maskOffset="[14, 14]">
           <Poster id="circleBg" translation="[14, 14]" width="192" height="192"
@@ -59,7 +62,9 @@
         fieldToInterp="contentHost.opacity" />
     </Animation>
 
-    <Timer id="arcTimer" duration="0.045" repeat="true" />
-    <Timer id="statusTimer" duration="2.0" repeat="true" />
+    <Animation id="spinnerAnim" duration="0.9" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+        fieldToInterp="spinnerSpin.rotation" />
+    </Animation>
   </children>
 </component>
