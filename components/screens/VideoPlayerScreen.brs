@@ -42,6 +42,7 @@ sub init()
     m.currentIndex = 0
     m.startOver = false
     m.isTrailer = false
+    m.isReel = false
     m.resumeSecs = 0
     ' Resume position to apply once playback is seekable. content.playStart resumes
     ' instantly on devices, but the brs-desktop simulator ignores playStart for HLS,
@@ -219,6 +220,7 @@ sub LoadAndPlay()
     MediaLogPlayUrl("video.player", url)
 
     m.isTrailer = VideoIsTrailer(m.detail)
+    m.isReel = VideoIsReel(m.detail)
     m.resumeSecs = VideoResumeSeconds(m.detail, m.startOver)
     m.introStart = VideoIntroStart(m.detail)
     m.introEnd = VideoIntroEnd(m.detail)
@@ -729,6 +731,7 @@ sub SendProgress()
     if m.disposed then return
     if m.detail = invalid then return
     if m.isTrailer then return                ' trailers don't track progress
+    if m.isReel then return                   ' reels: parity — web reels never POST progress
     videoId = VideoProgressId(m.detail)
     if videoId = "" then return
     if m.position <= 0 then return

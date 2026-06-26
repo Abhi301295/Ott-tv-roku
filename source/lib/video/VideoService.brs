@@ -97,7 +97,13 @@ function VideoIsTrailer(detail as object) as boolean
     return detail.isTrailer = true
 end function
 
-' Subtitle tracks for the ContentNode (parity with the web <track> list built from
+' Reels play inline on web with no updateVideoProgress — only detail player posts progress.
+function VideoIsReel(detail as object) as boolean
+    if detail = invalid then return false
+    return detail.isReel = true
+end function
+
+' Subtitle tracks for the ContentNode
 ' detail.subtitles[].{lang|value|language, path|url}). Returns [] when none.
 function VideoSubtitleTracks(detail as object) as object
     out = []
