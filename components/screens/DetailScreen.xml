@@ -4,6 +4,7 @@
   <interface>
     <field id="navState" type="assocarray" onChange="OnNavStateReady" />
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="stackResumed" type="boolean" value="false" alwaysNotify="true" onChange="OnStackResumed" />
     <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
   </interface>
 
