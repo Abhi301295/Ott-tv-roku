@@ -114,10 +114,6 @@ function ProfileArcFrameCount() as integer
     return 151
 end function
 
-function ProfileArcBandCount() as integer
-    return 12
-end function
-
 function ProfileArcFrameUriForIndex(idx as integer) as string
     last = ProfileArcFrameCount() - 1
     if idx < 0 then idx = 0
@@ -142,24 +138,6 @@ function ProfileArcMaskFrameUriForIndex(idx as integer) as string
         suffix = "0" + suffix
     end if
     return "pkg:/images/ui/profile_arc_mask_" + suffix + ".png"
-end function
-
-function ProfileArcBandFrameUriForIndex(band as integer, idx as integer) as string
-    last = ProfileArcFrameCount() - 1
-    if idx < 0 then idx = 0
-    if idx > last then idx = last
-    n = ProfileArcBandCount()
-    if band < 0 then band = 0
-    if band >= n then band = n - 1
-    bandTag = band.ToStr()
-    if band < 10 then bandTag = "0" + bandTag
-    suffix = idx.ToStr()
-    if idx < 10 then
-        suffix = "00" + suffix
-    else if idx < 100 then
-        suffix = "0" + suffix
-    end if
-    return "pkg:/images/ui/profile_arc_b" + bandTag + "_" + suffix + ".png"
 end function
 
 function ProfileArcFrameUriForProgress(progress as float) as string

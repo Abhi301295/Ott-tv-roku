@@ -18,3 +18,9 @@ node_modules/
 .vscode/
 .idea/
 .cursor/
+
+# Python
+scripts/__pycache__/
+
+# Abandoned 12-band profile arc experiment (use profile_arc_*.png + profile_arc_mask_*.png)
+images/ui/profile_arc_b*.png

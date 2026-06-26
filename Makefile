@@ -29,6 +29,8 @@ profile-square:
 	@python3 scripts/gen_profile_square_arc.py
 	@echo "Regenerated images/ui/profile_sq_*.png"
 
+# Simulator: pre-colored profile_arc_*.png (regenerate when portal colors change).
+# Device: profile_arc_mask_*.png in pkg for runtime bake; colored arcs are fallback until bake completes.
 profile-arcs:
 	@python3 scripts/gen_profile_circular_arc_colored.py \
 		--primary "$(or $(PORTAL_PRIMARY),#0b75e0)" \
