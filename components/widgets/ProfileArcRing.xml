@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Profile auto-select ring — per-pixel portal gradient (React netComponent parity). -->
+<component name="ProfileArcRing" extends="Group">
+  <interface>
+    <field id="ringSize" type="float" value="166" onChange="OnLayoutChanged" />
+    <field id="arcFrame" type="integer" value="0" onChange="OnFrameChanged" />
+    <field id="portalPrimary" type="string" value="0x0b75e0ff" onChange="OnPortalColorsChanged" />
+    <field id="portalSecondary" type="string" value="0xd355cbff" onChange="OnPortalColorsChanged" />
+    <field id="portalTertiary" type="string" value="0xff6b00ff" onChange="OnPortalColorsChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileArcTheme.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/ProfileArcRing.brs" />
+
+  <children>
+    <Poster id="progressArc" width="166" height="166" uri="pkg:/images/ui/profile_arc_000.png"
+      loadDisplayMode="scaleToFill" />
+  </children>
+</component>

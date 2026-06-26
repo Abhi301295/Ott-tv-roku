@@ -29,6 +29,13 @@ profile-square:
 	@python3 scripts/gen_profile_square_arc.py
 	@echo "Regenerated images/ui/profile_sq_*.png"
 
+profile-arcs:
+	@python3 scripts/gen_profile_circular_arc_colored.py \
+		--primary "$(or $(PORTAL_PRIMARY),#0b75e0)" \
+		--secondary "$(or $(PORTAL_SECONDARY),#d355cb)" \
+		--tertiary "$(or $(PORTAL_TERTIARY),#ff6b00)"
+	@echo "Regenerated images/ui/profile_arc_*.png (fallback / sim portal colors)"
+
 validate:
 	@bsc --project bsconfig.json
 

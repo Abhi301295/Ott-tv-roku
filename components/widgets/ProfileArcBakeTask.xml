@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Bakes portal-themed profile arc frames to tmp:/ (device only; sim uses pkg fallback). -->
+<component name="ProfileArcBakeTask" extends="Task">
+  <interface>
+    <field id="portalPrimary" type="string" />
+    <field id="portalSecondary" type="string" />
+    <field id="portalTertiary" type="string" />
+    <field id="colorKey" type="string" />
+    <field id="done" type="boolean" value="false" alwaysNotify="true" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileArcTheme.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/ProfileArcBakeTask.brs" />
+</component>

@@ -4,7 +4,7 @@ sub init()
     m.initialsLbl = m.top.findNode("initialsLbl")
     m.circleBg = m.top.findNode("circleBg")
     m.progressTrack = m.top.findNode("progressTrack")
-    m.progressArc = m.top.findNode("progressArc")
+    m.progressArcRing = m.top.findNode("progressArcRing")
     m.welcomeLbl = m.top.findNode("welcomeLbl")
     m.statusLbl = m.top.findNode("statusLbl")
     m.fadeIn = m.top.findNode("fadeIn")
@@ -42,6 +42,10 @@ end sub
 sub OnColorsChanged()
     primary = m.top.primaryColor
     if primary = invalid or primary = "" then primary = "0x0b75e0ff"
+    secondary = m.top.portalSecondary
+    if secondary = invalid or secondary = "" then secondary = "0xd355cbff"
+    tertiary = m.top.portalTertiary
+    if tertiary = invalid or tertiary = "" then tertiary = ProfileArcHexToRoku(ProfileArcFallbackTertiaryHex())
     neutral50 = m.top.neutral50
     if neutral50 = invalid or neutral50 = "" then neutral50 = "0xf8f1f7ff"
     avatarBg = m.top.avatarBg
@@ -52,6 +56,11 @@ sub OnColorsChanged()
     if m.initialsLbl <> invalid then m.initialsLbl.color = neutral50
     if m.circleBg <> invalid then m.circleBg.blendColor = avatarBg
     if m.progressTrack <> invalid then m.progressTrack.blendColor = neutral50
+    if m.progressArcRing <> invalid then
+        m.progressArcRing.portalPrimary = primary
+        m.progressArcRing.portalSecondary = secondary
+        m.progressArcRing.portalTertiary = tertiary
+    end if
 end sub
 
 sub OnRunningChanged()
@@ -116,6 +125,6 @@ sub OnArcTick()
 end sub
 
 sub ApplyArcFrame()
-    if m.progressArc = invalid then return
-    m.progressArc.uri = ProfileArcFrameUriForIndex(m.arcFrame)
+    if m.progressArcRing = invalid then return
+    m.progressArcRing.arcFrame = m.arcFrame
 end sub

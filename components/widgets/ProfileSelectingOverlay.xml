@@ -6,6 +6,8 @@
     <field id="avatarUri" type="string" value="" onChange="OnProfileChanged" />
     <field id="initials" type="string" value="" onChange="OnProfileChanged" />
     <field id="primaryColor" type="string" value="0x0b75e0ff" onChange="OnColorsChanged" />
+    <field id="portalSecondary" type="string" value="0xd355cbff" onChange="OnColorsChanged" />
+    <field id="portalTertiary" type="string" value="0xff6b00ff" onChange="OnColorsChanged" />
     <field id="neutral50" type="string" value="0xf8f1f7ff" onChange="OnColorsChanged" />
     <field id="avatarBg" type="string" value="0x404040ff" onChange="OnColorsChanged" />
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
@@ -16,6 +18,7 @@
 
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileArcTheme.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/ProfileSelectingOverlay.brs" />
 
   <children>
@@ -27,7 +30,7 @@
       <Group id="avatarStack" translation="[-110, -118]">
         <Poster id="progressTrack" width="220" height="220" uri="pkg:/images/ui/avatar_ring.png"
           blendColor="0xffffffff" opacity="0.28" />
-        <Poster id="progressArc" width="220" height="220" uri="pkg:/images/ui/profile_arc_000.png" />
+        <ProfileArcRing id="progressArcRing" ringSize="220" />
         <MaskGroup id="avatarMask" maskUri="pkg:/images/ui/avatar_circle.png"
           maskSize="[192, 192]" maskOffset="[14, 14]">
           <Poster id="circleBg" translation="[14, 14]" width="192" height="192"

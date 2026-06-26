@@ -15,6 +15,9 @@
     <field id="bgColor" type="string" value="0x171717ff" onChange="OnColorsChanged" />
     <field id="ringColor" type="string" value="0xffffffff" onChange="OnColorsChanged" />
     <field id="nameColor" type="string" value="0xf8f1f7ff" onChange="OnColorsChanged" />
+    <field id="portalPrimary" type="string" value="0x0b75e0ff" onChange="OnPortalColorsChanged" />
+    <field id="portalSecondary" type="string" value="0xd355cbff" onChange="OnPortalColorsChanged" />
+    <field id="portalTertiary" type="string" value="0xff6b00ff" onChange="OnPortalColorsChanged" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
@@ -42,8 +45,7 @@
          multicolor arc that fills clockwise from the top as `progress` advances. -->
     <Poster id="progressTrack" translation="[0, 0]" width="166" height="166"
       uri="pkg:/images/ui/avatar_ring.png" blendColor="0xffffffff" opacity="0.35" visible="false" />
-    <Poster id="progressArc" translation="[0, 0]" width="166" height="166"
-      uri="pkg:/images/ui/profile_arc_000.png" visible="false" />
+    <ProfileArcRing id="progressArcRing" ringSize="166" visible="false" />
     <Poster id="dot" translation="[74, 158]" width="18" height="18"
       uri="pkg:/images/ui/avatar_dot.png" blendColor="0xffffffff" visible="false" />
     <Poster id="lockBadge" translation="[69, 150]" width="28" height="28"
