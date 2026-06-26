@@ -50,7 +50,7 @@ sub init()
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
 
-    ' Grid build pauses on input; search API uses its own 600ms trailing debounce.
+    ' Grid build pauses on input; search API uses its own 500ms trailing debounce.
     m.interacting = false
     m.gridBuildDeferred = false
     m.gridBuildNeedsFresh = false
@@ -217,10 +217,16 @@ function CurrentSearchKeyword() as string
     return kw
 end function
 
+function SearchKeywordInFlight(keyword as string) as boolean
+    if m.searchTask = invalid then return false
+    if m.inFlightKeyword <> keyword then return false
+    return true
+end function
+
 sub CommitPendingSearchIfNeeded()
     kw = CurrentSearchKeyword()
     if kw = m.lastFetchedKeyword then return
-    if kw = m.inFlightKeyword then return
+    if SearchKeywordInFlight(kw) then return
     print "[SEARCH_DBG] debounce commit kw="; kw
     CommitSearch(kw)
 end sub
@@ -522,32 +528,38 @@ sub OnKeyboardKeyPress()
     key = m.keyboard.keyPress
     if key = invalid or key = "" then return
     m.keyboard.keyPress = ""
-    wasNonEmpty = Len(m.searchText) > 0
+
+    if key = "CLEAR" then
+        m.searchText = ""
+        UpdateInputLabel()
+        ResetSearchDebounce()
+        CommitEmptySearchRestore()
+        return
+    end if
+
     if key = "Backspace" then
         if Len(m.searchText) > 0 then m.searchText = Left(m.searchText, Len(m.searchText) - 1)
-    else if key = "CLEAR" then
-        m.searchText = ""
     else
         m.searchText = m.searchText + key
     end if
     UpdateInputLabel()
     kw = CurrentSearchKeyword()
     ScheduleSearch()
-    ' React searchcol.tsx calls getSearchList immediately on CLEAR / empty input — restore browse results.
-    if key = "CLEAR" or (Len(kw) = 0 and wasNonEmpty) then
-        CommitSearchImmediate(kw)
+    if key = "Backspace" and Len(kw) = 0 then
+        ResetSearchDebounce()
+        CommitEmptySearchRestore()
     else
         PushSearchDebounce()
     end if
 end sub
 
-' Immediate fetch — bypasses debounce and lastFetched dedup (needed for CLEAR → "").
-sub CommitSearchImmediate(keyword as string)
-    if keyword = invalid then keyword = ""
-    StopSearchDebouncePoll()
-    m.searchDebounceDeadlineMs = 0
-    m.lastFetchedKeyword = chr(1)
-    FetchSearch(keyword)
+' Restore browse listing (keyword "") — deduped so repeated CLEAR cannot spam the API.
+sub CommitEmptySearchRestore()
+    kw = ""
+    if kw = m.lastFetchedKeyword then return
+    if SearchKeywordInFlight(kw) then return
+    print "[SEARCH_DBG] restore commit kw="; kw
+    FetchSearch(kw)
 end sub
 
 sub UpdateInputLabel()
@@ -805,12 +817,16 @@ sub StopSearchDebouncePoll()
     if m.searchDebouncePoll <> invalid then m.searchDebouncePoll.control = "stop"
 end sub
 
+sub ResetSearchDebounce()
+    StopSearchDebouncePoll()
+    m.searchDebounceDeadlineMs = 0
+end sub
+
 sub OnSearchDebouncePoll()
     if m.searchDebounceDeadlineMs < 1 then return
     now = m.searchDebounceClock.TotalMilliseconds()
     if now < m.searchDebounceDeadlineMs then return
-    StopSearchDebouncePoll()
-    m.searchDebounceDeadlineMs = 0
+    ResetSearchDebounce()
     CommitPendingSearchIfNeeded()
 end sub
 
