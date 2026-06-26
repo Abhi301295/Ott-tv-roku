@@ -216,6 +216,7 @@ sub LoadAndPlay()
         ShowAlert(m.top, 2, CopyVideoLoadFailed())
         return
     end if
+    MediaLogPlayUrl("video.player", url)
 
     m.isTrailer = VideoIsTrailer(m.detail)
     m.resumeSecs = VideoResumeSeconds(m.detail, m.startOver)
