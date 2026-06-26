@@ -3,6 +3,8 @@ sub init()
     m.cardBg = m.top.findNode("cardBg")
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
+    m.thumbFallback = m.cardBg
+    m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.progressTrack = m.top.findNode("progressTrack")
     m.progressFill = m.top.findNode("progressFill")
     ' Build the gradient slices once (fixed node count); colored/sized in ApplyProgressFill.
@@ -38,7 +40,7 @@ end sub
 sub OnThumbLoad()
     status = ""
     if m.thumb <> invalid then status = m.thumb.loadStatus
-    CardOnPosterLoad(m.thumb, m.skeleton)
+    CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 540, 286)
     if status = "ready" or status = "failed" then ReportLoaded()
 end sub
 
@@ -59,30 +61,35 @@ end sub
 sub ApplyAll()
     uri = m.top.thumbnailUri
     if uri <> invalid and uri <> "" then
+        CardHideThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo)
         m.thumb.uri = uri
         m.thumb.visible = true
         status = m.thumb.loadStatus
         ready = (status = "ready" or status = "failed")
         if ready then
-            m.skeleton.visible = false
-            m.skeleton.running = false
-            CardOnPosterLoad(m.thumb, m.skeleton)
+            CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 540, 286)
             ReportLoaded()
         else
             m.skeleton.visible = true
             m.skeleton.running = true
         end if
     else
-        m.thumb.visible = false
-        m.skeleton.visible = true
-        m.skeleton.running = true
+        CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 540, 286)
         if m.dataApplied then ReportLoaded()
     end if
     bg = m.top.cPageBg
     if bg = invalid or bg = "" then bg = SkeletonDefaultPageBg()
     skColors = SkeletonResolveColors(CardSkeletonThemeTokens(m.top))
-    CardApplySkeleton(m.skeleton, skColors.base, skColors.highlight)
-    if m.cardBg <> invalid then m.cardBg.color = CardThumbPlaceholderBg()
+    if m.skeleton <> invalid and m.skeleton.visible = true then
+        CardApplySkeleton(m.skeleton, skColors.base, skColors.highlight)
+    end if
+    if m.cardBg <> invalid then
+        if m.thumbFallbackLogo <> invalid and m.thumbFallbackLogo.visible = true then
+            m.cardBg.color = CardThumbFallbackFillColor(m.top)
+        else
+            m.cardBg.color = CardThumbPlaceholderBg()
+        end if
+    end if
     m.progressTrack.color = CardProgressTrackColor()
     ApplyProgressFill()
 

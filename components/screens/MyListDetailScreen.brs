@@ -303,15 +303,12 @@ sub AppendRowNodes(newItemCount as integer)
                 card.translation = [x, 0]
                 CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800, m.cNeutral700)
                 card.cPageBg = m.cPageBg
-                card.isLoading = false
                 uri = ""
                 title = ""
                 lang = ""
                 tp = ""
                 if item <> invalid then
-                    if item.thumbnails <> invalid then
-                        uri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
-                    end if
+                    uri = WL_ItemThumbnail(item)
                     if item.title <> invalid then title = item.title
                     tp = WL_ItemContentType(item)
                     if item.originalLang <> invalid then lang = item.originalLang

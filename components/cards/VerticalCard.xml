@@ -18,6 +18,8 @@
   <children>
     <Group id="body" translation="[3, 3]">
       <Skeleton id="skeleton" boxWidth="220" boxHeight="300" />
+      <Rectangle id="thumbFallback" width="220" height="300" color="0x262626ff" visible="false" />
+      <Poster id="thumbFallbackLogo" width="92" height="92" loadDisplayMode="scaleToFit" opacity="0.35" visible="false" />
       <Group id="thumbClip" clippingRect="[0, 0, 220, 300]" clippingRectClipsChildren="true">
         <Poster id="thumb" width="220" height="300" loadDisplayMode="scaleToZoom" visible="false" />
       </Group>

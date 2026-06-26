@@ -24,6 +24,8 @@
       </Animation>
       <Group id="thumbWrap" translation="[0, 0]">
         <!-- MaskGroup does not clip in brs-engine/sim — corner nubs + page-bg tint (see ContinueWatchCard). -->
+        <Rectangle id="thumbFallback" width="280" height="150" color="0x262626ff" visible="false" />
+        <Poster id="thumbFallbackLogo" width="118" height="63" loadDisplayMode="scaleToFit" opacity="0.35" visible="false" />
         <Poster id="thumb" width="280" height="150" loadDisplayMode="scaleToZoom" visible="false" />
         <Poster id="grad" width="280" height="150" uri="pkg:/images/ui/grad_bottom.png" opacity="0.35" blendColor="0x505050ff" />
         <Poster id="cornerTL" uri="pkg:/images/ui/search_card_corner_tl.png" width="12" height="12" translation="[0, 0]" loadDisplayMode="scaleToFill" />

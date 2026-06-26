@@ -17,6 +17,8 @@
   <children>
     <Group id="body" translation="[3, 3]">
       <Skeleton id="skeleton" boxWidth="540" boxHeight="312" />
+      <Rectangle id="thumbFallback" width="540" height="312" color="0x262626ff" visible="false" />
+      <Poster id="thumbFallbackLogo" width="220" height="128" loadDisplayMode="scaleToFit" opacity="0.35" visible="false" />
       <Poster id="thumb" width="540" height="312" loadWidth="540" loadHeight="312" loadDisplayMode="scaleToFill" visible="false" />
       <!-- Rounded corners (radius-10) — baked corner covers; MaskGroup doesn't clip in sim.
            Shared round_corner_*.png (#0a0a0a). -->

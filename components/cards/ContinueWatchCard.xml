@@ -25,6 +25,7 @@
            thumbnail loads / on transparent art). -->
       <Rectangle id="cardBg" width="540" height="286" color="0x404040ff" />
       <Skeleton id="skeleton" boxWidth="540" boxHeight="286" />
+      <Poster id="thumbFallbackLogo" width="226" height="120" loadDisplayMode="scaleToFit" opacity="0.35" visible="false" translation="[157, 83]" />
       <Poster id="thumb" width="540" height="286" loadWidth="540" loadHeight="286" loadDisplayMode="scaleToFill" visible="false" />
       <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0x0a0a0aff" />
       <!-- Smooth fill gradient (parity with React from-primary-500 via-600 to-700): built in

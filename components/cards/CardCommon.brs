@@ -9,8 +9,92 @@ function CardProgressTrackColor() as string
 end function
 
 function CardThumbPlaceholderBg() as string
-    return "0x404040ff"
+    ' React verticalCard.tsx animate-pulse bg-neutral-800 (#262626).
+    return "0x262626ff"
 end function
+
+function CardBrandingLogoUrl(fromNode as object) as string
+    if fromNode = invalid then return ""
+    scene = fromNode.getScene()
+    if scene = invalid then return ""
+    tm = scene.findNode("themeManager")
+    if tm = invalid then return ""
+    if tm.brandingLogo <> invalid and tm.brandingLogo <> "" then return tm.brandingLogo
+    return ""
+end function
+
+function CardThumbFallbackFillColor(card as object) as string
+    if card <> invalid and card.hasField("cNeutral800") then
+        c = card.cNeutral800
+        if c <> invalid and c <> "" then return c
+    end if
+    return CardThumbPlaceholderBg()
+end function
+
+function CardResolveThumbSize(poster as object, posterW as integer, posterH as integer) as object
+    w = posterW
+    h = posterH
+    if w <= 0 and poster <> invalid then w = poster.width
+    if h <= 0 and poster <> invalid then h = poster.height
+    if w <= 0 then w = 220
+    if h <= 0 then h = 300
+    return [w, h]
+end function
+
+sub CardLayoutThumbFallbackNodes(fallback as object, fallbackLogo as object, w as integer, h as integer)
+    if fallback <> invalid then
+        fallback.width = w
+        fallback.height = h
+        fallback.translation = [0, 0]
+    end if
+    if fallbackLogo = invalid then return
+    logoW = Int(w * 0.42 + 0.5)
+    logoH = Int(h * 0.42 + 0.5)
+    if logoW < 40 then logoW = 40
+    if logoH < 40 then logoH = 40
+    fallbackLogo.width = logoW
+    fallbackLogo.height = logoH
+    fallbackLogo.translation = [Int((w - logoW) / 2), Int((h - logoH) / 2)]
+    fallbackLogo.loadDisplayMode = "scaleToFit"
+    fallbackLogo.opacity = 0.35
+end sub
+
+sub CardHideThumbPlaceholder(poster as object, skeleton as object, fallback as object, fallbackLogo as object)
+    if skeleton <> invalid then
+        skeleton.running = false
+        skeleton.visible = false
+    end if
+    if fallback <> invalid then fallback.visible = false
+    if fallbackLogo <> invalid then fallbackLogo.visible = false
+end sub
+
+' Terminal missing/broken poster — neutral-800 tile with optional portal logo watermark.
+' ⚠ Parity Note: React verticalCard.tsx keeps animate-pulse shimmer on onError; Roku
+' shows this branded placeholder instead of an infinite skeleton.
+sub CardApplyThumbPlaceholder(poster as object, skeleton as object, fallback as object, fallbackLogo as object, cardNode as object, posterW as integer, posterH as integer)
+    size = CardResolveThumbSize(poster, posterW, posterH)
+    w = size[0]
+    h = size[1]
+    if poster <> invalid then poster.visible = false
+    if skeleton <> invalid then
+        skeleton.running = false
+        skeleton.visible = false
+    end if
+    if fallback <> invalid then
+        fallback.color = CardThumbFallbackFillColor(cardNode)
+        CardLayoutThumbFallbackNodes(fallback, fallbackLogo, w, h)
+        fallback.visible = true
+    end if
+    if fallbackLogo <> invalid then
+        logoUrl = CardBrandingLogoUrl(cardNode)
+        if logoUrl <> "" then
+            fallbackLogo.uri = logoUrl
+            fallbackLogo.visible = true
+        else
+            fallbackLogo.visible = false
+        end if
+    end if
+end sub
 
 function CardSkeletonBaseColor() as string
     return "0x404040ff"
@@ -142,15 +226,22 @@ sub CardApplyFocusBorder(border as object, focused as boolean, color as string)
     end if
 end sub
 
-sub CardOnPosterLoad(poster as object, skeleton as object)
+sub CardOnPosterLoad(poster as object, skeleton as object, fallback = invalid as object, fallbackLogo = invalid as object, cardNode = invalid as object, posterW = 0 as integer, posterH = 0 as integer)
     if poster = invalid then return
     status = poster.loadStatus
-    if status = "ready" or status = "failed" then
-        if skeleton <> invalid then
-            skeleton.running = false
-            skeleton.visible = false
+    if status = "ready" then
+        CardHideThumbPlaceholder(poster, skeleton, fallback, fallbackLogo)
+        poster.visible = true
+    else if status = "failed" then
+        if fallback <> invalid then
+            CardApplyThumbPlaceholder(poster, skeleton, fallback, fallbackLogo, cardNode, posterW, posterH)
+        else
+            if skeleton <> invalid then
+                skeleton.running = false
+                skeleton.visible = false
+            end if
+            poster.visible = false
         end if
-        if status = "failed" and poster <> invalid then poster.visible = false
     end if
 end sub
 

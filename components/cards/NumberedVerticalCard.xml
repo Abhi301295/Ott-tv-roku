@@ -21,6 +21,8 @@
          numeral overlaps the poster's lower-left instead of sitting in empty space. -->
     <Group id="body" translation="[24, 3]">
       <Skeleton id="skeleton" boxWidth="368" boxHeight="208" />
+      <Rectangle id="thumbFallback" width="368" height="208" color="0x262626ff" visible="false" />
+      <Poster id="thumbFallbackLogo" width="154" height="87" loadDisplayMode="scaleToFit" opacity="0.35" visible="false" />
       <Poster id="thumb" width="368" height="208" loadWidth="368" loadHeight="208" loadDisplayMode="scaleToFill" visible="false" />
       <!-- Rounded corners (radius-10): the simulator ignores MaskGroup, so baked corner covers
            hide the square poster corners. Shared round_corner_*.png set (#0a0a0a backdrop). -->

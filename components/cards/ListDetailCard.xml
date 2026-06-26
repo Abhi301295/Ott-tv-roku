@@ -24,6 +24,8 @@
     <Group id="contentHost">
       <Group id="thumbBlock">
         <Skeleton id="thumbSkel" boxWidth="368" boxHeight="208" />
+        <Rectangle id="thumbFallback" width="368" height="208" color="0x262626ff" visible="false" />
+        <Poster id="thumbFallbackLogo" width="154" height="87" loadDisplayMode="scaleToFit" opacity="0.35" visible="false" />
         <Poster id="thumb" width="368" height="208" loadDisplayMode="scaleToZoom" visible="false" />
         <Poster id="grad" width="368" height="208" uri="pkg:/images/ui/grad_bottom.png" opacity="0.35" blendColor="0x505050ff" />
       </Group>

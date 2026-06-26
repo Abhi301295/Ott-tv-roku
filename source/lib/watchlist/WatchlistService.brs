@@ -32,6 +32,20 @@ function WL_DetailHasMore(api as object, batchCount as integer) as boolean
     return true
 end function
 
+function WL_ItemThumbnail(item as object) as string
+    if item = invalid then return ""
+    thumbs = item.thumbnails
+    if (thumbs = invalid or thumbs.Count() = 0) and item.content <> invalid then
+        thumbs = item.content.thumbnails
+    end if
+    uri = GetCardImgByType(HC_CardTypeHorizontal(), thumbs)
+    if uri <> "" then return uri
+    if item.image <> invalid and item.image <> "" then return item.image.ToStr()
+    if item.poster <> invalid and item.poster <> "" then return item.poster.ToStr()
+    if item.banner <> invalid and item.banner <> "" then return item.banner.ToStr()
+    return ""
+end function
+
 function WL_ItemContentType(item as object) as string
     if item = invalid then return ""
     tp = ""
