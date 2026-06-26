@@ -154,6 +154,18 @@ function HeroToggleMute() as void
     UpdateMuteIcon()
 end function
 
+function PauseAutoAdvance(dummy = invalid as dynamic) as boolean
+    StopSwipeTimer()
+    return true
+end function
+
+function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
+    if not m.top.visible or ItemCount() < 2 then return true
+    if m.isVideoPlaying then return true
+    RestartSwipeTimer()
+    return true
+end function
+
 sub UpdateMuteIcon()
     if m.muteIcon = invalid or m.trailerVideo = invalid then return
     if m.trailerVideo.mute then

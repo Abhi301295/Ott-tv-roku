@@ -504,3 +504,17 @@ end function
 function HeroToggleMute(dummy = invalid as dynamic) as boolean
     return true
 end function
+
+function PauseAutoAdvance(dummy = invalid as dynamic) as boolean
+    if m.swipeTimer <> invalid then m.swipeTimer.control = "stop"
+    return true
+end function
+
+function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
+    if not m.top.visible or ItemCount() < 2 then return true
+    if m.swipeTimer <> invalid then
+        m.swipeTimer.control = "stop"
+        m.swipeTimer.control = "start"
+    end if
+    return true
+end function
