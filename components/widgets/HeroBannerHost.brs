@@ -27,6 +27,7 @@ sub ApplyHeroSelection()
         m.activeHero.visible = true
     end if
     SyncToActiveHero()
+    ApplyAutoAdvanceHold()
 end sub
 
 sub HideAllHeroes()
@@ -112,6 +113,19 @@ sub OnContentWidthChanged()
     SyncHeroViewport()
 end sub
 
+sub OnAutoAdvanceHoldChanged()
+    ApplyAutoAdvanceHold()
+end sub
+
+sub ApplyAutoAdvanceHold()
+    if m.activeHero = invalid then return
+    if m.top.autoAdvanceHold = true then
+        m.activeHero.callFunc("PauseAutoAdvance", invalid)
+    else
+        m.activeHero.callFunc("ResumeAutoAdvance", invalid)
+    end if
+end sub
+
 function HeroGoNext(dummy = invalid as dynamic) as boolean
     if m.activeHero <> invalid then return m.activeHero.callFunc("HeroGoNext", invalid)
     return true
@@ -124,5 +138,15 @@ end function
 
 function HeroToggleMute(dummy = invalid as dynamic) as boolean
     if m.activeHero <> invalid then return m.activeHero.callFunc("HeroToggleMute", invalid)
+    return true
+end function
+
+function PauseAutoAdvance(dummy = invalid as dynamic) as boolean
+    if m.activeHero <> invalid then m.activeHero.callFunc("PauseAutoAdvance", invalid)
+    return true
+end function
+
+function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
+    if m.activeHero <> invalid then m.activeHero.callFunc("ResumeAutoAdvance", invalid)
     return true
 end function

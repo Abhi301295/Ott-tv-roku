@@ -40,7 +40,7 @@
     <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
 
     <Group id="contentHost" translation="[0, 0]">
-    <HeroBannerOtt id="hero" translation="[0, 0]" visible="true" contentWidth="1920" />
+    <HeroBannerOtt id="hero" translation="[0, 0]" visible="false" contentWidth="1920" />
     <GenreListSkeleton id="genreSkeleton" visible="false" />
 
     <Group id="rowsHost" translation="[0, 594]" visible="false" />

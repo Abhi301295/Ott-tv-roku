@@ -15,13 +15,12 @@ sub init()
     m.emptyHost = m.top.findNode("emptyHost")
     m.emptyIcon = m.top.findNode("emptyIcon")
     m.emptyLbl = m.top.findNode("emptyLbl")
-    m.searchDebounceTimer = m.top.findNode("searchDebounceTimer")
 
     m.focusZone = "input"
     m.searchText = ""
-    m.pendingKeyword = ""
     m.lastFetchedKeyword = chr(1)
     m.inFlightKeyword = ""
+    m.searchDebounceDeadlineMs = 0
     m.results = []
     m.cardNodes = []
     m.gridIndex = 0
@@ -50,10 +49,29 @@ sub init()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
-    if m.searchDebounceTimer <> invalid then
-        m.searchDebounceTimer.duration = SR_SearchDebounceMs()
-        m.searchDebounceTimer.observeField("fire", "OnSearchDebounceFire")
-    end if
+
+    ' Grid build pauses on input; search API uses its own 400ms trailing debounce.
+    m.interacting = false
+    m.gridBuildDeferred = false
+    m.gridBuildNeedsFresh = false
+    m.gridBuildIdx = 0
+    m.gridBuildTimer = CreateObject("roSGNode", "Timer")
+    m.gridBuildTimer.duration = 0.02
+    m.gridBuildTimer.repeat = true
+    m.top.appendChild(m.gridBuildTimer)
+    m.gridBuildTimer.observeField("fire", "OnGridBuildTick")
+    m.searchDebounceClock = CreateObject("roTimespan")
+    m.searchDebouncePoll = CreateObject("roSGNode", "Timer")
+    m.searchDebouncePoll.duration = 0.05
+    m.searchDebouncePoll.repeat = true
+    m.top.appendChild(m.searchDebouncePoll)
+    m.searchDebouncePoll.observeField("fire", "OnSearchDebouncePoll")
+    m.interactIdle = CreateObject("roSGNode", "Timer")
+    m.interactIdle.duration = 0.25
+    m.interactIdle.repeat = false
+    m.top.appendChild(m.interactIdle)
+    m.interactIdle.observeField("fire", "OnGridInteractIdle")
+
     ApplyEmptyCopy()
 end sub
 
@@ -61,7 +79,6 @@ sub OnNavStateReady()
     LoadSearchTokens()
     ApplySearchTokens()
     EnterInput()
-    m.pendingKeyword = ""
     FetchSearch("")
 end sub
 
@@ -69,10 +86,9 @@ sub OnDispose()
     if not m.top.dispose then return
     KillSearchTask(m.searchTask)
     m.searchTask = invalid
-    if m.searchDebounceTimer <> invalid then
-        m.searchDebounceTimer.control = "stop"
-        m.searchDebounceTimer.unobserveField("fire")
-    end if
+    if m.gridBuildTimer <> invalid then m.gridBuildTimer.control = "stop"
+    if m.searchDebouncePoll <> invalid then m.searchDebouncePoll.control = "stop"
+    if m.interactIdle <> invalid then m.interactIdle.control = "stop"
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid then tm.unobserveField("ready")
     if m.global <> invalid and m.global.hasField("businessResolved") then
@@ -85,6 +101,13 @@ end sub
 sub KillSearchTask(task as object)
     if task = invalid then return
     task.unobserveField("apiResult")
+    if task.hasField("control") then task.control = "stop"
+end sub
+
+sub CancelInFlightSearch()
+    KillSearchTask(m.searchTask)
+    m.searchTask = invalid
+    m.inFlightKeyword = ""
 end sub
 
 sub OnThemeReady()
@@ -184,23 +207,27 @@ function SearchGridCols(panelW as integer) as integer
     return cols
 end function
 
-sub ScheduleSearch(keyword as string)
-    if keyword = invalid then keyword = ""
-    if keyword <> m.lastFetchedKeyword then BeginSearchLoading()
-    m.pendingKeyword = keyword
-    if m.searchDebounceTimer = invalid then
-        CommitSearch(keyword)
-        return
-    end if
-    m.searchDebounceTimer.duration = SR_SearchDebounceMs()
-    m.searchDebounceTimer.control = "stop"
-    m.searchDebounceTimer.control = "start"
+sub ScheduleSearch()
+    CancelInFlightSearch()
 end sub
 
-sub OnSearchDebounceFire()
-    kw = m.pendingKeyword
-    if kw = invalid then kw = ""
+function CurrentSearchKeyword() as string
+    kw = m.searchText.Trim()
+    if kw = invalid then return ""
+    return kw
+end function
+
+function SearchKeywordInFlight(keyword as string) as boolean
+    if m.searchTask = invalid then return false
+    if m.inFlightKeyword <> keyword then return false
+    return true
+end function
+
+sub CommitPendingSearchIfNeeded()
+    kw = CurrentSearchKeyword()
     if kw = m.lastFetchedKeyword then return
+    if SearchKeywordInFlight(kw) then return
+    print "[SEARCH_DBG] debounce commit kw="; kw
     CommitSearch(kw)
 end sub
 
@@ -212,11 +239,12 @@ end sub
 
 sub FetchSearch(keyword as string)
     if keyword = invalid then keyword = ""
-    m.lastFetchedKeyword = keyword
+    CancelInFlightSearch()
+    StopGridBuild()
     m.inFlightKeyword = keyword
     m.loading = true
-    BeginSearchLoading()
-    KillSearchTask(m.searchTask)
+    ' searchgrid.tsx: skeleton/spinner only when there are no cards to show yet.
+    if m.cardNodes.Count() = 0 then BeginSearchLoading()
     path = SearchBuildPath(keyword, 1, SR_ApiLimit())
     m.searchTask = ApiGet(path)
     m.searchTask.observeField("apiResult", "OnSearchResponse")
@@ -239,10 +267,17 @@ sub OnSearchResponse()
     respondedKw = m.inFlightKeyword
     m.searchTask = invalid
 
-    if respondedKw <> m.pendingKeyword then return
+    if respondedKw <> CurrentSearchKeyword() then
+        print "[SEARCH_DBG] stale response kw="; respondedKw; " current="; CurrentSearchKeyword()
+        m.inFlightKeyword = ""
+        m.loading = false
+        ShowLoading(false)
+        return
+    end if
 
+    m.inFlightKeyword = ""
+    m.lastFetchedKeyword = respondedKw
     m.loading = false
-    ShowLoading(false)
 
     m.results = SearchParseListing(api)
     count = m.results.Count()
@@ -250,10 +285,15 @@ sub OnSearchResponse()
     if count = 0 and Len(m.searchText) > 0 then
         ShowEmpty(true)
         ClearGrid()
+        ShowLoading(false)
+        return
+    end if
+    if count = 0 then
+        ShowLoading(false)
         return
     end if
     ShowEmpty(false)
-    BuildGrid()
+    ScheduleGridBuild()
 end sub
 
 sub ShowLoading(show as boolean)
@@ -339,6 +379,8 @@ sub ApplyEmptyLayout()
 end sub
 
 sub ClearGrid()
+    StopGridBuild()
+    m.gridBuildIdx = 0
     if m.gridHost = invalid then return
     m.gridHost.removeChildrenIndex(m.gridHost.getChildCount(), 0)
     m.cardNodes = []
@@ -346,25 +388,121 @@ sub ClearGrid()
     m.gridScrollY = 0
 end sub
 
-sub BuildGrid()
-    ClearGrid()
-    if m.gridHost = invalid then return
-    for i = 0 to m.results.Count() - 1
-        item = m.results[i]
-        if item = invalid then continue for
-        cardPos = SearchCardPos(i)
-        card = m.gridHost.createChild("SearchResultCard")
-        card.translation = [cardPos[0], cardPos[1]]
-        card.title = item.title
-        card.thumbnailUri = SearchHorizontalThumb(item)
-        card.cPrimary700 = m.cPrimary700
-        card.cNeutral50 = m.cText
-        card.cNeutral700 = m.cKeyBorder
-        card.cPageBg = m.cPageBg
-        m.cardNodes.Push(card)
-    end for
+sub ScheduleGridBuild()
+    if m.interacting then
+        m.gridBuildDeferred = true
+        m.gridBuildNeedsFresh = true
+        StopGridBuild()
+        return
+    end if
+    m.gridBuildNeedsFresh = false
+    StartGridBuild(true)
+end sub
+
+' fresh=true clears prior cards; false resumes from gridBuildIdx after input pause.
+sub StartGridBuild(fresh as boolean)
+    m.gridBuildDeferred = false
+    if fresh then
+        StopGridBuild()
+        m.gridBuildIdx = 0
+        m.gridScrollY = 0
+        if m.gridHost <> invalid then
+            m.gridHost.removeChildrenIndex(m.gridHost.getChildCount(), 0)
+        end if
+        m.cardNodes = []
+        m.gridIndex = 0
+        ShowEmpty(false)
+    end if
+    if m.gridHost = invalid or m.results = invalid then return
+    if m.results.Count() = 0 then return
+    if m.gridBuildIdx >= m.results.Count() then
+        RevealSearchResults()
+        FinishGridBuild()
+        return
+    end if
+    ' Cold load: fill the skeleton viewport synchronously, then progressive rows below.
+    if fresh then
+        AppendGridRows(SR_SkeletonRows())
+        RevealSearchResults()
+    end if
+    if m.gridBuildIdx >= m.results.Count() then
+        FinishGridBuild()
+        return
+    end if
+    if m.gridBuildTimer <> invalid then m.gridBuildTimer.control = "start"
+end sub
+
+sub StopGridBuild()
+    if m.gridBuildTimer <> invalid then m.gridBuildTimer.control = "stop"
+end sub
+
+sub OnGridBuildTick()
+    if m.top.dispose = true then
+        StopGridBuild()
+        return
+    end if
+    if m.interacting then
+        m.gridBuildDeferred = true
+        StopGridBuild()
+        return
+    end if
+    if m.gridHost = invalid or m.results = invalid then
+        StopGridBuild()
+        return
+    end if
+    total = m.results.Count()
+    if m.gridBuildIdx >= total then
+        StopGridBuild()
+        RevealSearchResults()
+        FinishGridBuild()
+        return
+    end if
+
+    AppendGridRows(1)
+    RevealSearchResults()
+
+    if m.gridBuildIdx >= total then
+        StopGridBuild()
+        FinishGridBuild()
+    end if
+end sub
+
+' Materialize up to rowCount grid rows from m.gridBuildIdx (one row per call when rowCount=1).
+sub AppendGridRows(rowCount as integer)
+    if rowCount < 1 then return
+    if m.gridHost = invalid or m.results = invalid then return
+    total = m.results.Count()
+    rowsBuilt = 0
+    while rowsBuilt < rowCount and m.gridBuildIdx < total
+        rowEnd = m.gridBuildIdx + m.gridCols
+        if rowEnd > total then rowEnd = total
+        for i = m.gridBuildIdx to rowEnd - 1
+            item = m.results[i]
+            if item = invalid then continue for
+            cardPos = SearchCardPos(i)
+            card = m.gridHost.createChild("SearchResultCard")
+            card.translation = [cardPos[0], cardPos[1]]
+            card.title = item.title
+            card.thumbnailUri = SearchHorizontalThumb(item)
+            card.cPrimary700 = m.cPrimary700
+            card.cNeutral50 = m.cText
+            card.cNeutral700 = m.cKeyBorder
+            card.cPageBg = m.cPageBg
+            m.cardNodes.Push(card)
+        end for
+        m.gridBuildIdx = rowEnd
+        rowsBuilt = rowsBuilt + 1
+    end while
+end sub
+
+sub RevealSearchResults()
+    if m.cardNodes.Count() < 1 then return
+    if m.loadingHost = invalid or m.loadingHost.visible <> true then return
+    ShowLoading(false)
+end sub
+
+sub FinishGridBuild()
     if m.gridIndex >= m.cardNodes.Count() then m.gridIndex = 0
-    m.gridScrollY = 0
     ApplyGridFocus()
 end sub
 
@@ -386,20 +524,42 @@ function SearchCardPos(index as integer) as object
 end function
 
 sub OnKeyboardKeyPress()
+    BeginGridInteraction()
     key = m.keyboard.keyPress
     if key = invalid or key = "" then return
     m.keyboard.keyPress = ""
+
+    if key = "CLEAR" then
+        m.searchText = ""
+        UpdateInputLabel()
+        ResetSearchDebounce()
+        CommitEmptySearchRestore()
+        return
+    end if
+
     if key = "Backspace" then
         if Len(m.searchText) > 0 then m.searchText = Left(m.searchText, Len(m.searchText) - 1)
-    else if key = "CLEAR" then
-        m.searchText = ""
     else
         m.searchText = m.searchText + key
     end if
     UpdateInputLabel()
-    kw = m.searchText.Trim()
-    if kw = "" then kw = ""
-    ScheduleSearch(kw)
+    kw = CurrentSearchKeyword()
+    ScheduleSearch()
+    if key = "Backspace" and Len(kw) = 0 then
+        ResetSearchDebounce()
+        CommitEmptySearchRestore()
+    else
+        PushSearchDebounce()
+    end if
+end sub
+
+' Restore browse listing (keyword "") — deduped so repeated CLEAR cannot spam the API.
+sub CommitEmptySearchRestore()
+    kw = ""
+    if kw = m.lastFetchedKeyword then return
+    if SearchKeywordInFlight(kw) then return
+    print "[SEARCH_DBG] restore commit kw="; kw
+    FetchSearch(kw)
 end sub
 
 sub UpdateInputLabel()
@@ -521,6 +681,7 @@ sub OnKey()
     if not ev.press then return
     if m.vm <> invalid and m.vm.shellFocus = "header" then return
 
+    BeginGridInteraction()
     key = ev.key
     if m.focusZone = "input" then
         if key = "up" then
@@ -643,4 +804,58 @@ sub OpenDetail(idx as integer)
     if m.vm <> invalid then
         m.vm.callFunc("NavigatePush", RouteDetail(), { id: id, type: tp })
     end if
+end sub
+
+sub PushSearchDebounce()
+    debounceMs = Int(SR_SearchDebounceMs() * 1000 + 0.5)
+    if debounceMs < 1 then debounceMs = 1
+    m.searchDebounceDeadlineMs = m.searchDebounceClock.TotalMilliseconds() + debounceMs
+    if m.searchDebouncePoll <> invalid then m.searchDebouncePoll.control = "start"
+end sub
+
+sub StopSearchDebouncePoll()
+    if m.searchDebouncePoll <> invalid then m.searchDebouncePoll.control = "stop"
+end sub
+
+sub ResetSearchDebounce()
+    StopSearchDebouncePoll()
+    m.searchDebounceDeadlineMs = 0
+end sub
+
+sub OnSearchDebouncePoll()
+    if m.searchDebounceDeadlineMs < 1 then return
+    now = m.searchDebounceClock.TotalMilliseconds()
+    if now < m.searchDebounceDeadlineMs then return
+    ResetSearchDebounce()
+    CommitPendingSearchIfNeeded()
+end sub
+
+sub BeginGridInteraction()
+    m.interacting = true
+    StopGridBuild()
+    if GridBuildIncomplete() then m.gridBuildDeferred = true
+    if m.interactIdle <> invalid then
+        m.interactIdle.control = "stop"
+        m.interactIdle.control = "start"
+    end if
+end sub
+
+function GridBuildIncomplete() as boolean
+    if m.results = invalid then return false
+    total = m.results.Count()
+    if total = 0 then return false
+    return m.gridBuildIdx < total
+end function
+
+sub OnGridInteractIdle()
+    m.interacting = false
+    if not GridBuildIncomplete() then
+        m.gridBuildDeferred = false
+        m.gridBuildNeedsFresh = false
+        return
+    end if
+    fresh = m.gridBuildNeedsFresh
+    m.gridBuildDeferred = false
+    m.gridBuildNeedsFresh = false
+    StartGridBuild(fresh)
 end sub

@@ -76,6 +76,7 @@ sub init()
     ApplyProfileLayoutFromSpec()
     ApplyProfileSkeletonLayout()
     ApplyProfileColors()
+    ApplyProfileArcColors()
     ApplyProfileBranding()
 
     m.vm = FindViewManager(m.top)
@@ -128,7 +129,6 @@ sub OnDispose()
     if m.prefetchCatRetryTimer <> invalid then m.prefetchCatRetryTimer.control = "stop"
     m.prefetchCatalogHandled = false
     if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
-    if m.profileLoginDeferTimer <> invalid then m.profileLoginDeferTimer.control = "stop"
     if m.listScrollAnimTimer <> invalid then m.listScrollAnimTimer.control = "stop"
     m.profilesTask = invalid
     m.selectTask = invalid
@@ -175,6 +175,16 @@ sub LoadProfileTokens()
     ' Color behind the avatar corners; switches to a near-black scrim when the
     ' focus backdrop is visible so the corner-mask circle keeps blending cleanly.
     m.cAvatarBg = m.cBg
+    LoadProfilePortalColors()
+end sub
+
+sub LoadProfilePortalColors()
+    resolved = invalid
+    if m.global <> invalid then resolved = m.global.businessResolved
+    portal = ProfilePortalRokuColors(resolved)
+    m.cPortalPrimary = portal.primary
+    m.cPortalSecondary = portal.secondary
+    m.cPortalTertiary = portal.tertiary
 end sub
 
 function TC(name as string, fallbackHex as string) as string
@@ -473,6 +483,7 @@ sub OnBusinessResolved()
     ApplyProfileLayoutFromSpec()
     ApplyProfileSkeletonLayout()
     ApplyProfileColors()
+    ApplyProfileArcColors()
     ApplySquareAvatarColors()
     ApplyProfileBranding()
     ApplyProfileFocus()
@@ -488,6 +499,52 @@ sub ApplySquareAvatarColors()
         av.nameColor = m.cNeutral50
         av.hintColor = m.cNeutral400
     end for
+end sub
+
+sub ApplyProfileArcColors()
+    LoadProfilePortalColors()
+    for each av in m.avatars
+        if av <> invalid and av.hasField("portalPrimary") then
+            av.portalPrimary = m.cPortalPrimary
+            av.portalSecondary = m.cPortalSecondary
+            av.portalTertiary = m.cPortalTertiary
+        end if
+    end for
+    if m.selectingOverlay <> invalid then
+        m.selectingOverlay.primaryColor = m.cPortalPrimary
+        m.selectingOverlay.portalSecondary = m.cPortalSecondary
+        m.selectingOverlay.portalTertiary = m.cPortalTertiary
+    end if
+    if m.vm <> invalid then
+        node = ProfileTransitionNode(m.vm)
+        if node <> invalid then
+            node.primaryColor = m.cPortalPrimary
+            node.portalSecondary = m.cPortalSecondary
+            node.portalTertiary = m.cPortalTertiary
+        end if
+    end if
+    EnsureProfileArcBakeTask()
+    ProfileArcStartBake(m.profileArcBakeTask, m.global, m.cPortalPrimary, m.cPortalSecondary, m.cPortalTertiary)
+end sub
+
+sub EnsureProfileArcBakeTask()
+    if m.profileArcBakeTask <> invalid then return
+    m.profileArcBakeTask = CreateObject("roSGNode", "ProfileArcBakeTask")
+    m.profileArcBakeTask.id = "profileArcBakeTask"
+    m.top.appendChild(m.profileArcBakeTask)
+    m.profileArcBakeTask.observeField("done", "OnProfileArcBakeDone")
+end sub
+
+sub OnProfileArcBakeDone()
+    if m.profileArcBakeTask = invalid then return
+    if m.profileArcBakeTask.done <> true then return
+    key = m.profileArcBakeTask.colorKey
+    if key = invalid then key = ""
+    if m.global <> invalid then
+        ProfileArcEnsureGlobalFields(m.global)
+        m.global.profileArcBakeKey = key
+        m.global.profileArcBakeReady = true
+    end if
 end sub
 
 sub ApplyProfileBranding()
@@ -541,7 +598,7 @@ sub BindSelectingOverlayProfile()
     if p.name <> invalid then nm = p.name
     uri = ""
     if p.avatar <> invalid then uri = p.avatar
-    ProfileTransitionShow(m.vm, nm, uri, ProfileInitials(nm), m.cPrimary500, m.cNeutral50, m.cAvatarBg)
+    ProfileTransitionShow(m.vm, nm, uri, ProfileInitials(nm), m.cPortalPrimary, m.cPortalSecondary, m.cPortalTertiary, m.cNeutral50, m.cAvatarBg)
 end sub
 
 sub ShowSelectingOverlay(show as boolean)
@@ -828,6 +885,7 @@ sub BuildAvatars()
     end for
     ReflowProfileRows()
     ApplyProfileListScrollSnap()
+    ApplyProfileArcColors()
 end sub
 
 ' ── Focus ────────────────────────────────────────────────────────────────────

@@ -64,6 +64,5 @@
       </Group>
     </Group>
 
-    <Timer id="searchDebounceTimer" duration="0.4" repeat="false" />
   </children>
 </component>

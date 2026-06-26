@@ -127,6 +127,19 @@ function ProfileArcFrameUriForIndex(idx as integer) as string
     return "pkg:/images/ui/profile_arc_" + suffix + ".png"
 end function
 
+function ProfileArcMaskFrameUriForIndex(idx as integer) as string
+    last = ProfileArcFrameCount() - 1
+    if idx < 0 then idx = 0
+    if idx > last then idx = last
+    suffix = idx.ToStr()
+    if idx < 10 then
+        suffix = "00" + suffix
+    else if idx < 100 then
+        suffix = "0" + suffix
+    end if
+    return "pkg:/images/ui/profile_arc_mask_" + suffix + ".png"
+end function
+
 function ProfileArcFrameUriForProgress(progress as float) as string
     last = ProfileArcFrameCount() - 1
     idx = Int(progress * last + 0.5)

@@ -11,9 +11,13 @@
     <field id="focusTarget" type="string" value="" onChange="OnFocusTargetChanged" />
     <!-- Usable width after the left sidebar inset (1920 − offset). Keeps hero controls in view. -->
     <field id="contentWidth" type="integer" value="1920" onChange="OnContentWidthChanged" />
+    <!-- Tracks input-priority pause; Resume/Pause are driven explicitly from HomeScreen. -->
+    <field id="autoAdvanceHold" type="boolean" value="false" onChange="OnAutoAdvanceHoldChanged" />
     <function name="HeroGoNext" />
     <function name="HeroGoPrev" />
     <function name="HeroToggleMute" />
+    <function name="PauseAutoAdvance" />
+    <function name="ResumeAutoAdvance" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />

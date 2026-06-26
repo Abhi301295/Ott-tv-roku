@@ -360,6 +360,7 @@ function SR_SkeletonRows() as integer
 end function
 
 function SR_SearchDebounceMs() as float
+    ' Trailing debounce on keyboard input — one API call 400ms after the last keypress.
     return 0.4
 end function
 

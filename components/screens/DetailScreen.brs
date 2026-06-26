@@ -38,6 +38,7 @@ sub init()
     m.actionIds = []
     m.loading = true
     m.watchlistBusy = false
+    m.detailFetchSilent = false
 
     m.vm = FindViewManager(m.top)
     LoadDetailTokens()
@@ -60,7 +61,19 @@ sub OnNavStateReady()
     if state.id <> invalid then m.contentId = state.id
     if state.type <> invalid then m.contentType = state.type
     if m.contentId = "" or m.contentType = "" then return
-    FetchDetail()
+    FetchDetail(false)
+end sub
+
+' ViewManager sets stackResumed when a pushed screen (e.g. VideoPlayer) is popped.
+' Refetch contents/view in the background so continueWatching updates the Watch button.
+sub OnStackResumed()
+    if m.top.stackResumed <> true then return
+    m.top.stackResumed = false
+    if m.top.dispose = true then return
+    if m.contentId = "" or m.contentType = "" then return
+    if m.content = invalid then return
+    print "[DETAIL_DBG] stack_resumed silent_refresh id=" + m.contentId
+    FetchDetail(true)
 end sub
 
 sub OnDispose()
@@ -184,8 +197,11 @@ sub ShowLoading(show as boolean)
     end if
 end sub
 
-sub FetchDetail()
-    ShowLoading(true)
+sub FetchDetail(silent as boolean)
+    KillDetailTask(m.detailTask)
+    m.detailTask = invalid
+    m.detailFetchSilent = silent
+    if not silent then ShowLoading(true)
     path = DetailContentPath(m.contentId, m.contentType)
     m.detailTask = ApiGet(path)
     m.detailTask.observeField("apiResult", "OnDetailResponse")
@@ -198,8 +214,14 @@ sub OnDetailResponse()
     m.detailTask.unobserveField("apiResult")
     api = m.detailTask.apiResult
     m.detailTask = invalid
+    silent = m.detailFetchSilent = true
+    m.detailFetchSilent = false
 
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 then
+        if silent then
+            print "[DETAIL_DBG] silent_refresh failed status=" + Str(api.statusCode)
+            return
+        end if
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         ShowLoading(false)
         return
@@ -208,6 +230,7 @@ sub OnDetailResponse()
     raw = invalid
     if api.result <> invalid then raw = api.result
     if raw = invalid then
+        if silent then return
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         ShowLoading(false)
         return
@@ -215,10 +238,17 @@ sub OnDetailResponse()
 
     m.content = EnrichDetailContent(raw, m.contentType)
     ApplyDetailContent()
-    ShowLoading(false)
-    RebuildActionList()
-    m.actionIndex = 0
-    ApplyActionFocus()
+    if silent then
+        print "[DETAIL_DBG] silent_refresh ok watchLabel=" + m.watchNowBtn.label
+        RebuildActionList()
+        if m.actionIndex >= m.actionIds.Count() then m.actionIndex = 0
+        ApplyActionFocus()
+    else
+        ShowLoading(false)
+        RebuildActionList()
+        m.actionIndex = 0
+        ApplyActionFocus()
+    end if
 end sub
 
 sub ApplyDetailContent()

@@ -163,3 +163,11 @@ end function
 function HeroToggleMute(dummy = invalid as dynamic) as boolean
     return true
 end function
+
+function PauseAutoAdvance(dummy = invalid as dynamic) as boolean
+    return true
+end function
+
+function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
+    return true
+end function

@@ -79,7 +79,10 @@ sub OnRowVisualChanged()
     ' netflixContent.tsx: focused=1, above focus=0, below focus=0.4 (OTT below stays 1.0).
     if m.top.rowFocused = true then
         m.top.opacity = 1.0
-        if m.top.ottRowReveal = true and m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
+        if m.top.ottRowReveal = true then
+            if m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
+            if m.cards.Count() > 0 then RevealStripNow()
+        end if
     else if m.top.rowSuppressed = true then
         m.top.opacity = 0.0
     else if m.top.rowPeekVisible = true then
@@ -288,8 +291,14 @@ sub OnCardBuildTick()
         return
     end if
 
-    ' One card per tick keeps each render-thread slice tiny so the hero animation and
-    ' input stay responsive while the row fills in.
+    AppendNextCardFromPlan()
+    FinishCardBuildIfDone()
+end sub
+
+sub AppendNextCardFromPlan()
+    if m.buildPlan = invalid then return
+    if m.buildIdx >= m.buildPlan.Count() then return
+
     plan = m.buildPlan[m.buildIdx]
     gap = HC_CardGap()
 
@@ -315,27 +324,58 @@ sub OnCardBuildTick()
 
     m.buildIdx = m.buildIdx + 1
 
-    ' Highlight only the card just built (if it's the focused one) instead of looping the
-    ' whole strip on every 10ms tick. The full focus pass runs once at completion below.
     newCard = m.cards[m.cards.Count() - 1]
     if newCard <> invalid and newCard.hasField("focusedState") then
         newCard.focusedState = ((m.cards.Count() - 1) = m.top.cardFocusIndex)
     end if
-
-    if m.buildIdx >= m.buildPlan.Count() then
-        m.cardTimer.control = "stop"
-        if m.cardTimer <> invalid then m.cardTimer.duration = 0.01
-        OnCardFocusChanged()
-        m.buildComplete = true
-        m.buildActive = false
-        m.top.built = true
-        ' If we're still waiting on card thumbnails, arm the safety fallback.
-        if m.pendingMediaLoads > 0 and m.revealTimer <> invalid then
-            m.revealTimer.control = "start"
-        end if
-        MaybeReveal()
-    end if
 end sub
+
+sub FinishCardBuildIfDone()
+    if m.buildIdx < m.buildPlan.Count() then return
+    m.cardTimer.control = "stop"
+    if m.cardTimer <> invalid then m.cardTimer.duration = 0.01
+    OnCardFocusChanged()
+    m.buildComplete = true
+    m.buildActive = false
+    m.top.built = true
+    if m.pendingMediaLoads > 0 and m.revealTimer <> invalid then
+        m.revealTimer.control = "start"
+    end if
+    MaybeReveal()
+end sub
+
+sub RevealStripNow()
+    if m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
+    if m.cardsHost <> invalid then m.cardsHost.opacity = 1.0
+end sub
+
+' Sync-build the first N cards (focused-row navigation) so the strip is visible immediately.
+function BuildCardsNow(maxCards as dynamic) as boolean
+    limit = 6
+    if maxCards <> invalid then
+        if Type(maxCards) = "roInt" or Type(maxCards) = "Integer" then limit = maxCards
+        if Type(maxCards) = "roFloat" or Type(maxCards) = "Float" then limit = Int(maxCards)
+    end if
+    if limit < 1 then limit = 1
+    if m.buildPlan = invalid or m.buildPlan.Count() = 0 then return false
+    if not m.buildActive and not m.buildComplete then return false
+
+    if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+
+    n = 0
+    while n < limit and m.buildIdx < m.buildPlan.Count()
+        AppendNextCardFromPlan()
+        n = n + 1
+    end while
+
+    if m.top.ottRowReveal = true and m.cards.Count() > 0 then RevealStripNow()
+    if m.buildIdx >= m.buildPlan.Count() then
+        FinishCardBuildIfDone()
+    else if m.cardTimer <> invalid then
+        m.cardTimer.control = "start"
+    end if
+    return true
+end function
 
 ' Reveal only when every card node exists AND its media is loaded, so the
 ' shimmer stays up continuously and the real strip swaps in instantly.

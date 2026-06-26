@@ -6,7 +6,7 @@ sub init()
     m.initials = m.top.findNode("initials")
     m.ring = m.top.findNode("ring")
     m.progressTrack = m.top.findNode("progressTrack")
-    m.progressArc = m.top.findNode("progressArc")
+    m.progressArcRing = m.top.findNode("progressArcRing")
     m.dot = m.top.findNode("dot")
     m.lockBadge = m.top.findNode("lockBadge")
     m.editBadge = m.top.findNode("editBadge")
@@ -36,6 +36,7 @@ sub init()
     if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.observeField("fire", "OnSizeAnimTick")
 
     OnColorsChanged()
+    OnPortalColorsChanged()
     OnDataChanged()
     OnHintChanged()
     OnFocusChanged()
@@ -45,6 +46,13 @@ sub OnColorsChanged()
     if m.ring = invalid then return
     m.ring.blendColor = m.top.ringColor
     m.nameLabel.color = m.top.nameColor
+end sub
+
+sub OnPortalColorsChanged()
+    if m.progressArcRing = invalid then return
+    m.progressArcRing.portalPrimary = m.top.portalPrimary
+    m.progressArcRing.portalSecondary = m.top.portalSecondary
+    m.progressArcRing.portalTertiary = m.top.portalTertiary
 end sub
 
 sub OnDataChanged()
@@ -85,8 +93,14 @@ sub OnFocusChanged()
     end if
 
     m.progressTrack.visible = showArc
-    m.progressArc.visible = showArc
-    if showArc then m.progressArc.uri = ProfileArcFrameUriForProgress(progress)
+    if m.progressArcRing <> invalid then
+        m.progressArcRing.visible = showArc
+        if showArc then
+            last = ProfileArcFrameCount() - 1
+            idx = Int(progress * last + 0.5)
+            m.progressArcRing.arcFrame = idx
+        end if
+    end if
 
     m.ring.visible = (focused and not showArc)
     m.dot.visible = (focused and not showArc)
@@ -187,13 +201,17 @@ sub ApplyAvatarSize(scale as float)
         end if
     end for
 
-    for each node in [m.ring, m.progressTrack, m.progressArc]
+    for each node in [m.ring, m.progressTrack]
         if node <> invalid then
             node.translation = [0, 0]
             node.width = ringSize
             node.height = ringSize
         end if
     end for
+    if m.progressArcRing <> invalid then
+        m.progressArcRing.translation = [0, 0]
+        m.progressArcRing.ringSize = ringSize
+    end if
 
     if m.dot <> invalid then
         m.dot.translation = [74 * scale, 158 * scale]

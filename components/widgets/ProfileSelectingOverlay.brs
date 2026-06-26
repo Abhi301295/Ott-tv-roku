@@ -4,18 +4,13 @@ sub init()
     m.initialsLbl = m.top.findNode("initialsLbl")
     m.circleBg = m.top.findNode("circleBg")
     m.progressTrack = m.top.findNode("progressTrack")
-    m.progressArc = m.top.findNode("progressArc")
+    m.loaderArc = m.top.findNode("loaderArc")
     m.welcomeLbl = m.top.findNode("welcomeLbl")
     m.statusLbl = m.top.findNode("statusLbl")
     m.fadeIn = m.top.findNode("fadeIn")
-    m.arcTimer = m.top.findNode("arcTimer")
-    m.statusTimer = m.top.findNode("statusTimer")
+    m.spinnerAnim = m.top.findNode("spinnerAnim")
 
-    m.arcFrame = 0
-    m.arcMotionActive = false
-
-    if m.arcTimer <> invalid then m.arcTimer.observeField("fire", "OnArcTick")
-    if m.statusTimer <> invalid then m.statusTimer.control = "stop"
+    m.motionActive = false
 
     OnColorsChanged()
     OnProfileChanged()
@@ -52,38 +47,36 @@ sub OnColorsChanged()
     if m.initialsLbl <> invalid then m.initialsLbl.color = neutral50
     if m.circleBg <> invalid then m.circleBg.blendColor = avatarBg
     if m.progressTrack <> invalid then m.progressTrack.blendColor = neutral50
+    if m.loaderArc <> invalid then m.loaderArc.blendColor = primary
 end sub
 
 sub OnRunningChanged()
     if m.top.running = true then
-        StartMotion(m.arcMotionActive <> true)
+        StartMotion(m.motionActive <> true)
     else
         StopMotion()
     end if
 end sub
 
-' coldStart=false resumes arc mid-spin without resetting frame or fade-in.
+' coldStart=false keeps the spinner Animation running across profile → Home navigate.
 sub StartMotion(coldStart as boolean)
-    if coldStart = false and m.arcMotionActive = true then return
-    if coldStart = false and m.arcTimer <> invalid and m.arcTimer.control = "start" then
-        m.arcMotionActive = true
+    if coldStart = false and m.motionActive = true then return
+    if coldStart = false and m.spinnerAnim <> invalid and m.spinnerAnim.state = "running" then
+        m.motionActive = true
         return
     end if
 
-    m.arcMotionActive = true
-    m.arcFrame = 0
-    ApplyArcFrame()
+    m.motionActive = true
     ApplyStatusLabel()
     if m.contentHost <> invalid then m.contentHost.opacity = 0.0
     if m.fadeIn <> invalid then m.fadeIn.control = "start"
-    if m.arcTimer <> invalid then m.arcTimer.control = "start"
+    if m.spinnerAnim <> invalid then m.spinnerAnim.control = "start"
 end sub
 
 sub StopMotion()
-    m.arcMotionActive = false
+    m.motionActive = false
     if m.fadeIn <> invalid then m.fadeIn.control = "stop"
-    if m.arcTimer <> invalid then m.arcTimer.control = "stop"
-    if m.statusTimer <> invalid then m.statusTimer.control = "stop"
+    if m.spinnerAnim <> invalid then m.spinnerAnim.control = "stop"
     if m.contentHost <> invalid then m.contentHost.opacity = 0.0
     ClearStatusLabel()
 end sub
@@ -97,7 +90,6 @@ function ClearStatusLabelFunc() as boolean
     return true
 end function
 
-' Prefetch phases only — apply label immediately; never rotate idle messages.
 sub OnStatusTextChanged()
     ApplyStatusLabel()
 end sub
@@ -107,15 +99,4 @@ sub ApplyStatusLabel()
     txt = m.top.statusText
     if txt = invalid then txt = ""
     if m.statusLbl.text <> txt then m.statusLbl.text = txt
-end sub
-
-sub OnArcTick()
-    m.arcFrame = m.arcFrame + 2
-    if m.arcFrame >= ProfileArcFrameCount() then m.arcFrame = 0
-    ApplyArcFrame()
-end sub
-
-sub ApplyArcFrame()
-    if m.progressArc = invalid then return
-    m.progressArc.uri = ProfileArcFrameUriForIndex(m.arcFrame)
 end sub

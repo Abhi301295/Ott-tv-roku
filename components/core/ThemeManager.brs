@@ -60,7 +60,6 @@ end sub
 ' primary #0092ff, and background #1f1f22, matching LG.
 sub ApplyFallbackTheme()
     resolved = EmptyResolved()
-    cfg = AppConfig()
     resolved.portalPrimaryColor = ""
     resolved.portalSecondaryColor = ""
     resolved.portalTertiaryColor = ""

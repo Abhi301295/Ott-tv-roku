@@ -21,14 +21,16 @@ sub ProfileTransitionSetActive(active as boolean)
     end if
 end sub
 
-sub ProfileTransitionShow(vm as object, name as string, uri as string, initials as string, primary as string, neutral50 as string, avatarBg as string)
+sub ProfileTransitionShow(vm as object, name as string, uri as string, initials as string, portalPrimary as string, portalSecondary as string, portalTertiary as string, neutral50 as string, avatarBg as string)
     node = ProfileTransitionNode(vm)
     if node = invalid then return
     wasActive = ProfileTransitionActive()
     if name <> invalid then node.profileName = name
     if uri <> invalid then node.avatarUri = uri
     if initials <> invalid then node.initials = initials
-    if primary <> invalid and primary <> "" then node.primaryColor = primary
+    if portalPrimary <> invalid and portalPrimary <> "" then node.primaryColor = portalPrimary
+    if portalSecondary <> invalid and portalSecondary <> "" then node.portalSecondary = portalSecondary
+    if portalTertiary <> invalid and portalTertiary <> "" then node.portalTertiary = portalTertiary
     if neutral50 <> invalid and neutral50 <> "" then node.neutral50 = neutral50
     if avatarBg <> invalid and avatarBg <> "" then node.avatarBg = avatarBg
     ' Always reset status phases — a prior Home visit may have left the overlay on phase 3

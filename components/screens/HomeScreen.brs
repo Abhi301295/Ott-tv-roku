@@ -131,6 +131,13 @@ sub init()
     m.interactIdle.repeat = false
     m.top.appendChild(m.interactIdle)
     m.interactIdle.observeField("fire", "OnInteractIdle")
+    m.pendingHeroUpdate = false
+    if m.rowsAnim <> invalid then m.rowsAnim.observeField("state", "OnRowsAnimState")
+    m.rowPrefetchTimer = CreateObject("roSGNode", "Timer")
+    m.rowPrefetchTimer.duration = 0.001
+    m.rowPrefetchTimer.repeat = false
+    m.top.appendChild(m.rowPrefetchTimer)
+    m.rowPrefetchTimer.observeField("fire", "OnRowPrefetchTimer")
 
     ' Hero shimmer hides once the hero poster actually paints, with a safety timeout so
     ' a slow/blocked image can never strand it.
@@ -149,11 +156,6 @@ sub init()
     m.top.appendChild(m.rowsSkeletonTimeout)
     m.rowsSkeletonTimeout.observeField("fire", "OnRowsSkeletonTimeout")
     m.firstRowWatch = invalid
-    m.rowWarmupTimer = CreateObject("roSGNode", "Timer")
-    m.rowWarmupTimer.duration = 0.6
-    m.rowWarmupTimer.repeat = false
-    m.top.appendChild(m.rowWarmupTimer)
-    m.rowWarmupTimer.observeField("fire", "OnRowWarmupTimer")
     m.rowsForceHideTimer = CreateObject("roSGNode", "Timer")
     m.rowsForceHideTimer.duration = 4.0
     m.rowsForceHideTimer.repeat = false
@@ -374,7 +376,7 @@ sub OnDispose()
     if m.selectRetryTimer <> invalid then m.selectRetryTimer.control = "stop"
     if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
-    if m.rowWarmupTimer <> invalid then m.rowWarmupTimer.control = "stop"
+    if m.rowPrefetchTimer <> invalid then m.rowPrefetchTimer.control = "stop"
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
     if m.transitionSafetyTimer <> invalid then m.transitionSafetyTimer.control = "stop"
     if m.bootDeferTimer <> invalid then m.bootDeferTimer.control = "stop"
@@ -1783,8 +1785,10 @@ sub BuildContentRows()
     if m.contentRowCats.Count() > 0 then
         if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
         if ProfileTransitionActive() then
+            if m.rowBuildTimer <> invalid then m.rowBuildTimer.duration = 0.01
             ScheduleDeferredRowBuildStart()
         else
+            if m.rowBuildTimer <> invalid then m.rowBuildTimer.duration = 0.03
             m.rowBuildTimer.control = "start"
         end if
     end if
@@ -1837,6 +1841,9 @@ sub OnRowBuildTick()
         end if
         row.categoryData = cat
     else
+        ' OTT catalogue rows reveal on card nodes, not thumbnail completion — avoids a multi-
+        ' second blank strip when scrolling from row 0 into shell rows.
+        row.ottRowReveal = true
         row.callFunc("PrepareShell", cat)
     end if
     row.translation = [0, m.rowBuildY]
@@ -1851,6 +1858,11 @@ sub OnRowBuildTick()
     if m.rowBuildCostMs = invalid then m.rowBuildCostMs = 0
     m.rowBuildCostMs = m.rowBuildCostMs + rowMs
     print "[PERF] build row "; m.rowBuildIndex; " '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
+
+    addedIdx = m.rowWidgets.Count() - 1
+    if ProfileTransitionActive() and addedIdx > 0 and addedIdx < 3 then
+        WarmWelcomeRow(m.rowWidgets[addedIdx])
+    end if
 
     ' Drop welcome overlay as soon as row 0 media resolves; paintedReady is a fallback.
     if m.rowBuildIndex = 0 then
@@ -1883,8 +1895,27 @@ sub OnRowBuildTick()
         if m.rowsRevealed then
             ApplyHomeFocus()
             MaybeLandContentFocus()
+        else if ProfileTransitionActive() and m.rowBuildIndex >= m.contentRowCats.Count() then
+            WarmWelcomeRowsWindow()
         end if
     end if
+end sub
+
+sub WarmWelcomeRow(row as object)
+    if row = invalid then return
+    if row.hasField("ottRowReveal") then row.ottRowReveal = true
+    row.callFunc("Materialize", invalid)
+    row.callFunc("BuildCardsNow", 6)
+end sub
+
+' While the welcome overlay is up, pre-build the first content rows so landing is instant.
+sub WarmWelcomeRowsWindow()
+    if m.rowWidgets = invalid then return
+    hi = 2
+    if hi >= m.rowWidgets.Count() then hi = m.rowWidgets.Count() - 1
+    for i = 1 to hi
+        WarmWelcomeRow(m.rowWidgets[i])
+    end for
 end sub
 
 ' Row 0 cards resolved (media loaded) — dismiss welcome overlay; paintedReady is fallback.
@@ -1896,6 +1927,7 @@ sub OnFirstRowMediaReady()
     if row.hasField("mediaReady") and row.mediaReady <> true then return
 
     HomeBootLog(m.bootSpan, "row0 mediaReady", "hide welcome overlay")
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.duration = 0.03
     if ProfileTransitionActive() then HideProfileWelcomeTransition()
     if not m.rowsRevealed then PrepareFirstRowReveal()
 end sub
@@ -1950,7 +1982,7 @@ sub PrepareFirstRowReveal()
     ApplyHomeFocus()
     MaybeLandContentFocus()
     LogCwRowState("post-focus zone=" + m.focusZone)
-    ScheduleSecondRowWarmup()
+    WarmWelcomeRowsWindow()
 end sub
 
 sub EnsureFirstRowVisibleUnderShimmer()
@@ -1964,17 +1996,6 @@ sub EnsureFirstRowVisibleUnderShimmer()
     if host <> invalid and host.opacity < 1.0 then host.opacity = 1.0
     title = row0.findNode("rowTitle")
     if title <> invalid and title.opacity < 1.0 then title.opacity = 1.0
-end sub
-
-sub ScheduleSecondRowWarmup()
-    if m.rowWidgets = invalid or m.rowWidgets.Count() < 2 then return
-    if m.rowWarmupTimer <> invalid then m.rowWarmupTimer.control = "start"
-end sub
-
-sub OnRowWarmupTimer()
-    if m.rowWidgets = invalid or m.rowWidgets.Count() < 2 then return
-    row1 = m.rowWidgets[1]
-    if row1 <> invalid then row1.callFunc("Materialize", invalid)
 end sub
 
 sub ClearContentRows()
@@ -2007,14 +2028,8 @@ end sub
 sub ApplyHomeFocus()
     if m.rowsHost = invalid then return
 
-    if m.focusZone = "rows" then
-        MaterializeVisibleRows()
-        if ThemeIsOttHome() then ResumeFocusedRowBuild()
-    end if
-
     pitch = m.layoutRowPitch
     if pitch = invalid or pitch <= 0 then pitch = HC_RowPitchForLayout(m.homeLayout)
-    ' Pin focused row at anchor. OTT uses cumulative rowTops (mixed card heights).
     if m.focusZone = "rows" then
         if ThemeIsOttHome() and m.rowTops <> invalid and m.rowIndex >= 0 and m.rowIndex < m.rowTops.Count() then
             anchorY = m.layoutAnchorY - m.rowTops[m.rowIndex]
@@ -2032,32 +2047,30 @@ sub ApplyHomeFocus()
         anchorY = m.layoutAnchorY
     end if
     if anchorY > m.layoutAnchorY then anchorY = m.layoutAnchorY
-    AnimateRowsHost(anchorY)
 
-    for i = 0 to m.rowWidgets.Count() - 1
-        ApplyRowFocusState(i)
-    end for
+    if m.focusZone = "rows" then
+        lo = m.rowIndex - 1
+        if lo < 0 then lo = 0
+        hi = m.rowIndex + 2
+        if hi >= m.rowWidgets.Count() then hi = m.rowWidgets.Count() - 1
+        for i = lo to hi
+            ApplyRowFocusState(i)
+        end for
+    else
+        for i = 0 to m.rowWidgets.Count() - 1
+            ApplyRowFocusState(i)
+        end for
+    end if
 
     UpdateRowsScrim()
-    UpdateOttHeroFromFocus()
-end sub
-
-' Materialize only the rows currently visible on screen: the focused row pinned at the anchor
-' plus the next row, which peeks in at the bottom (anchor 702 + pitch 430 = 1132, within the
-' 1080 viewport). Called on every focus change; deliberately does NOT build the off-screen
-' look-ahead row so it can't steal render-thread time from the scroll animation.
-sub MaterializeVisibleRows()
-    if not m.rowsRevealed then return
-    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
-    lo = m.rowIndex
-    hi = m.rowIndex + 1
-    if ThemeIsOttHome() and m.rowIndex > 0 then lo = m.rowIndex - 1
-    for i = lo to hi
-        if i >= 0 and i < m.rowWidgets.Count() then
-            row = m.rowWidgets[i]
-            if row <> invalid then row.callFunc("Materialize", invalid)
-        end if
-    end for
+    if m.interacting then
+        m.pendingHeroUpdate = true
+    else
+        UpdateOttHeroFromFocus()
+    end if
+    SyncHeroAutoAdvanceHold()
+    AnimateRowsHost(anchorY)
+    ScheduleRowPrefetch()
 end sub
 
 ' Set the focus/dim state for a single row. Pulled out of ApplyHomeFocus so the row-build
@@ -2073,7 +2086,11 @@ sub MaterializeNearbyRows()
     if hi >= m.rowWidgets.Count() then hi = m.rowWidgets.Count() - 1
     for i = lo to hi
         row = m.rowWidgets[i]
-        if row <> invalid then row.callFunc("Materialize", invalid)
+        if row <> invalid then
+            if row.hasField("ottRowReveal") then row.ottRowReveal = true
+            row.callFunc("Materialize", invalid)
+            row.callFunc("BuildCardsNow", 6)
+        end if
     end for
 end sub
 
@@ -2124,21 +2141,84 @@ sub UpdateRowsScrim()
     if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.opacity = 0.0
 end sub
 
-' Smooth row pinning (parity with netflixContent.tsx 400ms translate).
+' Smooth row pinning (parity with netflixContent.tsx 400ms translate). User keys snap
+' instantly so the render thread never waits on animation + card materialize together.
 sub AnimateRowsHost(targetY as integer)
     if m.rowsHost = invalid then return
     offX = 0
     if m.layoutOffsetX <> invalid then offX = m.layoutOffsetX
     fromY = m.rowsHost.translation[1]
+    if m.interacting then
+        if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
+        m.rowsHost.translation = [offX, targetY]
+        return
+    end if
     if m.rowsAnim = invalid or m.rowsInterp = invalid or fromY = targetY then
         m.rowsHost.translation = [offX, targetY]
-        ' No animation in flight (initial land, or left/right within a row) — safe to build the
-        ' off-screen look-ahead now so it's ready before the next animated row switch.
-        if m.focusZone = "rows" then MaterializeNearbyRows()
         return
     end if
     m.rowsInterp.keyValue = [[offX, fromY], [offX, targetY]]
     m.rowsAnim.control = "start"
+end sub
+
+sub OnRowsAnimState()
+    if m.rowsAnim = invalid then return
+    if m.rowsAnim.state <> "stopped" then return
+    RunRowPrefetchPass()
+end sub
+
+sub ScheduleRowPrefetch()
+    if not m.rowsRevealed then return
+    if m.focusZone <> "rows" then return
+    if m.rowPrefetchTimer = invalid then return
+    m.rowPrefetchTimer.control = "stop"
+    m.rowPrefetchTimer.control = "start"
+end sub
+
+sub OnRowPrefetchTimer()
+    RunRowPrefetchPass()
+end sub
+
+' Focused row is primed even during key repeat; neighbor materialize waits for idle.
+sub RunRowPrefetchPass()
+    if not m.rowsRevealed then return
+    if m.focusZone <> "rows" then return
+    PrimeFocusedRow()
+    if m.interacting then return
+    MaterializeNearbyRows()
+    if ThemeIsOttHome() then ResumeFocusedRowBuild()
+    FlushPendingHeroUpdate()
+end sub
+
+sub FlushPendingHeroUpdate()
+    if not m.pendingHeroUpdate then return
+    m.pendingHeroUpdate = false
+    UpdateOttHeroFromFocus()
+end sub
+
+sub SyncHeroAutoAdvanceHold()
+    if m.hero = invalid then return
+    if m.interacting then
+        if m.hero.hasField("autoAdvanceHold") then m.hero.autoAdvanceHold = true
+        m.hero.callFunc("PauseAutoAdvance", invalid)
+    else
+        if m.hero.hasField("autoAdvanceHold") then m.hero.autoAdvanceHold = false
+        ' Always re-arm — a paused timer is not cleared by the hold field alone.
+        m.hero.callFunc("ResumeAutoAdvance", invalid)
+    end if
+end sub
+
+' Materialize shell + sync-build visible cards so vertical nav never lands on a blank strip.
+sub PrimeFocusedRow()
+    if not m.rowsRevealed then return
+    if m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return
+    row = m.rowWidgets[m.rowIndex]
+    if row = invalid then return
+    if row.hasField("ottRowReveal") then row.ottRowReveal = true
+    row.callFunc("Materialize", invalid)
+    row.callFunc("BuildCardsNow", 6)
+    row.callFunc("ResumeBuild", invalid)
+    row.callFunc("ForceReveal", invalid)
 end sub
 
 sub ClampCardIndex()
@@ -2183,8 +2263,17 @@ sub OnKey()
     if not ev.press then return
 
     key = ev.key
-    ' Give the render thread to this interaction: suspend any in-progress background build.
-    BeginInteraction()
+    navRowIdx = -1
+    if m.focusZone = "rows" and not AnyBootLoading() then
+        if key = "down" and m.rowIndex < LastRowIndex() then
+            navRowIdx = m.rowIndex + 1
+        else if key = "up" and m.rowIndex > 0 then
+            navRowIdx = m.rowIndex - 1
+        end if
+    end if
+    ' Give the render thread to this interaction: suspend background builds except the row
+    ' the user is scrolling into so that strip can materialize immediately.
+    BeginInteraction(navRowIdx)
 
     if m.focusZone = "header" then
         HandleHeaderKey(key)
@@ -2220,6 +2309,7 @@ sub OnKey()
         if m.rowIndex > 0 then
             m.rowIndex = m.rowIndex - 1
             ClampCardIndex()
+            PrimeFocusedRow()
             ApplyHomeFocus()
         else
             EnterHeroOrHeader()
@@ -2228,6 +2318,7 @@ sub OnKey()
         if m.rowIndex < LastRowIndex() then
             m.rowIndex = m.rowIndex + 1
             ClampCardIndex()
+            PrimeFocusedRow()
             ApplyHomeFocus()
         else if m.hasMore and not m.loadingMore then
             LoadMoreCategories()
@@ -2241,9 +2332,10 @@ end sub
 ' Pause progressive row/card building the instant the user presses a key, so creating
 ' card nodes never steals render-thread time from a slide change or navigation. The idle
 ' timer is reset on every key, so building only resumes once the user pauses (0.25s).
-sub BeginInteraction()
+sub BeginInteraction(primeRowIdx = -1 as integer)
     m.interacting = true
-    PauseRowBuilding()
+    PauseRowBuilding(primeRowIdx)
+    SyncHeroAutoAdvanceHold()
     if m.interactIdle <> invalid then
         m.interactIdle.control = "stop"
         m.interactIdle.control = "start"
@@ -2252,17 +2344,17 @@ end sub
 
 sub OnInteractIdle()
     m.interacting = false
-    ' User paused — now safe to build the off-screen look-ahead row(s) for the next move,
-    ' since there's no scroll animation in flight to compete with.
-    if m.focusZone = "rows" then MaterializeNearbyRows()
+    SyncHeroAutoAdvanceHold()
+    RunRowPrefetchPass()
     ResumeRowBuilding()
 end sub
 
-sub PauseRowBuilding()
+sub PauseRowBuilding(exceptIdx = -1 as integer)
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
     if m.rowWidgets = invalid then return
-    for each row in m.rowWidgets
-        if row <> invalid then row.callFunc("PauseBuild", invalid)
+    for i = 0 to m.rowWidgets.Count() - 1
+        row = m.rowWidgets[i]
+        if row <> invalid and i <> exceptIdx then row.callFunc("PauseBuild", invalid)
     end for
 end sub
 
