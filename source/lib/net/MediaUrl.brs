@@ -29,6 +29,31 @@ function MediaStreamUrl(path as dynamic) as string
     return s
 end function
 
+function MediaPlayUrlHost(url as string) as string
+    if url = "" then return "empty"
+    lc = LCase(url)
+    if Instr(1, lc, "amazonaws.com") > 0 then return "s3"
+    cfg = AppConfig()
+    apiBase = cfg.apiBaseUrl
+    if apiBase <> invalid and apiBase <> "" then
+        apiLc = LCase(apiBase)
+        while Len(apiLc) > 0 and Right(apiLc, 1) = "/"
+            apiLc = Left(apiLc, Len(apiLc) - 1)
+        end while
+        if apiLc <> "" and Instr(1, lc, apiLc) = 1 then return "api"
+    end if
+    return "other"
+end function
+
+' Telnet: grep [PLAY_URL_DBG] — resolved URL handed to the Video node.
+sub MediaLogPlayUrl(source as string, url as string)
+    if url = invalid or url = "" then
+        print "[PLAY_URL_DBG] src=" + source + " host=empty url="
+        return
+    end if
+    print "[PLAY_URL_DBG] src=" + source + " host=" + MediaPlayUrlHost(url) + " url=" + Left(url, 128)
+end sub
+
 function MediaRewritePrivateStreamOrigin(url as string) as string
     lc = LCase(url)
     priv = Instr(1, lc, "/private/")
