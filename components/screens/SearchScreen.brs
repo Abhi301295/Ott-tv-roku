@@ -50,7 +50,7 @@ sub init()
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
 
-    ' Grid build pauses on input; search API uses its own 500ms trailing debounce.
+    ' Grid build pauses on input; search API uses its own 400ms trailing debounce.
     m.interacting = false
     m.gridBuildDeferred = false
     m.gridBuildNeedsFresh = false
@@ -833,17 +833,29 @@ end sub
 sub BeginGridInteraction()
     m.interacting = true
     StopGridBuild()
+    if GridBuildIncomplete() then m.gridBuildDeferred = true
     if m.interactIdle <> invalid then
         m.interactIdle.control = "stop"
         m.interactIdle.control = "start"
     end if
 end sub
 
+function GridBuildIncomplete() as boolean
+    if m.results = invalid then return false
+    total = m.results.Count()
+    if total = 0 then return false
+    return m.gridBuildIdx < total
+end function
+
 sub OnGridInteractIdle()
     m.interacting = false
-    if m.gridBuildDeferred then
-        fresh = m.gridBuildNeedsFresh
+    if not GridBuildIncomplete() then
+        m.gridBuildDeferred = false
         m.gridBuildNeedsFresh = false
-        StartGridBuild(fresh)
+        return
     end if
+    fresh = m.gridBuildNeedsFresh
+    m.gridBuildDeferred = false
+    m.gridBuildNeedsFresh = false
+    StartGridBuild(fresh)
 end sub
