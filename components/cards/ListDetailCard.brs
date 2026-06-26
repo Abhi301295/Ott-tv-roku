@@ -89,6 +89,8 @@ sub init()
     m.contentHost = m.top.findNode("contentHost")
     m.thumbBlock = m.top.findNode("thumbBlock")
     m.thumbSkel = m.top.findNode("thumbSkel")
+    m.thumbFallback = m.top.findNode("thumbFallback")
+    m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.thumb = m.top.findNode("thumb")
     m.grad = m.top.findNode("grad")
     m.titleSkelHost = m.top.findNode("titleSkelHost")
@@ -122,7 +124,14 @@ sub OnThemeChanged()
 end sub
 
 sub OnThumbLoad()
-    CardOnPosterLoad(m.thumb, m.thumbSkel)
+    CardOnPosterLoad(m.thumb, m.thumbSkel, m.thumbFallback, m.thumbFallbackLogo, m.top, LD_ThumbW(), LD_ThumbH())
+    SyncThumbOverlay()
+end sub
+
+sub SyncThumbOverlay()
+    showPoster = false
+    if m.thumb <> invalid and m.thumb.visible = true and m.thumb.loadStatus = "ready" then showPoster = true
+    if m.grad <> invalid then m.grad.visible = showPoster
 end sub
 
 sub LayoutCard()
@@ -143,6 +152,7 @@ sub LayoutCard()
         m.grad.width = tw
         m.grad.height = th
     end if
+    CardLayoutThumbFallbackNodes(m.thumbFallback, m.thumbFallbackLogo, tw, th)
 
     titleY = pad + th + LD_TitleMarginTop()
     if m.titleSkelHost <> invalid then m.titleSkelHost.translation = [textX, titleY]
@@ -213,7 +223,8 @@ end sub
 
 sub ApplyAll()
     LayoutCard()
-    loading = m.top.isLoading = true
+    loading = false
+    if m.top.isLoading = true then loading = true
     ApplySkeletonMode(loading)
     if not loading then ApplyContent()
     ApplyFocusVisual()
@@ -225,23 +236,28 @@ sub LD_ApplySkeleton(sk as object, running as boolean)
 end sub
 
 sub ApplySkeletonMode(loading as boolean)
-    if m.thumbSkel <> invalid then
-        m.thumbSkel.visible = loading
-        if loading then LD_ApplySkeleton(m.thumbSkel, true)
-        else m.thumbSkel.running = false
-    end if
-    if m.thumb <> invalid then m.thumb.visible = not loading
-    if m.grad <> invalid then m.grad.visible = not loading
-    if m.titleSkelHost <> invalid then m.titleSkelHost.visible = loading
-    if m.metaSkelHost <> invalid then m.metaSkelHost.visible = loading
-    if m.titleLbl <> invalid then m.titleLbl.visible = not loading
-    if m.metaHost <> invalid then m.metaHost.visible = not loading
-
     if loading then
+        if m.thumbFallback <> invalid then m.thumbFallback.visible = false
+        if m.thumbFallbackLogo <> invalid then m.thumbFallbackLogo.visible = false
+        if m.thumbSkel <> invalid then
+            m.thumbSkel.visible = true
+            LD_ApplySkeleton(m.thumbSkel, true)
+        end if
+        if m.thumb <> invalid then m.thumb.visible = false
+        if m.grad <> invalid then m.grad.visible = false
+        if m.titleSkelHost <> invalid then m.titleSkelHost.visible = true
+        if m.metaSkelHost <> invalid then m.metaSkelHost.visible = true
+        if m.titleLbl <> invalid then m.titleLbl.visible = false
+        if m.metaHost <> invalid then m.metaHost.visible = false
         LD_ApplySkeleton(m.titleSkel, true)
         LD_ApplySkeleton(m.typeSkel, true)
         LD_ApplySkeleton(m.dotSkel, true)
         LD_ApplySkeleton(m.langSkel, true)
+    else
+        if m.titleSkelHost <> invalid then m.titleSkelHost.visible = false
+        if m.metaSkelHost <> invalid then m.metaSkelHost.visible = false
+        if m.titleLbl <> invalid then m.titleLbl.visible = true
+        if m.metaHost <> invalid then m.metaHost.visible = true
     end if
 end sub
 
@@ -271,27 +287,28 @@ sub ApplyContent()
         m.langLbl.color = LangLabelColor(m.top.cNeutral50)
     end if
     LayoutMetaRow()
+    ApplyThumbContent()
+end sub
 
+' Thumb: shimmer while the poster loads; neutral/logo placeholder only on missing URI or load failure.
+sub ApplyThumbContent()
     uri = m.top.thumbnailUri
-    if m.thumb <> invalid then
-        if uri <> invalid and uri <> "" then
-            m.thumb.uri = uri
-            m.thumb.visible = true
-            if m.thumbSkel <> invalid then
-                m.thumbSkel.visible = true
-                LD_ApplySkeleton(m.thumbSkel, true)
-            end if
-        else
-            m.thumb.uri = ""
-            m.thumb.visible = false
-            if m.thumbSkel <> invalid then
-                m.thumbSkel.visible = true
-                LD_ApplySkeleton(m.thumbSkel, true)
-            end if
-        end if
+    tw = LD_ThumbW()
+    th = LD_ThumbH()
+    if m.thumb = invalid then return
+    if uri = invalid or uri = "" then
+        CardApplyThumbPlaceholder(m.thumb, m.thumbSkel, m.thumbFallback, m.thumbFallbackLogo, m.top, tw, th)
+        SyncThumbOverlay()
+        return
     end if
-    if m.titleLbl <> invalid then m.titleLbl.visible = true
-    if m.metaHost <> invalid then m.metaHost.visible = true
+    CardHideThumbPlaceholder(m.thumb, m.thumbSkel, m.thumbFallback, m.thumbFallbackLogo)
+    if m.thumbSkel <> invalid then
+        m.thumbSkel.visible = true
+        LD_ApplySkeleton(m.thumbSkel, true)
+    end if
+    m.thumb.visible = true
+    m.thumb.uri = uri
+    OnThumbLoad()
 end sub
 
 function FormatListContentType(contentType as string) as string

@@ -4,6 +4,8 @@ sub init()
     m.rankGlow = m.top.findNode("rankGlow")
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
+    m.thumbFallback = m.top.findNode("thumbFallback")
+    m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.thumb.observeField("loadStatus", "OnThumbLoad")
     ApplyAll()
 end sub
@@ -21,7 +23,7 @@ sub OnThemeChanged()
 end sub
 
 sub OnThumbLoad()
-    CardOnPosterLoad(m.thumb, m.skeleton)
+    CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 368, 208)
 end sub
 
 sub ApplyAll()
@@ -31,23 +33,19 @@ sub ApplyAll()
 
     uri = m.top.thumbnailUri
     if uri <> invalid and uri <> "" then
+        CardHideThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo)
         m.thumb.uri = uri
         m.thumb.visible = true
         m.skeleton.visible = true
         m.skeleton.running = true
+        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
     else
-        m.thumb.visible = false
-        m.skeleton.visible = true
-        m.skeleton.running = true
+        CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 368, 208)
     end if
-    CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
     ApplyFocusVisual()
 end sub
 
 sub ApplyFocusVisual()
-    ' Insert the focus frame between the poster body (index 0) and the rank glow/label so the
-    ' border sits behind the giant numeral — parity with numberedVerticalCard.tsx (z-1 border,
-    ' z-2 rank span on top).
     if m.focusBorder = invalid then
         frame = m.top.createChild("FocusFrame")
         m.top.removeChild(frame)

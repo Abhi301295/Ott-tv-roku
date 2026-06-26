@@ -2,6 +2,8 @@ sub init()
     m.thumbBlock = m.top.findNode("thumbBlock")
     m.thumbWrap = m.top.findNode("thumbWrap")
     m.thumb = m.top.findNode("thumb")
+    m.thumbFallback = m.top.findNode("thumbFallback")
+    m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.grad = m.top.findNode("grad")
     m.cornerTL = m.top.findNode("cornerTL")
     m.cornerTR = m.top.findNode("cornerTR")
@@ -32,7 +34,14 @@ sub OnThemeChanged()
 end sub
 
 sub OnThumbLoad()
-    CardOnPosterLoad(m.thumb, invalid)
+    CardOnPosterLoad(m.thumb, invalid, m.thumbFallback, m.thumbFallbackLogo, m.top, SR_CardW(), SR_CardH())
+    SyncThumbOverlay()
+end sub
+
+sub SyncThumbOverlay()
+    showPoster = false
+    if m.thumb <> invalid and m.thumb.visible = true and m.thumb.loadStatus = "ready" then showPoster = true
+    if m.grad <> invalid then m.grad.visible = showPoster
 end sub
 
 function PageBgColor() as string
@@ -69,6 +78,7 @@ sub LayoutCard()
         m.grad.width = w
         m.grad.height = h
     end if
+    CardLayoutThumbFallbackNodes(m.thumbFallback, m.thumbFallbackLogo, w, h)
 
     LayoutCorner(m.cornerTL, "tl", 0, 0, r)
     LayoutCorner(m.cornerTR, "tr", w - r, 0, r)
@@ -108,13 +118,14 @@ sub ApplyAll()
     uri = m.top.thumbnailUri
     if m.thumb <> invalid then
         if uri <> invalid and uri <> "" then
+            CardHideThumbPlaceholder(m.thumb, invalid, m.thumbFallback, m.thumbFallbackLogo)
             m.thumb.uri = uri
             m.thumb.visible = true
         else
-            m.thumb.uri = ""
-            m.thumb.visible = false
+            CardApplyThumbPlaceholder(m.thumb, invalid, m.thumbFallback, m.thumbFallbackLogo, m.top, SR_CardW(), SR_CardH())
         end if
     end if
+    SyncThumbOverlay()
     ApplyFocus()
 end sub
 

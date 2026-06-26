@@ -1,6 +1,7 @@
 sub init()
     m.focusBorder = m.top.findNode("focusBorder")
-    m.fallback = m.top.findNode("fallback")
+    m.thumbFallback = m.top.findNode("fallback")
+    m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
     m.titleLabel = m.top.findNode("titleLabel")
@@ -21,31 +22,24 @@ sub OnThemeChanged()
 end sub
 
 sub OnThumbLoad()
-    CardOnPosterLoad(m.thumb, m.skeleton)
-    if m.thumb.loadStatus = "failed" then
-        m.fallback.visible = true
-        m.titleLabel.visible = true
-    end if
+    CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 1770, 400)
 end sub
 
 sub ApplyAll()
     m.titleLabel.text = m.top.title
     m.titleLabel.color = m.top.cNeutral50
-    m.fallback.color = m.top.cNeutral800
-    CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
 
     uri = m.top.thumbnailUri
     if uri <> invalid and uri <> "" then
+        CardHideThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo)
         m.thumb.uri = uri
         m.thumb.visible = true
         m.skeleton.visible = true
         m.skeleton.running = true
-        m.fallback.visible = false
+        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
         m.titleLabel.visible = true
     else
-        m.thumb.visible = false
-        m.skeleton.visible = false
-        m.fallback.visible = true
+        CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 1770, 400)
         m.titleLabel.visible = true
     end if
     CardApplyFocusBorder(m.focusBorder, m.top.focusedState, m.top.cPrimary700)

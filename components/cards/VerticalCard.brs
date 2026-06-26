@@ -4,6 +4,8 @@ sub init()
     m.thumbClip = m.top.findNode("thumbClip")
     m.thumb = m.top.findNode("thumb")
     m.skeleton = m.top.findNode("skeleton")
+    m.thumbFallback = m.top.findNode("thumbFallback")
+    m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.veil = m.top.findNode("veil")
     m.thumb.observeField("loadStatus", "OnThumbLoad")
     ApplyAll()
@@ -21,19 +23,23 @@ sub OnThemeChanged()
     ApplyAll()
 end sub
 
+function ThumbW() as integer
+    if m.top.listType = true then return 272
+    return 220
+end function
+
+function ThumbH() as integer
+    if m.top.listType = true then return 340
+    return 300
+end function
+
 sub OnThumbLoad()
-    CardOnPosterLoad(m.thumb, m.skeleton)
+    CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, ThumbW(), ThumbH())
 end sub
 
 sub ApplyAll()
-    ' Content vertical card is 220×300 (parity with verticalCard.tsx w-240 token = 220px);
-    ' the list variant is 272×340.
-    w = 220
-    h = 300
-    if m.top.listType = true then
-        w = 272
-        h = 340
-    end if
+    w = ThumbW()
+    h = ThumbH()
     m.focusW = w + 6
     m.focusH = h + 6
     m.skeleton.boxWidth = w
@@ -43,7 +49,6 @@ sub ApplyAll()
         m.veil.width = w
         m.veil.height = h
     end if
-    ' Corner covers are baked for each card size (radius-10).
     tl = m.top.findNode("cornerTL")
     tr = m.top.findNode("cornerTR")
     bl = m.top.findNode("cornerBL")
@@ -55,31 +60,27 @@ sub ApplyAll()
 
     uri = m.top.thumbnailUri
     if uri <> invalid and uri <> "" then
+        CardHideThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo)
         m.thumb.uri = uri
         m.thumb.visible = true
         m.skeleton.visible = true
         m.skeleton.running = true
+        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
     else
-        m.thumb.visible = false
-        m.skeleton.visible = true
-        m.skeleton.running = true
+        CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, w, h)
     end if
-    CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
     ApplyFocusVisual()
 end sub
 
 sub ApplyFocusVisual()
     border = 3
-    ' React verticalCard.tsx: radius-16, p-2 inside border, bw-3 when focused.
     pad = 2
     offX = 0
     offY = 0
     radius = 16
-    w = 220
-    h = 300
+    w = ThumbW()
+    h = ThumbH()
     if m.top.listType = true then
-        w = 272
-        h = 340
         offX = -border
         offY = -border
     end if
