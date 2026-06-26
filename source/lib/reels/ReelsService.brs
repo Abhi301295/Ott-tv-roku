@@ -289,6 +289,7 @@ function ReelsVideoPlayerPayload(reel as object) as object
         title: ReelsTitle(reel)
         continueWatching: []
         isTrailer: false
+        isReel: true
     }
     if reel._id <> invalid then detail._id = reel._id
     if reel.videoId <> invalid then detail.videoId = reel.videoId
