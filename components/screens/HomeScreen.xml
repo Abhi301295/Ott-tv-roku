@@ -33,6 +33,11 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/ContentRowCatalogue.brs" />
+  <script type="text/brightscript" uri="pkg:/components/home/HomeBoot.brs" />
+  <script type="text/brightscript" uri="pkg:/components/home/HomeRowBuild.brs" />
+  <script type="text/brightscript" uri="pkg:/components/home/HomeScroll.brs" />
+  <script type="text/brightscript" uri="pkg:/components/home/HomeFocus.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeNav.brs" />
