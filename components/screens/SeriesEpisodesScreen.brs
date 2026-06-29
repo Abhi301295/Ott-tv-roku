@@ -228,6 +228,8 @@ sub OnSeriesResponse()
     api = m.seriesTask.apiResult
     m.seriesTask = invalid
 
+    if api <> invalid and HandleSessionExpiry(m.top, api) then return
+
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 or api.result = invalid then
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         ShowLoading(false)

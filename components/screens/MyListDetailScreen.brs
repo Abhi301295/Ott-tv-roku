@@ -221,6 +221,8 @@ sub OnFoldersResponse()
     api = m.folderTask.apiResult
     m.folderTask = invalid
 
+    if api <> invalid and HandleSessionExpiry(m.top, api) then return
+
     folder = WL_ParseFirstFolder(api)
     if folder = invalid then
         m.loading = false
@@ -262,6 +264,8 @@ sub OnDetailResponse()
     m.loading = false
     m.initialLoad = false
     ShowSkeleton(false)
+
+    if api <> invalid and HandleSessionExpiry(m.top, api) then return
 
     items = WL_ParseDetailItems(api)
     count = items.Count()

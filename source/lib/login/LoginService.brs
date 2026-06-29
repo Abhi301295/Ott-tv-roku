@@ -157,9 +157,9 @@ sub HandleLoginRedirect(deviceToken as object, viewManager as object, fromNode =
 end sub
 
 ' Session-expiry handler — parity with axios.instance.ts 403 handler + logoutSession():
-' when an API result is flagged shouldLogout (HTTP 403), clear all tokens and send
-' the user back to Login. Returns true when it handled a logout so the caller can
-' stop processing the (now invalid) response.
+' when an API result is flagged shouldLogout, clear all tokens and send the user back
+' to Login. Returns true when it handled a logout so the caller can stop processing
+' the (now invalid) response.
 function HandleSessionExpiry(fromNode as object, api as object) as boolean
     if api = invalid then return false
     if api.shouldLogout <> true then return false
@@ -176,7 +176,8 @@ function HandleSessionExpiry(fromNode as object, api as object) as boolean
     ' when a pre-login call on the login screen itself returns 403).
     vm = FindViewManager(fromNode)
     if vm <> invalid and vm.currentRoute <> RouteLogin() then
-        vm.callFunc("NavigateReplace", RouteLogin(), {})
+        print "[AUTH_DBG] session expired -> NavigateClearAndReplace login route="; vm.currentRoute
+        vm.callFunc("NavigateClearAndReplace", RouteLogin(), {})
     end if
     return true
 end function
