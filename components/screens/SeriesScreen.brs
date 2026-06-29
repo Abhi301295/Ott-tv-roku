@@ -23,6 +23,13 @@ sub init()
     m.scrollY = 0
     m.rowScrollX = []
 
+    m.rowBuildIdx = 0
+    m.rowBuildTimer = CreateObject("roSGNode", "Timer")
+    m.rowBuildTimer.duration = 0.02
+    m.rowBuildTimer.repeat = true
+    m.top.appendChild(m.rowBuildTimer)
+    m.rowBuildTimer.observeField("fire", "OnSeriesRowBuildTick")
+
     m.vScrollAnim = m.top.findNode("vScrollAnim")
     m.vScrollInterp = m.top.findNode("vScrollInterp")
     m.hScrollAnim = m.top.findNode("hScrollAnim")
@@ -79,6 +86,7 @@ end sub
 
 sub OnDispose()
     if not m.top.dispose then return
+    StopSeriesGridBuild()
     KillListTask(m.listTask)
     m.listTask = invalid
     if m.global <> invalid and m.global.hasField("businessResolved") then
@@ -102,20 +110,8 @@ sub OnBusinessResolved()
 end sub
 
 sub LoadBrowseTokens()
-    m.tokens = {}
-    tm = m.top.getScene().findNode("themeManager")
-    if tm <> invalid and tm.themeTokens <> invalid then m.tokens = tm.themeTokens
-    m.cPrimary500 = TCb("primary-500", "#0b75e0")
-    m.cPrimary600 = TCb("primary-600", "#0760bb")
-    m.cPrimary700 = TCb("primary-700", "#04478b")
-    m.cNeutral50 = TCb("neutral-50", "#f5f5f5")
-    m.cNeutral700 = TCb("neutral-700", "#404040")
-    m.cNeutral800 = TCb("neutral-800", "#262626")
+    ThemeApplyBrowsePalette(m, m.top)
 end sub
-
-function TCb(name as string, fallbackHex as string) as string
-    return ThemeTokenColor(m.tokens, name, fallbackHex)
-end function
 
 sub ApplyStaticColors()
     if m.bg <> invalid then m.bg.color = m.cNeutral800
@@ -145,6 +141,7 @@ sub RevealContent()
 end sub
 
 sub ResetAndFetch()
+    StopSeriesGridBuild()
     m.page = 0
     m.hasMore = true
     m.initialLoad = true
@@ -213,15 +210,11 @@ sub OnListResponse()
     ShowEmpty(false)
     m.rows = SL_AppendRows(m.rows, listing, BS_ItemsPerRow())
     m.hasMore = SL_PageHasMore(api, listing.Count(), SL_FlatItemCount(m.rows))
-    BrowseDbg("series_response", "listingCount=" + Str(listing.Count()) + " hasMore=" + BrowseDbgStr(m.hasMore) + " loaded=" + Str(SL_FlatItemCount(m.rows)))
-    RebuildSeriesGrid()
-    RevealContent()
+    BrowseDbg("series_response", "listingCount=" + Str(listing.Count()) + " hasMore=" + BrowseDbgStr(m.hasMore) + " loaded=" + Str(SL_FlatItemCount(m.rows)) + " page=" + Str(m.page))
     if m.page = 1 then
-        SeriesHandoffContentFocus()
+        StartSeriesGridBuild(true)
     else
-        ClampCol()
-        ApplyFocus()
-        if m.vm <> invalid and m.vm.shellFocus = "header" then ShellEnterContent(m.vm)
+        StartSeriesGridBuild(false)
     end if
 end sub
 
@@ -238,52 +231,126 @@ end sub
 
 sub ClearRows()
     if m.rowsHost = invalid then return
-    for i = m.rowsHost.getChildCount() - 1 to 0 step -1
-        m.rowsHost.removeChildIndex(i)
-    end for
+    m.rowsHost.removeChildrenIndex(m.rowsHost.getChildCount(), 0)
     m.rowNodes = []
 end sub
 
-sub RebuildSeriesGrid()
-    savedRowIdx = m.rowIdx
-    savedColIdx = m.colIdx
-    ClearRows()
-    m.rowScrollX = []
+sub StopSeriesGridBuild()
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+end sub
 
-    for i = 0 to m.rows.Count() - 1
-        row = m.rows[i]
-        if row = invalid or row.items = invalid then continue for
+function SeriesGridBuildIncomplete() as boolean
+    if m.rows = invalid then return false
+    return m.rowBuildIdx < m.rows.Count()
+end function
 
-        rowGroup = m.rowsHost.createChild("Group")
-        rowGroup.id = "seriesRow" + Str(i)
-        rowY = i * BS_RowPitch()
-        rowGroup.translation = [0, rowY]
+' fresh=true clears nodes and rebuilds from row 0; false appends after the last built row.
+sub StartSeriesGridBuild(fresh as boolean)
+    StopSeriesGridBuild()
+    if fresh then
+        m.rowBuildIdx = 0
+        ClearRows()
+        m.rowScrollX = []
+    else
+        m.rowBuildIdx = m.rowNodes.Count()
+    end if
+    if m.rows = invalid or m.rows.Count() = 0 then return
 
-        cards = []
-        x = 0
-        for j = 0 to row.items.Count() - 1
-            item = row.items[j]
-            card = rowGroup.createChild("VerticalCard")
-            card.translation = [x, 0]
-            CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800, m.cNeutral700)
-            card.listType = true
-            uri = ""
-            if item.thumbnails <> invalid then
-                uri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
-            end if
-            card.thumbnailUri = uri
-            card.focusedState = false
-            cards.Push(card)
-            x = x + BS_ListCardPitch()
+    if fresh then
+        syncMax = BS_SkeletonRows()
+        if syncMax > m.rows.Count() then syncMax = m.rows.Count()
+        for i = 0 to syncMax - 1
+            row = m.rows[i]
+            if row = invalid then continue for
+            EnsureSeriesRow(i, row)
+            m.rowBuildIdx = i + 1
         end for
+        RevealContent()
+        if m.page = 1 then
+            SeriesHandoffContentFocus()
+        else
+            ClampCol()
+            ApplyFocus()
+        end if
+        print "[SERIES_DBG] grid_sync rows="; syncMax; " total="; m.rows.Count()
+    end if
 
-        m.rowNodes.Push({ group: rowGroup, cards: cards })
+    if m.rowBuildIdx >= m.rows.Count() then
+        FinishSeriesGridBuild()
+        return
+    end if
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "start"
+end sub
+
+sub OnSeriesRowBuildTick()
+    if m.top.dispose = true then
+        StopSeriesGridBuild()
+        return
+    end if
+    if m.rows = invalid or m.rows.Count() = 0 then
+        StopSeriesGridBuild()
+        return
+    end if
+    if m.rowBuildIdx >= m.rows.Count() then
+        StopSeriesGridBuild()
+        FinishSeriesGridBuild()
+        return
+    end if
+
+    row = m.rows[m.rowBuildIdx]
+    if row <> invalid then EnsureSeriesRow(m.rowBuildIdx, row)
+    m.rowBuildIdx = m.rowBuildIdx + 1
+
+    if m.rowBuildIdx >= m.rows.Count() then
+        StopSeriesGridBuild()
+        FinishSeriesGridBuild()
+    end if
+end sub
+
+sub FinishSeriesGridBuild()
+    ClampCol()
+    ApplyFocus()
+    if m.page > 1 and m.vm <> invalid and m.vm.shellFocus = "header" then
+        ShellEnterContent(m.vm)
+    end if
+    print "[SERIES_DBG] grid_build_done rows="; m.rows.Count(); " nodes="; m.rowNodes.Count()
+end sub
+
+sub EnsureSeriesRow(rowIdx as integer, row as object)
+    while m.rowNodes.Count() <= rowIdx
+        rowGroup = m.rowsHost.createChild("Group")
+        rowGroup.id = "seriesRow" + Str(m.rowNodes.Count())
+        m.rowNodes.Push({ group: rowGroup, cards: [] })
         m.rowScrollX.Push(0)
+    end while
+
+    entry = m.rowNodes[rowIdx]
+    if entry = invalid or entry.group = invalid then return
+    if entry.cards = invalid then entry.cards = []
+
+    for j = entry.cards.Count() to row.items.Count() - 1
+        item = row.items[j]
+        if item = invalid then continue for
+        card = entry.group.createChild("VerticalCard")
+        card.translation = [j * BS_ListCardPitch(), 0]
+        CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800, m.cNeutral700)
+        card.listType = true
+        uri = ""
+        if item.thumbnails <> invalid then
+            uri = GetCardImgByType(HC_CardTypeVertical(), item.thumbnails)
+        end if
+        card.thumbnailUri = uri
+        card.focusedState = false
+        entry.cards.Push(card)
     end for
 
-    m.rowIdx = savedRowIdx
-    m.colIdx = savedColIdx
-    ClampCol()
+    scrollX = 0
+    if m.rowScrollX.Count() > rowIdx then scrollX = m.rowScrollX[rowIdx]
+    rowY = rowIdx * BS_RowPitch()
+    if rowIdx <> m.rowIdx then
+        entry.group.translation = [-scrollX, rowY]
+    end if
+    m.rowNodes[rowIdx] = entry
 end sub
 
 sub RefreshCardThemes()
@@ -312,13 +379,16 @@ sub SeriesHandoffContentFocus()
 end sub
 
 sub ApplyFocus()
+    paintGridFocus = true
+    if m.vm <> invalid and m.vm.shellFocus = "header" then paintGridFocus = false
+
     for i = 0 to m.rowNodes.Count() - 1
         entry = m.rowNodes[i]
         if entry = invalid or entry.cards = invalid then continue for
         for j = 0 to entry.cards.Count() - 1
             card = entry.cards[j]
             if card = invalid then continue for
-            card.focusedState = (i = m.rowIdx and j = m.colIdx)
+            card.focusedState = (paintGridFocus and i = m.rowIdx and j = m.colIdx)
         end for
     end for
     ApplyScroll()
@@ -329,14 +399,7 @@ sub ApplyScroll()
     if m.rowsHost = invalid then return
     if m.rowNodes.Count() = 0 then return
 
-    rowTop = m.rowIdx * BS_RowPitch()
-    rowBottom = rowTop + BS_ListCardH()
-    if rowTop < m.scrollY then
-        m.scrollY = rowTop
-    else if rowBottom > m.scrollY + BS_ViewHeight() then
-        m.scrollY = rowBottom - BS_ViewHeight()
-    end if
-    if m.scrollY < 0 then m.scrollY = 0
+    m.scrollY = GridClampScrollY(m.rowIdx, m.scrollY, BS_RowPitch(), BS_ListCardH(), BS_ViewHeight())
 
     viewW = 1808
     for i = 0 to m.rowNodes.Count() - 1
@@ -345,13 +408,8 @@ sub ApplyScroll()
         scrollX = 0
         if m.rowScrollX.Count() > i then scrollX = m.rowScrollX[i]
         if i = m.rowIdx and entry.cards <> invalid and entry.cards.Count() > 0 then
-            if m.colIdx >= entry.cards.Count() then m.colIdx = entry.cards.Count() - 1
-            if m.colIdx < 0 then m.colIdx = 0
-            cardLeft = m.colIdx * BS_ListCardPitch()
-            cardRight = cardLeft + BS_ListCardW()
-            if cardLeft < scrollX then scrollX = cardLeft
-            if cardRight > scrollX + viewW then scrollX = cardRight - viewW
-            if scrollX < 0 then scrollX = 0
+            m.colIdx = GridClampColIndex(m.rowIdx, m.colIdx, m.rowNodes)
+            scrollX = GridClampRowScrollX(m.colIdx, scrollX, BS_ListCardPitch(), BS_ListCardW(), viewW)
             m.rowScrollX[i] = scrollX
         end if
         rowY = i * BS_RowPitch()
@@ -369,15 +427,7 @@ end sub
 sub AnimateRowsHostVertical()
     if m.rowsHost = invalid then return
     target = [BS_ListLeft(), BS_RowStartY() - m.scrollY]
-    from = m.rowsHost.translation
-    if from[0] = target[0] and from[1] = target[1] then return
-    if m.vScrollAnim = invalid or m.vScrollInterp = invalid then
-        m.rowsHost.translation = target
-        return
-    end if
-    if m.vScrollAnim.state = "running" then m.vScrollAnim.control = "stop"
-    m.vScrollInterp.keyValue = [from, target]
-    m.vScrollAnim.control = "start"
+    GridAnimateTranslation(m.rowsHost, m.rowsHost.translation, target, m.vScrollAnim, m.vScrollInterp, true, "")
 end sub
 
 ' Horizontal row scroll — animate the focused row strip.
@@ -389,24 +439,12 @@ sub AnimateFocusedRowHorizontal()
     scrollX = 0
     if m.rowScrollX.Count() > m.rowIdx then scrollX = m.rowScrollX[m.rowIdx]
     target = [-scrollX, m.rowIdx * BS_RowPitch()]
-    from = entry.group.translation
-    if from[0] = target[0] and from[1] = target[1] then return
-
-    if m.hScrollAnim = invalid or m.hScrollInterp = invalid then
-        entry.group.translation = target
-        return
-    end if
-    if m.hScrollAnim.state = "running" then m.hScrollAnim.control = "stop"
-    m.hScrollInterp.fieldToInterp = entry.group.id + ".translation"
-    m.hScrollInterp.keyValue = [from, target]
-    m.hScrollAnim.control = "start"
+    GridAnimateTranslation(entry.group, entry.group.translation, target, m.hScrollAnim, m.hScrollInterp, true, entry.group.id + ".translation")
 end sub
 
 sub MaybeLoadMore()
-    if not m.hasMore then return
-    if m.loading then return
-    if m.rows.Count() = 0 then return
-    if m.rowIdx = m.rows.Count() - 1 then FetchNextPage()
+    if SeriesGridBuildIncomplete() then return
+    if GridShouldLoadMore(m.hasMore, m.loading, m.rows.Count(), m.rowIdx) then FetchNextPage()
 end sub
 
 function SeriesEmptyVisible() as boolean
@@ -469,11 +507,7 @@ sub OnKey()
 end sub
 
 sub ClampCol()
-    if m.rowIdx < 0 or m.rowIdx >= m.rowNodes.Count() then return
-    entry = m.rowNodes[m.rowIdx]
-    if entry = invalid or entry.cards = invalid then return
-    if m.colIdx >= entry.cards.Count() then m.colIdx = entry.cards.Count() - 1
-    if m.colIdx < 0 then m.colIdx = 0
+    m.colIdx = GridClampColIndex(m.rowIdx, m.colIdx, m.rowNodes)
 end sub
 
 sub OpenFocusedItem()

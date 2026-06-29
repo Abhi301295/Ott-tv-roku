@@ -296,6 +296,26 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
     return false
 end function
 
+' True when the header re-selected the same top-level tab with identical nav params
+' (hand off focus only). Movies vs Series share RouteGenere() but differ by type.
+function AppShellSameTabReselect(vm as object, item as object) as boolean
+    if vm = invalid or item = invalid then return false
+    if vm.currentRoute <> item.route then return false
+
+    state = vm.navState
+    if state = invalid then state = {}
+
+    if item.route = RouteGenere() then
+        curType = ""
+        newType = ""
+        if state.type <> invalid then curType = state.type
+        if item.type <> invalid then newType = item.type
+        return curType = newType
+    end if
+
+    return true
+end function
+
 sub AppShellSelectHeaderItem(vm as object, menuIndex as integer)
     menuItems = vm.menuItems
     if menuItems = invalid or menuIndex < 0 or menuIndex >= menuItems.Count() then return
@@ -320,7 +340,15 @@ sub AppShellSelectHeaderItem(vm as object, menuIndex as integer)
         return
     end if
 
-    if vm.currentRoute <> item.route and vm.shellFocus = "header" then
+    ' Same tab + same nav params — hand off to content; do not remount.
+    if AppShellSameTabReselect(vm, item) then
+        if vm.shellFocus = "header" then
+            AppShellLeaveHeader(vm, "restore")
+        end if
+        return
+    end if
+
+    if vm.shellFocus = "header" then
         ShellEnterContent(vm)
     end if
 

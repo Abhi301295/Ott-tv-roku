@@ -44,6 +44,9 @@ sub ApplyAll()
     m.focusH = h + 6
     m.skeleton.boxWidth = w
     m.skeleton.boxHeight = h
+    if m.skeleton.hasField("shapeUri") then
+        m.skeleton.shapeUri = CardVerticalSkeletonShapeUri(w, h)
+    end if
     CardApplyPosterCover(m.thumb, m.thumbClip, w, h)
     if m.veil <> invalid then
         m.veil.width = w

@@ -25,12 +25,14 @@
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/ContentRowCatalogue.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeNav.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/GenreListService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/GenreNav.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/debug/OttDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />

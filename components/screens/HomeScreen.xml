@@ -36,6 +36,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeNav.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/debug/OttDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />

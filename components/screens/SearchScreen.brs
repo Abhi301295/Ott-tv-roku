@@ -198,13 +198,7 @@ end sub
 
 function SearchGridCols(panelW as integer) as integer
     ' React searchgrid.tsx: repeat(auto-fill, minmax(300px, 1fr)).
-    usable = panelW - SR_GridMarginLeft()
-    minColW = SR_GridMinCol()
-    gap = SR_GridGapX()
-    if usable < minColW then return 1
-    cols = Int((usable + gap) / (minColW + gap))
-    if cols < 1 then cols = 1
-    return cols
+    return GridFlatColsForPanel(panelW, SR_GridMarginLeft(), SR_GridMinCol(), SR_GridGapX())
 end function
 
 sub ScheduleSearch()
@@ -243,8 +237,9 @@ sub FetchSearch(keyword as string)
     StopGridBuild()
     m.inFlightKeyword = keyword
     m.loading = true
-    ' searchgrid.tsx: skeleton/spinner only when there are no cards to show yet.
-    if m.cardNodes.Count() = 0 then BeginSearchLoading()
+    ' Show grid shimmer as soon as the debounced API fires (replaces any prior results).
+    BeginSearchLoading()
+    print "[SEARCH_DBG] fetch kw="; keyword; " cards_before="; m.cardNodes.Count()
     path = SearchBuildPath(keyword, 1, SR_ApiLimit())
     m.searchTask = ApiGet(path)
     m.searchTask.observeField("apiResult", "OnSearchResponse")
@@ -298,6 +293,9 @@ end sub
 
 sub ShowLoading(show as boolean)
     if m.loadingHost <> invalid then m.loadingHost.visible = show
+    if m.gridHost <> invalid and m.emptyHost <> invalid and m.emptyHost.visible <> true then
+        m.gridHost.visible = not show
+    end if
     if show then
         BuildSkeletonGrid()
     else
@@ -503,6 +501,7 @@ end sub
 
 sub FinishGridBuild()
     if m.gridIndex >= m.cardNodes.Count() then m.gridIndex = 0
+    m.gridIndex = GridClampFlatIndex(m.gridIndex, m.cardNodes.Count())
     ApplyGridFocus()
 end sub
 
@@ -574,8 +573,7 @@ sub ApplyInputFocus()
 end sub
 
 function SearchGridRowCount() as integer
-    if m.cardNodes.Count() < 1 then return 0
-    return Int((m.cardNodes.Count() - 1) / m.gridCols) + 1
+    return GridFlatRowCount(m.cardNodes.Count(), m.gridCols)
 end function
 
 function SearchCardHeight() as integer
@@ -604,28 +602,16 @@ end function
 sub ApplyGridScroll()
     if m.gridScrollHost = invalid then return
     if m.focusZone = "grid" and m.cardNodes.Count() > 0 then
-        idx = m.gridIndex
-        if idx < 0 then idx = 0
-        if idx >= m.cardNodes.Count() then idx = m.cardNodes.Count() - 1
-        row = Int(idx / m.gridCols)
+        m.gridIndex = GridClampFlatIndex(m.gridIndex, m.cardNodes.Count())
+        row = GridFlatRowForIndex(m.gridIndex, m.gridCols)
         rowTop = row * SR_CardRowPitch()
         scrollBottom = SearchRowScrollBottom(row)
         pad = SR_GridScrollPad()
         viewH = SR_GridViewHeight()
-        if rowTop < m.gridScrollY + pad then
-            m.gridScrollY = rowTop - pad
-        else if scrollBottom > m.gridScrollY + viewH then
-            m.gridScrollY = scrollBottom - viewH
-        end if
         lastRow = SearchGridRowCount() - 1
-        if row = lastRow then
-            needY = scrollBottom - viewH
-            if needY > m.gridScrollY then m.gridScrollY = needY
-        end if
+        m.gridScrollY = GridClampFlatScrollY(m.gridScrollY, rowTop, scrollBottom, viewH, pad, row = lastRow)
     end if
-    if m.gridScrollY < 0 then m.gridScrollY = 0
-    maxScroll = SearchGridMaxScroll()
-    if m.gridScrollY > maxScroll then m.gridScrollY = maxScroll
+    m.gridScrollY = GridClampScrollMax(m.gridScrollY, SearchGridMaxScroll())
     m.gridScrollHost.translation = [SR_GridMarginLeft(), -m.gridScrollY]
 end sub
 
@@ -669,8 +655,7 @@ sub EnterGrid()
     if m.cardNodes.Count() = 0 then return
     m.focusZone = "grid"
     if m.keyboard <> invalid then m.keyboard.focusActive = false
-    if m.gridIndex < 0 then m.gridIndex = 0
-    if m.gridIndex >= m.cardNodes.Count() then m.gridIndex = m.cardNodes.Count() - 1
+    m.gridIndex = GridClampFlatIndex(m.gridIndex, m.cardNodes.Count())
     ApplyInputFocus()
     ApplyGridFocus()
 end sub

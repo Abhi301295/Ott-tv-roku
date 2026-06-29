@@ -46,6 +46,11 @@ function BS_ListEmptyCopy() as string
     return "We are sorry, we can not find the content"
 end function
 
+' Rows materialized synchronously before the progressive build timer (parity Search SR_SkeletonRows).
+function BS_SkeletonRows() as integer
+    return 2
+end function
+
 function GL_CataloguePageLimit() as integer
     return 10
 end function

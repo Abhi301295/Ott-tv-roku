@@ -85,7 +85,7 @@ Do not screenshot the simulator.
 
 | Area | Files |
 |------|-------|
-| Routing | `components/core/ViewManager.brs`, `source/lib/nav/Routes.brs` |
+| Routing | `components/core/ViewManager.brs`, `source/lib/Routes.brs` |
 | Shell / header | `components/core/AppShell.brs`, `components/widgets/HomeHeader.brs` |
 | Home rows + See All tile | `components/widgets/ContentRow.brs`, `components/cards/SeeAllCard.*` |
 | Card → route | `source/lib/home/HomeNav.brs`, `source/lib/browse/GenreNav.brs` |
@@ -217,8 +217,11 @@ Roku:
 
 ## Improvement backlog
 
+**Active plan:** [`../docs/m6-architect-review-and-plan.md`](../docs/m6-architect-review-and-plan.md) — phased refactor on `feature/m6-refactor` from `dev` (replaces `feature/m6-polish`).
+
 | Item | Rationale |
 |------|-----------|
+| Phase A–C | Shared libs + slim `HomeScreen` / grid screens (see architect plan) |
 | Structured `[BOOT]` timeline logs | Easier profile→home regression triage |
 | Update `port-plan.md` Reels row | Docs still say placeholder; `ReelsScreen` is shipped |
 | M5 Ads | Only major feature area not ported |

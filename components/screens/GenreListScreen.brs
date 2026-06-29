@@ -31,12 +31,20 @@ sub init()
     m.firstRowWatch = invalid
     m.prefetchWarmupIdx = 1
     m.interacting = false
+    m.pendingHeroUpdate = false
+    m.pendingPrefetchWarmup = false
 
     m.interactIdle = CreateObject("roSGNode", "Timer")
     m.interactIdle.duration = 0.25
     m.interactIdle.repeat = false
     m.top.appendChild(m.interactIdle)
     m.interactIdle.observeField("fire", "OnGenreInteractIdle")
+
+    m.rowPrefetchTimer = CreateObject("roSGNode", "Timer")
+    m.rowPrefetchTimer.duration = 0.001
+    m.rowPrefetchTimer.repeat = false
+    m.top.appendChild(m.rowPrefetchTimer)
+    m.rowPrefetchTimer.observeField("fire", "OnGenreRowPrefetchTimer")
 
     m.vm = FindViewManager(m.top)
     LoadGenreTokens()
@@ -112,6 +120,7 @@ sub OnDispose()
     if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "stop"
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
+    if m.rowPrefetchTimer <> invalid then m.rowPrefetchTimer.control = "stop"
     KillCatalogueTask(m.catalogueTask)
     m.catalogueTask = invalid
     if m.hero <> invalid then
@@ -376,45 +385,30 @@ sub OnRowBuildTick()
         return
     end if
 
-    row = m.rowsHost.createChild("ContentRow")
-    ApplyThemeToRow(row)
+    theme = GenreRowTheme()
+    y = m.rowContentHeight
     if m.rowBuildIndex = 0 then
-        row.categoryData = cat
-        row.rowPeekVisible = true
-        if row.cardCount = 0 then
-            PrepareGenreReveal()
-        else
-            row.callFunc("BuildCardsNow", 6)
-            PrepareGenreReveal()
+        row = CRC_CreateDataRow(m.rowsHost, cat, y, theme)
+        if row <> invalid then
+            row.rowPeekVisible = true
+            if row.cardCount = 0 then
+                PrepareGenreReveal()
+            else
+                row.callFunc("BuildCardsNow", 6)
+                PrepareGenreReveal()
+            end if
         end if
     else
-        row.callFunc("PrepareShell", cat)
+        row = CRC_CreateShellRow(m.rowsHost, cat, y, theme)
     end if
-    row.translation = [0, m.rowContentHeight]
-    m.rowTops.Push(m.rowContentHeight)
-    m.rowContentHeight = m.rowContentHeight + HC_ContentRowLayoutHeight(cat)
-    m.rowWidgets.Push(row)
+    if row <> invalid then CRC_AppendRowRecord(m, row, y, cat)
     ApplyRowFocusState(m.rowWidgets.Count() - 1)
     if m.rowsRevealed then MaterializePrefetchWindow()
     m.rowBuildIndex = m.rowBuildIndex + 1
 end sub
 
 sub AppendRowsFrom(startIdx as integer)
-    if startIdx < 0 then startIdx = 0
-    y = m.rowContentHeight
-    for i = startIdx to m.categories.Count() - 1
-        if i < m.rowWidgets.Count() then continue for
-        cat = m.categories[i]
-        if cat = invalid then continue for
-        row = m.rowsHost.createChild("ContentRow")
-        ApplyThemeToRow(row)
-        row.callFunc("PrepareShell", cat)
-        row.translation = [0, y]
-        m.rowTops.Push(y)
-        y = y + HC_ContentRowLayoutHeight(cat)
-        m.rowWidgets.Push(row)
-    end for
-    m.rowContentHeight = y
+    CRC_AppendShellRowsFrom(m.rowsHost, m.categories, m, GenreRowTheme(), startIdx)
     MaterializePrefetchWindow()
 end sub
 
@@ -445,15 +439,14 @@ sub PrepareGenreReveal()
     HideGenreSkeleton()
     if m.hero <> invalid then m.hero.visible = true
     if m.rowsHost <> invalid then m.rowsHost.visible = true
-    WarmGenrePrefetchWindow()
-    m.prefetchWarmupIdx = 3
-    if m.prefetchWarmupIdx < m.rowWidgets.Count() then ScheduleGenrePrefetchWarmup()
+    ' Neighbor-row warm-up waits for idle so row-0 horizontal nav stays responsive.
+    m.pendingPrefetchWarmup = true
     ApplyGenreFocus()
     if m.vm <> invalid and m.categories.Count() > 0 and not GenreEmptyVisible() then
         wasHeader = false
         if m.vm.shellFocus = "header" then wasHeader = true
         ShellEnterContent(m.vm)
-        print "[BROWSE_DBG] genre_focus handoff_to_rows categories="; m.categories.Count(); " fromHeader="; wasHeader
+        BrowseDbg("genre_reveal", "handoff_to_rows categories=" + Str(m.categories.Count()) + " fromHeader=" + BrowseDbgStr(wasHeader))
     end if
     BrowseDbg("genre_reveal", "rows visible focus applied")
 end sub
@@ -524,26 +517,20 @@ end sub
 sub ClearRows()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
     StopGenrePrefetchWarmup()
-    if m.rowsHost = invalid then return
-    for i = m.rowsHost.getChildCount() - 1 to 0 step -1
-        m.rowsHost.removeChildIndex(i)
-    end for
+    CRC_ClearHost(m.rowsHost)
     m.rowWidgets = []
     m.rowTops = []
     m.rowBuildIndex = 0
 end sub
 
+function GenreRowTheme() as object
+    theme = CRC_ThemeFromHost(m)
+    theme.rowTitleFontSize = GL_RowTitleFontSize()
+    return theme
+end function
+
 sub ApplyThemeToRow(row as object)
-    if row = invalid then return
-    if row.hasField("ottRowReveal") then row.ottRowReveal = true
-    if row.hasField("rowTitleFontSize") then row.rowTitleFontSize = GL_RowTitleFontSize()
-    row.cPrimary500 = m.cPrimary500
-    row.cPrimary600 = m.cPrimary600
-    row.cPrimary700 = m.cPrimary700
-    row.cNeutral50 = m.cNeutral50
-    row.cNeutral800 = m.cNeutral800
-    row.cNeutral950 = m.cNeutral950
-    row.cNeutral700 = m.cNeutral700
+    CRC_ApplyRowTheme(row, GenreRowTheme())
 end sub
 
 sub RefreshRowThemes()
@@ -575,19 +562,43 @@ sub ApplyGenreFocusWindow()
     end for
 end sub
 
-' Horizontal nav — sync-build focused card, update focus + banner without scroll work.
-sub ApplyGenreCardFocus()
+' Horizontal nav — focus chrome only; card build + hero update defer to prefetch/idle.
+sub ApplyGenreCardFocusInstant()
     if m.rowWidgets.Count() = 0 then return
     if not m.rowsRevealed then return
     if m.rowIndex < 0 then m.rowIndex = 0
     if m.rowIndex >= m.rowWidgets.Count() then m.rowIndex = m.rowWidgets.Count() - 1
     ClampCardIndex()
-    PrimeFocusedRowCards()
     ApplyGenreFocusWindow()
-    UpdateGenreHeroFromFocus()
+    if m.interacting then
+        m.pendingHeroUpdate = true
+    else
+        UpdateGenreHeroFromFocus()
+    end if
+    ScheduleGenreRowPrefetch()
 end sub
 
-sub PrimeFocusedRowCards()
+sub ApplyGenreFocus()
+    if m.rowWidgets.Count() = 0 then return
+    if not m.rowsRevealed then return
+
+    if m.rowIndex < 0 then m.rowIndex = 0
+    if m.rowIndex >= m.rowWidgets.Count() then m.rowIndex = m.rowWidgets.Count() - 1
+    ClampCardIndex()
+    GenreApplyVerticalScroll()
+    ApplyGenreFocusWindow()
+    if m.interacting then
+        m.pendingHeroUpdate = true
+    else
+        UpdateGenreHeroFromFocus()
+    end if
+    ScheduleGenreRowPrefetch()
+    MaybeLoadMore()
+end sub
+
+' Sync-build cards for the focused row (runs on prefetch timer, not on the key path).
+sub PrimeFocusedRow()
+    if not m.rowsRevealed then return
     if m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return
     row = m.rowWidgets[m.rowIndex]
     if row = invalid then return
@@ -599,41 +610,9 @@ sub PrimeFocusedRowCards()
     row.callFunc("ForceReveal", invalid)
 end sub
 
-sub ApplyGenreFocus()
-    if m.rowWidgets.Count() = 0 then return
-    if not m.rowsRevealed then return
-
-    if m.rowIndex < 0 then m.rowIndex = 0
-    if m.rowIndex >= m.rowWidgets.Count() then m.rowIndex = m.rowWidgets.Count() - 1
-    ClampCardIndex()
-    PrimeFocusedRow()
-    GenreApplyVerticalScroll()
-    ApplyGenreFocusWindow()
-    UpdateGenreHeroFromFocus()
-    MaybeLoadMore()
-end sub
-
-' Materialize shell + sync-build visible cards so row navigation never lands on a blank strip.
-sub PrimeFocusedRow()
-    if not m.rowsRevealed then return
-    if m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return
-    row = m.rowWidgets[m.rowIndex]
-    if row = invalid then return
-    row.callFunc("Materialize", invalid)
-    row.callFunc("BuildCardsNow", 6)
-    row.callFunc("ResumeBuild", invalid)
-    row.callFunc("ForceReveal", invalid)
-end sub
-
 function GenreRowsContentHeight() as integer
     if m.rowContentHeight <> invalid and m.rowContentHeight > 0 then return m.rowContentHeight
-    if m.rowTops = invalid or m.rowTops.Count() = 0 then return 0
-    if m.categories = invalid or m.categories.Count() = 0 then return 0
-    lastIdx = m.rowTops.Count() - 1
-    if lastIdx < 0 or lastIdx >= m.categories.Count() then return 0
-    cat = m.categories[lastIdx]
-    if cat = invalid then return 0
-    return m.rowTops[lastIdx] + HC_ContentRowLayoutHeight(cat)
+    return CRC_ContentHeight(m.rowTops, m.categories)
 end function
 
 sub GenreLogRowTops(tag as string)
@@ -753,20 +732,44 @@ sub RunGenrePrefetchPass()
     PrimeFocusedRow()
     if m.interacting then return
     MaterializePrefetchWindow()
+    FlushPendingHeroUpdate()
+    RunDeferredPrefetchWarmup()
 end sub
 
-sub ResumeFocusedRowBuild()
-    if m.rowIndex < 0 or m.rowIndex >= m.rowWidgets.Count() then return
-    row = m.rowWidgets[m.rowIndex]
-    if row <> invalid then row.callFunc("ResumeBuild", invalid)
+sub ScheduleGenreRowPrefetch()
+    if not m.rowsRevealed then return
+    if m.rowPrefetchTimer = invalid then return
+    m.rowPrefetchTimer.control = "stop"
+    m.rowPrefetchTimer.control = "start"
 end sub
 
-sub PauseGenreRowBuilding(exceptIdx = -1 as integer)
+sub OnGenreRowPrefetchTimer()
+    RunGenrePrefetchPass()
+end sub
+
+sub FlushPendingHeroUpdate()
+    if not m.pendingHeroUpdate then return
+    m.pendingHeroUpdate = false
+    UpdateGenreHeroFromFocus()
+end sub
+
+sub RunDeferredPrefetchWarmup()
+    if not m.pendingPrefetchWarmup then return
+    m.pendingPrefetchWarmup = false
+    WarmGenrePrefetchWindow()
+    m.prefetchWarmupIdx = 3
+    if m.prefetchWarmupIdx < m.rowWidgets.Count() then ScheduleGenrePrefetchWarmup()
+end sub
+
+' Pause every background build the instant a key is pressed (parity Home input-priority).
+sub PauseGenreBackgroundWork()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+    StopGenrePrefetchWarmup()
+    if m.rowPrefetchTimer <> invalid then m.rowPrefetchTimer.control = "stop"
     if m.rowWidgets = invalid then return
     for i = 0 to m.rowWidgets.Count() - 1
         row = m.rowWidgets[i]
-        if row <> invalid and i <> exceptIdx then row.callFunc("PauseBuild", invalid)
+        if row <> invalid then row.callFunc("PauseBuild", invalid)
     end for
 end sub
 
@@ -780,9 +783,9 @@ sub ResumeGenreRowBuilding()
     end for
 end sub
 
-sub BeginGenreInteraction(primeRowIdx = -1 as integer)
+sub BeginGenreInteraction()
     m.interacting = true
-    PauseGenreRowBuilding(primeRowIdx)
+    PauseGenreBackgroundWork()
     if m.interactIdle <> invalid then
         m.interactIdle.control = "stop"
         m.interactIdle.control = "start"
@@ -793,10 +796,6 @@ sub OnGenreInteractIdle()
     m.interacting = false
     ResumeGenreRowBuilding()
     RunGenrePrefetchPass()
-end sub
-
-sub MaterializeVisibleRows()
-    MaterializePrefetchWindow()
 end sub
 
 sub MaterializeNearbyRows()
@@ -875,17 +874,7 @@ sub OnKey()
     if m.vm <> invalid and m.vm.shellFocus = "header" then return
 
     key = ev.key
-    navRowIdx = -1
-    if m.rowsRevealed and not GenreEmptyVisible() then
-        if key = "down" and m.rowIndex < m.rowWidgets.Count() - 1 then
-            navRowIdx = m.rowIndex + 1
-        else if key = "up" and m.rowIndex > 0 then
-            navRowIdx = m.rowIndex - 1
-        else if key = "left" or key = "right" then
-            navRowIdx = m.rowIndex
-        end if
-    end if
-    BeginGenreInteraction(navRowIdx)
+    BeginGenreInteraction()
 
     if GenreEmptyVisible() then
         if key = "up" then EnterGenreHeader()
@@ -920,12 +909,12 @@ sub OnKey()
             return
         end if
         if m.cardIndex > 0 then m.cardIndex = m.cardIndex - 1
-        ApplyGenreCardFocus()
+        ApplyGenreCardFocusInstant()
     else if key = "right" then
         row = m.rowWidgets[m.rowIndex]
         if row <> invalid and m.cardIndex < row.cardCount - 1 then m.cardIndex = m.cardIndex + 1
-        print "[BROWSE_DBG] genre_key right cardIndex="; m.cardIndex
-        ApplyGenreCardFocus()
+        BrowseDbg("genre_key", "right cardIndex=" + Str(m.cardIndex))
+        ApplyGenreCardFocusInstant()
     else if key = "OK" or key = "ok" then
         OpenFocusedCard()
     end if

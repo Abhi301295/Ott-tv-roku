@@ -48,3 +48,9 @@ function SkeletonResolveColors(tokens as object) as object
     hi = SK_TokenColor(tokens, SK_HighlightToken(), SK_HighlightFallbackHex())
     return { base: base, highlight: hi }
 end function
+
+' Rounded skeleton mask for vertical catalogue cards (parity verticalCard.tsx radius-10).
+function CardVerticalSkeletonShapeUri(w as integer, h as integer) as string
+    if w = 272 and h = 340 then return "pkg:/images/ui/sk_vertical_card_272x340.png"
+    return "pkg:/images/ui/sk_vertical_card_220x300.png"
+end function

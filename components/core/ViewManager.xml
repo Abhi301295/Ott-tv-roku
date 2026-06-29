@@ -36,6 +36,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/ScreenLifecycle.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/nav/ScreenFactory.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/ViewManager.brs" />
 
   <children>
