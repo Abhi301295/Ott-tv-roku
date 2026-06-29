@@ -300,9 +300,6 @@ end sub
 
 ' Cut the HomeSkeleton row strip before revealing real cards so the two shimmer
 ' systems (HomeSkeleton rectangles vs per-card Skeleton widgets) never overlap.
-
-' Cut the HomeSkeleton row strip before revealing real cards so the two shimmer
-' systems (HomeSkeleton rectangles vs per-card Skeleton widgets) never overlap.
 sub PrepareFirstRowReveal()
     if m.rowsRevealed then
         if ProfileTransitionActive() then HideProfileWelcomeTransition()

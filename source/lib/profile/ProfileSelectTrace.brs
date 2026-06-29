@@ -10,10 +10,6 @@ function ProfileSelectFmt(val as dynamic) as string
     return "" + val
 end function
 
-function ProfileSelectCtx(fromNode as object) as string
-    return ""
-end function
-
 sub ProfileSelectLog(tag as string, detail as string)
 end sub
 

@@ -181,13 +181,9 @@ end function
 '     tinted at runtime via Poster.blendColor = cPageBg (page background token).
 '   • Corners generated in scripts/gen_search_keyboard_assets.py (pieslice L-masks, 12px).
 '   • Focus: search_card_focus_ring.png (inset 3px ring, same radius) — NOT outside FocusFrame.
-'   • Assets: search_card_corner_*.png, search_card_focus_ring.png; mask PNG exists but sim-only fails.
+'   • Assets: search_card_corner_*.png, search_card_focus_ring.png.
 function SR_CardCornerUri(quadrant as string) as string
     return "pkg:/images/ui/search_card_corner_" + quadrant + ".png"
-end function
-
-function SR_CardMaskUri() as string
-    return "pkg:/images/ui/search_card_mask_280x150.png"
 end function
 
 function SR_CardFocusRingUri() as string

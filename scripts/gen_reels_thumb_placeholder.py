@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 from PIL import Image
@@ -13,7 +14,6 @@ ROOT = Path(__file__).resolve().parents[1]
 REACT_IMAGE_TS = ROOT.parent / "lg-samsung-tv-player-lg-dev" / "src" / "utils" / "images" / "image.ts"
 UI = ROOT / "images" / "ui"
 OUT_PNG = UI / "reels_thumb_placeholder.png"
-OUT_SVG = UI / "reels_thumb.svg"
 W, H = 608, 1080
 BG_RGB = (250, 250, 251)  # #fafafb from Images.THUMBNAIL
 
@@ -61,13 +61,15 @@ def main() -> None:
 
     UI.mkdir(parents=True, exist_ok=True)
     svg = _extract_svg(args.primary)
-    OUT_SVG.write_text(svg, encoding="utf-8")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".svg", delete=False, encoding="utf-8") as tmp:
+        tmp.write(svg)
+        svg_path = Path(tmp.name)
 
-    logo = _cover_crop(_render_svg(OUT_SVG), W, H)
+    logo = _cover_crop(_render_svg(svg_path), W, H)
+    svg_path.unlink(missing_ok=True)
     bg = Image.new("RGB", (W, H), BG_RGB)
     bg.paste(logo, (0, 0), logo)
     bg.save(OUT_PNG, optimize=True)
-    print(f"Wrote {OUT_SVG}")
     print(f"Wrote {OUT_PNG} ({W}x{H}) primary={args.primary}")
 
 

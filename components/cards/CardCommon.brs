@@ -336,7 +336,7 @@ end sub
 
 ' ── Sim-safe rounded thumbs (parity search cards) ─────────────────────────────
 ' Stack: full-rect Poster → overlays → 4× card_corner_{tl,tr,bl,br}.png with page bg
-' baked in (gen_card_assets.py — blendColor is unreliable for corner nubs in sim).
+' baked in (gen_search_keyboard_assets.py corner pies — blendColor is unreliable in sim).
 ' Focus: card_focus_ring_{w}x{h}.png inset 3px, tinted via blendColor — NOT FocusFrame.
 
 function CardThumbCornerRadius() as integer

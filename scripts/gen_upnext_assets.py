@@ -32,17 +32,6 @@ def shape_polygon(s):
     return pts
 
 
-def raster_alpha_mask():
-    """White shape on black — roBitmap.SetAlphaMask uses red channel as alpha."""
-    ws, hs = int(W * SCALE), int(H * SCALE)
-    alpha = Image.new("L", (ws, hs), 0)
-    ImageDraw.Draw(alpha).polygon(shape_polygon(SCALE), fill=255)
-    small = alpha.resize((W, H), Image.Resampling.LANCZOS)
-    rgb = Image.new("RGB", (W, H), (0, 0, 0))
-    rgb.paste((255, 255, 255), mask=small)
-    return rgb
-
-
 def raster_mask_rgba():
     ws, hs = int(W * SCALE), int(H * SCALE)
     alpha = Image.new("L", (ws, hs), 0)
@@ -77,7 +66,6 @@ def raster_shadow():
 def raster_grad_overlay():
     """Bottom fade only — parity heroBanner linear-gradient(to top, black 75% at 0%, transparent 55%)."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-  # 55% from bottom is transparent; lower 55% fades from transparent → 75% black.
     fade_top = int(H * 0.45 + 0.5)
     max_a = int(0.75 * 255)
     for y in range(H):
@@ -92,22 +80,10 @@ def raster_grad_overlay():
     return img
 
 
-def raster_blank():
-    return Image.new("RGBA", (W, H), (0, 0, 0, 0))
-
-
-def raster_stage():
-    return Image.new("RGBA", (1920, 1080), (0, 0, 0, 0))
-
-
 if __name__ == "__main__":
     OUT_IMG.mkdir(parents=True, exist_ok=True)
-    raster_blank().save(OUT_IMG / "upnext_blank.png")
-    raster_stage().save(OUT_IMG / "upnext_stage.png")
-    raster_alpha_mask().save(OUT_IMG / "upnext_alpha_mask.png")
-    raster_cutout = raster_mask_rgba()
-    raster_cutout.save(OUT_IMG / "upnext_cutout_mask.png")
+    raster_mask_rgba().save(OUT_IMG / "upnext_cutout_mask.png")
     raster_grad_overlay().save(OUT_IMG / "upnext_grad_overlay.png")
     raster_left_edge().save(OUT_IMG / "upnext_left_edge.png")
     raster_shadow().save(OUT_IMG / "upnext_shadow.png")
-    print("Wrote upnext_blank.png, upnext_alpha_mask.png, upnext_cutout_mask.png, upnext_grad_overlay.png, upnext_left_edge.png, upnext_shadow.png")
+    print("Wrote upnext_cutout_mask.png, upnext_grad_overlay.png, upnext_left_edge.png, upnext_shadow.png")

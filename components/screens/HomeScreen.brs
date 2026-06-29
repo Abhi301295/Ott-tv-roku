@@ -415,8 +415,6 @@ sub ApplyLayoutGeometry(animate = false as boolean)
 end sub
 
 ' Drive HomeSkeleton placeholder positions from the active layout case.
-
-' Drive HomeSkeleton placeholder positions from the active layout case.
 sub ApplySkeletonLayout()
     if m.homeSkeleton = invalid then return
     mode = "netflix"
@@ -424,8 +422,6 @@ sub ApplySkeletonLayout()
     m.homeSkeleton.layoutMode = mode
     m.homeSkeleton.anchorY = m.layoutAnchorY
 end sub
-
-' OTT rows default to y=702 in XML (Netflix anchor); snap to OTT anchor unless scrolled down.
 
 ' OTT rows default to y=702 in XML (Netflix anchor); snap to OTT anchor unless scrolled down.
 sub NormalizeOttRowsHostY()
