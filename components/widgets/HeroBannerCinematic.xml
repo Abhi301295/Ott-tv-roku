@@ -28,6 +28,8 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeroSlide.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeroBannerCommon.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />

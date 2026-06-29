@@ -27,6 +27,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/video/VideoStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoPlayback.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/VideoPlayerScreen.brs" />
 
   <children>

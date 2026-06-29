@@ -77,6 +77,32 @@ function HC_HeroMetaBeforePosterSec() as float
     return 0.15
 end function
 
+' Cinematic metaHost fade + slide-up (heroBannerCinematic.tsx textVisible).
+function HC_HeroMetaEntranceSec() as float
+    return 0.6
+end function
+
+' Parallax frost-strip meta fade-in after slide settles.
+function HC_HeroContentRevealSec() as float
+    return 0.5
+end function
+
+function HC_HeroParallaxAccentSec() as float
+    return 0.7
+end function
+
+function HC_HeroParallaxSwipeSec() as float
+    return 5.5
+end function
+
+function HC_HeroPageFlipSwipeSec() as float
+    return 5.0
+end function
+
+function HC_HeroOttFadeSec() as float
+    return 0.7
+end function
+
 function HC_HeroSwipeMs() as integer
     return 15000
 end function

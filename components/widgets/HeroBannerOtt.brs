@@ -1,3 +1,5 @@
+' OTT single-banner hero — parity banner/index.tsx (activeItem, no carousel).
+' ⚠ Parity Note: HeroGoNext/Prev are no-ops; no multi-slide timer or trailer.
 sub init()
     m.bannerPoster = m.top.findNode("bannerPoster")
     m.heroBg = m.top.findNode("heroBg")
@@ -28,6 +30,8 @@ sub init()
     m.posterReadyTimer.repeat = false
     m.top.appendChild(m.posterReadyTimer)
     m.posterReadyTimer.observeField("fire", "OnPosterReadyTimeout")
+    if m.fadeAnim <> invalid then m.fadeAnim.duration = HC_HeroOttFadeSec()
+    if m.scaleAnim <> invalid then m.scaleAnim.duration = HC_HeroOttFadeSec()
     ApplyViewportLayout()
 end sub
 

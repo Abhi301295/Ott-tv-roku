@@ -58,7 +58,8 @@ Profile avatar style follows **header style only** (Netflix = circular, Sidebar 
 ### 7. Verify with logs, not pixels
 
 Instrument flows with grep-friendly tags (`[BROWSE_DBG]`, `ProfileSelectLog`, `[HTTP]`).
-Run `make validate && make sim`, drive keys via `scripts/sim.py`, read telnet on port 8085.
+Run `make validate && make sim`, or **`make smoke`** for validate + deploy + telnet assertions.
+Drive keys via `scripts/sim.py`, read telnet on port 8085.
 Do not screenshot the simulator.
 
 ---
@@ -221,7 +222,7 @@ Roku:
 
 | Item | Rationale |
 |------|-----------|
-| Phase A–C | Shared libs + slim `HomeScreen` / grid screens (see architect plan) |
+| Phase A–C | Shared libs + slim `HomeScreen` / grid screens — **Phase C done** on `feature/m6-refactor-phase-c` |
 | Structured `[BOOT]` timeline logs | Easier profile→home regression triage |
 | Update `port-plan.md` Reels row | Docs still say placeholder; `ReelsScreen` is shipped |
 | M5 Ads | Only major feature area not ported |
@@ -235,6 +236,7 @@ Roku:
 ```bash
 make validate          # compile + lint
 make sim               # BrightScript Simulator
+make smoke             # validate + sim + scripts/smoke.sh (Phase F)
 scripts/sim.py key OK  # inject remote key
 scripts/sim.py log     # tail telnet debug (port 8085)
 ```

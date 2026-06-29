@@ -1,4 +1,5 @@
-' Parallax vertical-slide hero — parity with heroBannerParallax.tsx.
+' Parallax vertical-slide hero — parity heroBannerParallax.tsx.
+' ⚠ Parity Note: meta hides during slide, then contentAnim reveals after HC_HeroMetaBeforePosterSec.
 
 function PX_HeroH() as integer
     return 918
@@ -156,8 +157,16 @@ sub init()
     m.accentWidthInterp = m.top.findNode("accentWidthInterp")
 
     if m.metaHost <> invalid then m.metaHost.translation = [48, PX_MetaY()]
-    if m.swipeTimer <> invalid then m.swipeTimer.observeField("fire", "OnSwipeTimer")
-    if m.contentDelayTimer <> invalid then m.contentDelayTimer.observeField("fire", "OnContentDelay")
+    if m.swipeTimer <> invalid then
+        m.swipeTimer.duration = HC_HeroParallaxSwipeSec()
+        m.swipeTimer.observeField("fire", "OnSwipeTimer")
+    end if
+    if m.contentDelayTimer <> invalid then
+        m.contentDelayTimer.duration = HC_HeroMetaBeforePosterSec()
+        m.contentDelayTimer.observeField("fire", "OnContentDelay")
+    end if
+    if m.contentAnim <> invalid then m.contentAnim.duration = HC_HeroContentRevealSec()
+    if m.accentAnim <> invalid then m.accentAnim.duration = HC_HeroParallaxAccentSec()
     if m.slideAnim <> invalid then m.slideAnim.observeField("state", "OnSlideAnimState")
     if m.activePoster <> invalid then m.activePoster.observeField("loadStatus", "OnPosterLoad")
     m.top.observeField("visible", "OnVisibleChanged")
@@ -248,22 +257,15 @@ sub OnBannerItemsChanged()
 end sub
 
 function ItemCount() as integer
-    if m.items = invalid then return 0
-    return m.items.Count()
+    return HeroSlideCount(m.items)
 end function
 
 function NextIndex(idx as integer) as integer
-    count = ItemCount()
-    if count < 2 then return idx
-    return (idx + 1) mod count
+    return HeroSlideNextIndex(idx, ItemCount())
 end function
 
 function PrevIndex(idx as integer) as integer
-    count = ItemCount()
-    if count < 2 then return idx
-    p = idx - 1
-    if p < 0 then p = count - 1
-    return p
+    return HeroSlidePrevIndex(idx, ItemCount())
 end function
 
 sub ShowSlide(index as integer, delayContent as boolean)
@@ -648,18 +650,7 @@ end sub
 
 sub PlayContentReveal()
     m.pendingContentReveal = false
-    if m.frostStrip <> invalid then m.frostStrip.opacity = 1.0
-    if m.vertDots <> invalid then m.vertDots.opacity = 1.0
-    if m.metaHost <> invalid then m.metaHost.opacity = 0.0
-    if m.accentLine <> invalid then m.accentLine.width = 0.0
-    if m.contentOpacityInterp <> invalid and m.contentAnim <> invalid then
-        m.contentOpacityInterp.keyValue = [0.0, 1.0]
-        m.contentAnim.control = "start"
-    end if
-    if m.accentWidthInterp <> invalid and m.accentAnim <> invalid then
-        m.accentWidthInterp.keyValue = [0.0, 50.0]
-        m.accentAnim.control = "start"
-    end if
+    HeroPlayParallaxContentReveal(m.metaHost, m.contentOpacityInterp, m.contentAnim, m.accentWidthInterp, m.accentAnim, m.frostStrip, m.vertDots, m.accentLine)
 end sub
 
 sub OnContentDelay()
@@ -741,7 +732,7 @@ sub BeginSlide(dir as string, targetIdx as integer)
     m.contentReady = false
 
     ' React: contentReady=false hides meta immediately; thumbs stay on OLD active during slide.
-    if m.metaHost <> invalid then m.metaHost.opacity = 0.0
+    HeroHideMetaHost(m.metaHost)
 
     revealUri = GetHeroBannerImage(m.items[targetIdx])
     if m.nextPoster <> invalid and revealUri <> "" then m.nextPoster.uri = revealUri

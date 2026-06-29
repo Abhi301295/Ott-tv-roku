@@ -1,4 +1,6 @@
 sub init()
+    ' HeroBannerHost selects one child by theme; all children expose the same callFunc
+    ' surface (HeroGoNext/Prev, PauseAutoAdvance, etc.) documented in HeroSlide.brs.
     m.heroCinematic = m.top.findNode("heroCinematic")
     m.heroPageFlip = m.top.findNode("heroPageFlip")
     m.heroParallax = m.top.findNode("heroParallax")
