@@ -82,22 +82,8 @@ sub KillTask(task as object)
 end sub
 
 sub LoadMyListTokens()
-    m.tokens = {}
-    tm = m.top.getScene().findNode("themeManager")
-    if tm <> invalid and tm.themeTokens <> invalid then m.tokens = tm.themeTokens
-    m.cPrimary500 = TCw("primary-500", "#0092ff")
-    m.cPrimary600 = TCw("primary-600", "#459adb")
-    m.cPrimary700 = TCw("primary-700", "#80bbe9")
-    m.cNeutral50 = TCw("neutral-50", "#ffffff")
-    m.cEmptyText = m.cNeutral50
-    m.cNeutral700 = TCw("neutral-700", "#404040")
-    m.cNeutral800 = TCw("neutral-800", "#262626")
-    m.cPageBg = TCw("background", "#0a0a0a")
+    ThemeApplyWatchlistPalette(m, m.top)
 end sub
-
-function TCw(name as string, fallbackHex as string) as string
-    return ThemeTokenColor(m.tokens, name, fallbackHex)
-end function
 
 sub ApplyStaticColors()
     if m.bg <> invalid then m.bg.color = m.cPageBg
@@ -340,6 +326,9 @@ sub RefreshCardThemes()
 end sub
 
 sub ApplyFocus()
+    paintGridFocus = true
+    if m.vm <> invalid and m.vm.shellFocus = "header" then paintGridFocus = false
+
     focusedCard = invalid
     focusedRow = invalid
     for i = 0 to m.rowNodes.Count() - 1
@@ -348,7 +337,7 @@ sub ApplyFocus()
         for j = 0 to entry.cards.Count() - 1
             card = entry.cards[j]
             if card = invalid then continue for
-            focused = (i = m.rowIdx and j = m.colIdx)
+            focused = (paintGridFocus and i = m.rowIdx and j = m.colIdx)
             card.focusedState = focused
             if focused then
                 focusedCard = card
@@ -368,30 +357,19 @@ sub ApplyScroll()
     if m.rowsHost = invalid then return
     if m.rowNodes.Count() = 0 then return
 
-    rowTop = m.rowIdx * WL_RowPitch()
-    rowBottom = rowTop + WL_CardOuterH()
-    if rowTop < m.scrollY then
-        m.scrollY = rowTop
-    else if rowBottom > m.scrollY + WL_ViewHeight() then
-        m.scrollY = rowBottom - WL_ViewHeight()
-    end if
-    if m.scrollY < 0 then m.scrollY = 0
+    m.scrollY = GridClampScrollY(m.rowIdx, m.scrollY, WL_RowPitch(), WL_CardOuterH(), WL_ViewHeight())
 
     viewW = m.viewportW
     if viewW < 1 then viewW = 1808
+    cardScrollW = WL_CardOuterW() + WL_CardBorderBleed()
     for i = 0 to m.rowNodes.Count() - 1
         entry = m.rowNodes[i]
         if entry = invalid or entry.group = invalid then continue for
         scrollX = 0
         if m.rowScrollX.Count() > i then scrollX = m.rowScrollX[i]
         if i = m.rowIdx and entry.cards <> invalid and entry.cards.Count() > 0 then
-            if m.colIdx >= entry.cards.Count() then m.colIdx = entry.cards.Count() - 1
-            if m.colIdx < 0 then m.colIdx = 0
-            cardLeft = m.colIdx * WL_CardPitch()
-            cardRight = cardLeft + WL_CardOuterW() + WL_CardBorderBleed()
-            if cardLeft < scrollX then scrollX = cardLeft
-            if cardRight > scrollX + viewW then scrollX = cardRight - viewW
-            if scrollX < 0 then scrollX = 0
+            m.colIdx = GridClampColIndex(m.rowIdx, m.colIdx, m.rowNodes)
+            scrollX = GridClampRowScrollX(m.colIdx, scrollX, WL_CardPitch(), cardScrollW, viewW)
             m.rowScrollX[i] = scrollX
         end if
         entry.group.translation = [-scrollX, i * WL_RowPitch() - m.scrollY]
@@ -400,10 +378,7 @@ sub ApplyScroll()
 end sub
 
 sub MaybeLoadMore()
-    if not m.hasMore then return
-    if m.loading then return
-    if m.rows.Count() = 0 then return
-    if m.rowIdx = m.rows.Count() - 1 then FetchDetailPage()
+    if GridShouldLoadMore(m.hasMore, m.loading, m.rows.Count(), m.rowIdx) then FetchDetailPage()
 end sub
 
 sub EnterMyListHeader()
@@ -459,11 +434,7 @@ sub OnKey()
 end sub
 
 sub ClampCol()
-    if m.rowIdx < 0 or m.rowIdx >= m.rowNodes.Count() then return
-    entry = m.rowNodes[m.rowIdx]
-    if entry = invalid or entry.cards = invalid then return
-    if m.colIdx >= entry.cards.Count() then m.colIdx = entry.cards.Count() - 1
-    if m.colIdx < 0 then m.colIdx = 0
+    m.colIdx = GridClampColIndex(m.rowIdx, m.colIdx, m.rowNodes)
 end sub
 
 sub OpenFocusedItem()

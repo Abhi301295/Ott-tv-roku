@@ -31,6 +31,8 @@
   <script type="text/brightscript" uri="pkg:/source/lib/watchlist/MyListConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/watchlist/WatchlistService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeScreenColors.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/grid/GridFocus.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/MyListDetailScreen.brs" />
 
