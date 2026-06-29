@@ -694,8 +694,6 @@ sub OnProfileFetchRefreshResponse()
     if api.httpStatus <> invalid then http = api.httpStatus
     print "[PROFILE_FETCH_DBG] refresh response http="; http; " ok="; CwPerfBool(api.ok = true)
 
-    if api.shouldLogout = true then return
-
     if api.ok and ApplyRefreshTokens(api.result) then
         ProfileSelectLogNode("PROFILE_FETCH", "refresh ok -> retry list", m.top)
         print "[PROFILE_FETCH_DBG] refresh ok -> retry profiles"
@@ -781,8 +779,6 @@ sub OnProfilesResponse(event as object)
     http = -1
     if api.httpStatus <> invalid then http = api.httpStatus
     print "[PROFILE_FETCH_DBG] profiles response http="; http; " ok="; CwPerfBool(api.ok = true); " refreshTried="; CwPerfBool(m.profileFetchRefreshTried = true)
-
-    if api.shouldLogout = true then return
 
     if not api.ok or api.result = invalid then
         if api.httpStatus = 401 and m.profileFetchRefreshTried = true then
@@ -1131,13 +1127,6 @@ sub OnProfileSelectResponse()
     api = m.selectTask.apiResult
     if api = invalid then return
 
-    if api.shouldLogout = true then
-        m.selecting = false
-        ShowSelectingOverlay(false)
-        ApplyProfileFocus()
-        return
-    end if
-
     profileId = m.pendingNavigateProfileId
     avatar = m.pendingNavigateAvatar
     ok = false
@@ -1279,10 +1268,6 @@ sub OnPrefetchCwResponse()
     if m.prefetchCwTask = invalid then return
     api = m.prefetchCwTask.apiResult
     if api = invalid then return
-    if api.shouldLogout = true then
-        CancelHomePrefetch()
-        return
-    end if
     if PrefetchApiOk(api) then
         print "[PREFETCH_DBG] cw_response ok=true"
         PrefetchMarkCwDone(api)
@@ -1304,10 +1289,6 @@ sub OnPrefetchCatResponse()
     if m.prefetchCatTask = invalid then return
     api = m.prefetchCatTask.apiResult
     if api = invalid then return
-    if api.shouldLogout = true then
-        CancelHomePrefetch()
-        return
-    end if
     if PrefetchApiOk(api) then
         print "[PREFETCH_DBG] home_response ok=true"
         PrefetchMarkCatDone(api)
@@ -1496,8 +1477,6 @@ sub OnVerifyResponse()
     if m.verifyTask = invalid then return
     api = m.verifyTask.apiResult
     if api = invalid then return
-
-    if api.shouldLogout = true then return
 
     if IsPinVerified(api) then
         m.popup = ""

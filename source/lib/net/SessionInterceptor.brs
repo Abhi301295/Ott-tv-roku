@@ -1,7 +1,7 @@
 ' SessionInterceptor.brs
-' Global session-expiry side effects (parity with axios 403 handler + logoutSession).
-' ProcessApiResponse flags shouldLogout; HttpClient calls ApplyGlobalSessionExpiry
-' when any request completes so individual screens do not each handle navigation.
+' Global session-expiry side effects when ProcessApiResponse sets shouldLogout on
+' apiResult. HttpClient.WatchRequest observes apiResult before screen handlers so
+' navigation runs first; screens never read shouldLogout.
 
 function GetGlobalViewManager() as object
     if m.global <> invalid and m.global.viewManager <> invalid then
@@ -35,9 +35,5 @@ sub ApplyGlobalSessionExpiry(api as object)
 
     print "[AUTH_DBG] session expired -> NavigateClearAndReplace login route="; vm.currentRoute
     vm.callFunc("NavigateClearAndReplace", RouteLogin(), {})
+    if m.global <> invalid then m.global.sessionLogoutInFlight = false
 end sub
-
-' Returns true when the global session interceptor will handle this response.
-function ApiSessionEnded(api as object) as boolean
-    return api <> invalid and api.shouldLogout = true
-end function

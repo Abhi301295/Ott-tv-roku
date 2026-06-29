@@ -106,13 +106,14 @@ function GetDeviceTimezone() as string
     return "UTC"
 end function
 
-' Pre-login endpoints where a "login required" body must not tear down an in-progress login.
+' Endpoints that must never trigger a global session logout (pre-login + version check).
 function IsAuthLogoutExemptUrl(url as string) as boolean
     if url = invalid or url = "" then return true
     ep = Endpoints()
     if Instr(1, url, ep.LOGIN.DEVICE_TOKEN) > 0 then return true
     if Instr(1, url, ep.LOGIN.ONBOARD_DEVICE) > 0 then return true
     if Instr(1, url, ep.LOGIN.EMAIL_TOKEN) > 0 then return true
+    if Instr(1, url, ep.LOGIN.CHECK_UPDATE) > 0 then return true
     return false
 end function
 
@@ -182,7 +183,7 @@ function ProcessApiResponse(url as string, httpStatus as integer, responseText a
         result.result = body.result
     end if
 
-    if result.statusCode = 403 then
+    if result.statusCode = 403 and not IsAuthLogoutExemptUrl(url) then
         result.shouldLogout = true
         result.suppressToast = true
         result.ok = false
@@ -190,7 +191,8 @@ function ProcessApiResponse(url as string, httpStatus as integer, responseText a
     end if
 
     ' Some APIs return a login-required message without statusCode 403; treat like 403.
-    if not IsAuthLogoutExemptUrl(url) and IsLoginRequiredMessage(result.message) then
+    ' Profile/select endpoints may retry or refresh on 401 — do not force logout here.
+    if not IsAuthLogoutExemptUrl(url) and not IsSessionRefresh401ExemptUrl(url) and IsLoginRequiredMessage(result.message) then
         result.shouldLogout = true
         result.suppressToast = true
         result.ok = false
