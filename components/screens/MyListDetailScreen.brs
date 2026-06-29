@@ -404,11 +404,11 @@ sub OnKey()
     key = ev.key
     if key = "up" then
         if MyListEmptyVisible() then
-            EnterMyListHeader()
+            if NavUpOpensHeaderFromContent() then EnterMyListHeader()
             return
         end if
         if m.rowIdx = 0 and m.rows.Count() > 0 then
-            EnterMyListHeader()
+            if NavUpOpensHeaderFromContent() then EnterMyListHeader()
             return
         end if
         if m.rowIdx > 0 then m.rowIdx = m.rowIdx - 1
@@ -420,6 +420,10 @@ sub OnKey()
         ClampCol()
         ApplyFocus()
     else if key = "left" then
+        if NavLeftOpensSidebarFromContent(m.colIdx = 0) then
+            EnterMyListHeader()
+            return
+        end if
         if m.colIdx > 0 then m.colIdx = m.colIdx - 1
         ApplyFocus()
     else if key = "right" then

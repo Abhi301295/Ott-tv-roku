@@ -475,14 +475,15 @@ sub OnKey()
 
     key = ev.key
     if SeriesEmptyVisible() then
-        if key = "up" then EnterSeriesHeader()
+        if key = "up" and NavUpOpensHeaderFromContent() then EnterSeriesHeader()
+        if key = "left" and NavLeftOpensSidebarFromContent(true) then EnterSeriesHeader()
         return
     end if
     if m.rows.Count() = 0 then return
 
     if key = "up" then
         if m.rowIdx = 0 then
-            EnterSeriesHeader()
+            if NavUpOpensHeaderFromContent() then EnterSeriesHeader()
             return
         end if
         if m.rowIdx > 0 then m.rowIdx = m.rowIdx - 1
@@ -493,6 +494,10 @@ sub OnKey()
         ClampCol()
         ApplyFocus()
     else if key = "left" then
+        if NavLeftOpensSidebarFromContent(m.colIdx = 0) then
+            EnterSeriesHeader()
+            return
+        end if
         if m.colIdx > 0 then m.colIdx = m.colIdx - 1
         ApplyFocus()
     else if key = "right" then

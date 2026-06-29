@@ -178,3 +178,13 @@ end function
 function ThemeContentOffsetX() as integer
     return ThemeSidebarOffset(false)
 end function
+
+' Netflix top bar: UP from the top content row opens the header.
+' Sidebar: LEFT from the leftmost column opens the menu; UP stays in the vertical stack.
+function NavUpOpensHeaderFromContent() as boolean
+    return not ThemeIsSidebarHeader()
+end function
+
+function NavLeftOpensSidebarFromContent(isLeftmostColumn as boolean) as boolean
+    return ThemeIsSidebarHeader() and isLeftmostColumn
+end function

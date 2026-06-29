@@ -877,7 +877,8 @@ sub OnKey()
     BeginGenreInteraction()
 
     if GenreEmptyVisible() then
-        if key = "up" then EnterGenreHeader()
+        if key = "up" and NavUpOpensHeaderFromContent() then EnterGenreHeader()
+        if key = "left" and NavLeftOpensSidebarFromContent(true) then EnterGenreHeader()
         return
     end if
 
@@ -885,8 +886,10 @@ sub OnKey()
     if m.categories.Count() = 0 then return
     if key = "up" then
         if m.rowIndex = 0 then
-            ShellEnterHeader(m.vm, invalid)
-            ClearGenreRowCardFocus()
+            if NavUpOpensHeaderFromContent() then
+                ShellEnterHeader(m.vm, invalid)
+                ClearGenreRowCardFocus()
+            end if
             return
         end if
         if m.rowIndex > 0 then m.rowIndex = m.rowIndex - 1

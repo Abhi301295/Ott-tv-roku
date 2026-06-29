@@ -219,11 +219,7 @@ end function
 
 sub EnterHeroOrHeader()
     if not HeroAvailable() then
-        if ThemeIsSidebarHeader() then
-            EnterHeaderFromContent()
-        else
-            EnterHeader()
-        end if
+        if NavUpOpensHeaderFromContent() then EnterHeader()
         return
     end if
     target = "next"
@@ -551,7 +547,7 @@ sub OnKey()
     end if
 
     if m.rowWidgets.Count() = 0 then
-        if key = "up" then EnterHeroOrHeader()
+        if key = "up" and NavUpOpensHeaderFromContent() then EnterHeroOrHeader()
         return
     end if
 
@@ -574,8 +570,10 @@ sub OnKey()
             ClampCardIndex()
             PrimeFocusedRow()
             ApplyHomeFocus()
-        else
+        else if NavUpOpensHeaderFromContent() then
             EnterHeroOrHeader()
+        else if HeroAvailable() then
+            EnterHero("next")
         end if
     else if key = "down" then
         if m.rowIndex < LastRowIndex() then
