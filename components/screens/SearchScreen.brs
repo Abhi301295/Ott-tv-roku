@@ -20,6 +20,8 @@ sub init()
     m.searchText = ""
     m.lastFetchedKeyword = chr(1)
     m.inFlightKeyword = ""
+    m.searchFetchGen = 0
+    m.pendingSearchGen = 0
     m.searchDebounceDeadlineMs = 0
     m.results = []
     m.cardNodes = []
@@ -107,7 +109,6 @@ end sub
 sub CancelInFlightSearch()
     KillSearchTask(m.searchTask)
     m.searchTask = invalid
-    m.inFlightKeyword = ""
 end sub
 
 sub OnThemeReady()
@@ -235,11 +236,17 @@ sub FetchSearch(keyword as string)
     if keyword = invalid then keyword = ""
     CancelInFlightSearch()
     StopGridBuild()
+    if m.interactIdle <> invalid then m.interactIdle.control = "stop"
+    m.interacting = false
+    m.gridBuildDeferred = false
+    m.gridBuildNeedsFresh = false
+    m.searchFetchGen = m.searchFetchGen + 1
+    m.pendingSearchGen = m.searchFetchGen
     m.inFlightKeyword = keyword
     m.loading = true
     ' Show grid shimmer as soon as the debounced API fires (replaces any prior results).
     BeginSearchLoading()
-    print "[SEARCH_DBG] fetch kw="; keyword; " cards_before="; m.cardNodes.Count()
+    print "[SEARCH_DBG] fetch kw="; keyword; " gen="; m.pendingSearchGen; " cards_before="; m.cardNodes.Count()
     path = SearchBuildPath(keyword, 1, SR_ApiLimit())
     m.searchTask = ApiGet(path)
     m.searchTask.observeField("apiResult", "OnSearchResponse")
@@ -248,6 +255,7 @@ end sub
 
 sub BeginSearchLoading()
     m.gridScrollY = 0
+    m.results = []
     ClearGrid()
     ShowEmpty(false)
     ShowLoading(true)
@@ -257,16 +265,19 @@ end sub
 sub OnSearchResponse()
     if m.top.dispose = true then return
     if m.searchTask = invalid then return
+    responseGen = m.pendingSearchGen
     m.searchTask.unobserveField("apiResult")
     api = m.searchTask.apiResult
     respondedKw = m.inFlightKeyword
     m.searchTask = invalid
 
+    if responseGen <> m.searchFetchGen then
+        print "[SEARCH_DBG] stale gen="; responseGen; " current="; m.searchFetchGen; " kw="; respondedKw
+        return
+    end if
+
     if respondedKw <> CurrentSearchKeyword() then
         print "[SEARCH_DBG] stale response kw="; respondedKw; " current="; CurrentSearchKeyword()
-        m.inFlightKeyword = ""
-        m.loading = false
-        ShowLoading(false)
         return
     end if
 
@@ -627,10 +638,10 @@ end sub
 
 sub ApplyKeyboardFocus()
     if m.keyboard = invalid then return
-    if m.focusZone = "keyboard" then
-        m.keyboard.focusedRow = m.keyRow
-        m.keyboard.focusedCol = m.keyCol
-    end if
+    if m.focusZone <> "keyboard" then return
+    m.keyboard.batchFocusRow = m.keyRow
+    m.keyboard.batchFocusCol = m.keyCol
+    m.keyboard.callFunc("SetFocusedKey", invalid)
 end sub
 
 sub EnterInput()
@@ -699,8 +710,9 @@ end sub
 sub HandleKeyboardNav(key as string)
     if key = "up" then
         if m.keyRow > 0 then
+            fromRow = m.keyRow
             m.keyRow = m.keyRow - 1
-            ClampKeyCol()
+            MapKeyColVertical(fromRow, m.keyRow)
         else
             EnterInput()
             return
@@ -708,8 +720,9 @@ sub HandleKeyboardNav(key as string)
     else if key = "down" then
         maxRow = 3
         if m.keyRow < maxRow then
+            fromRow = m.keyRow
             m.keyRow = m.keyRow + 1
-            ClampKeyCol()
+            MapKeyColVertical(fromRow, m.keyRow)
         end if
     else if key = "left" then
         if m.keyCol > 0 then m.keyCol = m.keyCol - 1
@@ -722,8 +735,9 @@ sub HandleKeyboardNav(key as string)
             return
         end if
     else if key = "OK" or key = "ok" then
-        m.keyboard.focusedRow = m.keyRow
-        m.keyboard.focusedCol = m.keyCol
+        m.keyboard.batchFocusRow = m.keyRow
+        m.keyboard.batchFocusCol = m.keyCol
+        m.keyboard.callFunc("SetFocusedKey", invalid)
         m.keyboard.callFunc("PressFocusedKey", invalid)
         return
     end if
@@ -743,6 +757,18 @@ sub ClampKeyCol()
     maxC = KeyRowCount(m.keyRow) - 1
     if m.keyCol > maxC then m.keyCol = maxC
     if m.keyCol < 0 then m.keyCol = 0
+end sub
+
+sub MapKeyColVertical(fromRow as integer, toRow as integer)
+    if m.keyboard = invalid then
+        ClampKeyCol()
+        return
+    end if
+    m.keyboard.navFromRow = fromRow
+    m.keyboard.navFromCol = m.keyCol
+    m.keyboard.navToRow = toRow
+    m.keyCol = m.keyboard.callFunc("MapColForVerticalNav", invalid)
+    ClampKeyCol()
 end sub
 
 sub HandleGridNav(key as string)
@@ -837,6 +863,11 @@ end function
 
 sub OnGridInteractIdle()
     m.interacting = false
+    if m.loading then
+        m.gridBuildDeferred = false
+        m.gridBuildNeedsFresh = false
+        return
+    end if
     if not GridBuildIncomplete() then
         m.gridBuildDeferred = false
         m.gridBuildNeedsFresh = false
