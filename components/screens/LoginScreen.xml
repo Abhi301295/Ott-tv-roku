@@ -107,10 +107,19 @@
       <LoginTabButton id="loginBtn" label="Login" translation="[64, 247]" buttonWidth="794" buttonHeight="60"
         shapeUri="pkg:/images/ui/btn_login.png" shadowUri="pkg:/images/ui/btn_login_shadow.png"
         fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="22" />
-      <!-- In-button loader (parity with web's spinner inside the Login button) -->
-      <BusySpinner id="loginSpinner" translation="[443, 259]" visible="false">
-        <Poster role="poster" uri="pkg:/images/ui/spinner.png" width="36" height="36" />
-      </BusySpinner>
+      <!-- In-button loader — ring + arc (size set in LoginScreen.brs LoginSpinnerPx) -->
+      <Group id="loginSpinner" translation="[447, 263]" visible="false">
+        <Group id="loginSpinnerSpin" translation="[14, 14]" rotation="0.0">
+          <Poster id="loginSpinnerRing" translation="[-14, -14]" width="28" height="28"
+            uri="pkg:/images/ui/spinner_ring.png" />
+          <Poster id="loginSpinnerArc" translation="[-14, -14]" width="28" height="28"
+            uri="pkg:/images/ui/spinner_arc.png" blendColor="0xf8f1f7ff" />
+        </Group>
+        <Animation id="loginSpinnerAnim" duration="0.75" repeat="true" easeFunction="linear">
+          <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+            fieldToInterp="loginSpinnerSpin.rotation" />
+        </Animation>
+      </Group>
     </Group>
 
     <Timer id="pollTimer" repeat="true" duration="6" />
