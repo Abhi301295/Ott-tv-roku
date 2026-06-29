@@ -1,3 +1,6 @@
+' Cinematic hero — parity heroBannerCinematic.tsx.
+' ⚠ Parity Note: meta animates before poster on every slide (meta-first ordering);
+' trailer auto-advance pauses while isVideoPlaying. Do not reorder meta/poster here.
 sub init()
     m.items = []
     m.activeIndex = 0
@@ -58,6 +61,7 @@ sub init()
     if m.nextZoomAnim <> invalid then m.nextZoomAnim.duration = HC_HeroZoomSec()
     m.barAnim.duration = HC_HeroSwipeMs() / 1000.0
     m.trailerTimer.duration = HC_HeroTrailerDelaySec()
+    if m.metaAnim <> invalid then m.metaAnim.duration = HC_HeroMetaEntranceSec()
 
     m.swipeTimer.observeField("fire", "OnSwipeTimer")
     if m.slidePosterTimer <> invalid then m.slidePosterTimer.observeField("fire", "OnSlidePosterTimer")
@@ -137,9 +141,7 @@ end function
 function HeroGoPrev() as void
     if ItemCount() < 2 then return
     RestartSwipeTimer()
-    p = m.activeIndex - 1
-    if p < 0 then p = ItemCount() - 1
-    GoToSlide(p)
+    GoToSlide(HeroSlidePrevIndex(m.activeIndex, ItemCount()))
 end function
 
 ' OK on the mute control → toggle trailer audio (parity toggleMute).
@@ -230,19 +232,15 @@ sub ApplyRingTheme()
 end sub
 
 function ItemCount() as integer
-    if m.items = invalid then return 0
-    return m.items.Count()
+    return HeroSlideCount(m.items)
 end function
 
 function NextSlideIndex() as integer
-    count = ItemCount()
-    if count < 2 then return m.activeIndex
-    return (m.activeIndex + 1) mod count
+    return HeroSlideNextIndex(m.activeIndex, ItemCount())
 end function
 
 function ItemAt(index as integer) as object
-    if m.items = invalid or index < 0 or index >= m.items.Count() then return invalid
-    return m.items[index]
+    return HeroSlideItemAt(m.items, index)
 end function
 
 sub ApplySlides()
@@ -590,15 +588,7 @@ end function
 
 ' Text entrance: reset to start pose, then fade + slide up (parity textVisible).
 sub PlayMetaEntrance()
-    if m.metaHost = invalid then return
-    if m.metaAnim = invalid then
-        m.metaHost.opacity = 1.0
-        return
-    end if
-    m.metaAnim.control = "stop"
-    m.metaHost.opacity = 0.0
-    m.metaHost.translation = [64, 364]
-    m.metaAnim.control = "start"
+    HeroPlayCinematicMetaEntrance(m.metaHost, m.metaAnim)
 end sub
 
 sub StartKenBurns()

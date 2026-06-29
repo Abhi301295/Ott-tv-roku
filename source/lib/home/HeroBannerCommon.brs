@@ -201,3 +201,51 @@ sub HeroApplyOttMeta(item as object, titleLabel as object, ratingHost as object,
     if item.description <> invalid then desc = item.description
     if descLabel <> invalid then descLabel.text = HeroTruncate(desc, 180)
 end sub
+
+' ── Meta entrance timing (shared across cinematic + parallax) ───────────────
+
+function HeroCinematicMetaX() as integer
+    return 64
+end function
+
+function HeroCinematicMetaStartY() as integer
+    return 364
+end function
+
+function HeroCinematicMetaEndY() as integer
+    return 340
+end function
+
+sub HeroHideMetaHost(metaHost as object)
+    if metaHost <> invalid then metaHost.opacity = 0.0
+end sub
+
+' Cinematic: reset meta to start pose and run metaAnim (opacity + slide-up).
+' Poster reveal is always scheduled separately — meta leads, poster follows.
+sub HeroPlayCinematicMetaEntrance(metaHost as object, metaAnim as object)
+    if metaHost = invalid then return
+    if metaAnim = invalid then
+        metaHost.opacity = 1.0
+        return
+    end if
+    metaAnim.control = "stop"
+    metaHost.opacity = 0.0
+    metaHost.translation = [HeroCinematicMetaX(), HeroCinematicMetaStartY()]
+    metaAnim.control = "start"
+end sub
+
+' Parallax: fade meta + accent line after slide delay (contentReady path).
+sub HeroPlayParallaxContentReveal(metaHost as object, contentOpacityInterp as object, contentAnim as object, accentWidthInterp as object, accentAnim as object, frostStrip as object, vertDots as object, accentLine as object)
+    if frostStrip <> invalid then frostStrip.opacity = 1.0
+    if vertDots <> invalid then vertDots.opacity = 1.0
+    HeroHideMetaHost(metaHost)
+    if accentLine <> invalid then accentLine.width = 0.0
+    if contentOpacityInterp <> invalid and contentAnim <> invalid then
+        contentOpacityInterp.keyValue = [0.0, 1.0]
+        contentAnim.control = "start"
+    end if
+    if accentWidthInterp <> invalid and accentAnim <> invalid then
+        accentWidthInterp.keyValue = [0.0, 50.0]
+        accentAnim.control = "start"
+    end if
+end sub
