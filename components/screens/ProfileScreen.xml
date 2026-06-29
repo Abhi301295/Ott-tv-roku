@@ -36,6 +36,13 @@
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileArcTheme.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/profile/ProfileFetchFlow.brs" />
+  <script type="text/brightscript" uri="pkg:/components/profile/ProfileAppearance.brs" />
+  <script type="text/brightscript" uri="pkg:/components/profile/ProfileFocus.brs" />
+  <script type="text/brightscript" uri="pkg:/components/profile/ProfileSelectFlow.brs" />
+  <script type="text/brightscript" uri="pkg:/components/profile/ProfileAutoSelect.brs" />
+  <script type="text/brightscript" uri="pkg:/components/profile/ProfileListScroll.brs" />
+  <script type="text/brightscript" uri="pkg:/components/profile/ProfileOverlays.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/ProfileScreen.brs" />
 
   <children>

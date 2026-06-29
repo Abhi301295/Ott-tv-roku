@@ -133,7 +133,7 @@ end sub
 sub OnNavStateReady()
     state = m.top.navState
     if state = invalid then return
-    key = VideoPlaybackKey(state)
+    key = VP_PlaybackKey(state)
     if key <> "" and key = m.playbackKey and m.playbackInitialized = true then
         return
     end if
@@ -149,15 +149,6 @@ sub OnNavStateReady()
     m.ignoredSpuriousFinish = false
     LoadAndPlay()
 end sub
-
-function VideoPlaybackKey(state as object) as string
-    id = ""
-    if state.contentId <> invalid and state.contentId <> "" then id = state.contentId
-    if id = "" and state.detail <> invalid and state.detail._id <> invalid then id = state.detail._id
-    so = "0"
-    if state.startOver = true then so = "1"
-    return id + ":so" + so
-end function
 
 sub LoadVideoTokens()
     m.tokens = {}
@@ -248,32 +239,11 @@ sub LoadAndPlay()
     if fmt = "hls" then FetchQualityLadder(url)
 end sub
 
-' Build the playback ContentNode (url + resume + optional subtitle tracks).
-' Sidecar VTT is deferred (includeSubtitles=false) until the user picks a caption —
-' attaching tracks on initial load can make the Roku player fetch VTT and restart HLS.
+' Build the playback ContentNode — delegates to VP_BuildContent.
 function BuildContent(url as string, startSecs as integer, includeSubtitles as boolean) as object
-    content = CreateObject("roSGNode", "ContentNode")
-    content.url = url
-    content.streamFormat = VideoStreamFormat(url)
-    if m.detail <> invalid and m.detail.title <> invalid then content.title = m.detail.title
-    if startSecs > 0 then
-        content.playStart = startSecs       ' instant resume on real devices
-        m.pendingSeek = startSecs           ' fallback .seek for sim / firmwares that ignore playStart
-    else
-        m.pendingSeek = -1
-    end if
-    if includeSubtitles then
-        tracks = VideoSubtitleTracks(m.detail)
-        if tracks.Count() > 0 then
-            subs = []
-            for each tk in tracks
-                ' Sideloaded WebVTT: TrackName MUST be the VTT URL (not the lang code).
-                subs.Push({ Language: tk.lang, Description: tk.lang, TrackName: tk.url })
-            end for
-            content.subtitleTracks = subs
-        end if
-    end if
-    return content
+    built = VP_BuildContent(url, startSecs, includeSubtitles, m.detail)
+    m.pendingSeek = built.pendingSeek
+    return built.content
 end function
 
 sub AttachSubtitlesAtPosition()
@@ -295,16 +265,19 @@ end sub
 sub ApplyPendingSeek()
     if m.pendingSeek < 0 then return
     target = m.pendingSeek
-    m.pendingSeek = -1
-    if m.videoNode = invalid then return
-    curPos = m.videoNode.position
-    if curPos = invalid then curPos = 0
-    ' Only seek when playStart clearly didn't take (still near the start).
-    if target > 2 and curPos < target - 3 then
-        m.videoNode.seek = target
-        m.position = target
-        UpdateScrubber()
+    if m.videoNode = invalid then
+        m.pendingSeek = -1
+        return
     end if
+    curPos = m.videoNode.position
+    if not VP_ShouldApplyPendingSeek(target, curPos) then
+        m.pendingSeek = -1
+        return
+    end if
+    m.pendingSeek = -1
+    m.videoNode.seek = target
+    m.position = target
+    UpdateScrubber()
 end sub
 
 ' Fetch + parse the HLS master so the Quality dropdown shows real resolutions.
@@ -411,7 +384,7 @@ sub OnVideoFinished()
     ' wrong — resume instead of treating it as end-of-video.
     d = m.duration
     if m.videoNode <> invalid and m.videoNode.duration > d then d = m.videoNode.duration
-    if not m.ignoredSpuriousFinish and d > 0 and d < 30 and m.position >= d - 1 then
+    if VP_IsSpuriousHlsFinish(m.ignoredSpuriousFinish, d, m.position) then
         m.ignoredSpuriousFinish = true
         m.videoNode.control = "play"
         return
@@ -552,17 +525,12 @@ sub SeekBy(deltaSecs as integer)
     ' Ended: forward is disabled; backward replays from near the end.
     if m.ended then
         if deltaSecs < 0 then
-            target = m.duration + deltaSecs
-            if target < 0 then target = 0
-            ReplayFrom(target)
+            ReplayFrom(VP_EndedRewindTarget(m.duration, deltaSecs))
         end if
         return
     end if
 
-    target = m.position + deltaSecs
-    if target < 0 then target = 0
-    ' Never seek to the exact end (that strands the player in a finished/buffering limbo).
-    if m.duration > 0 and target > m.duration - 1 then target = m.duration - 1
+    target = VP_ClampSeekPosition(m.position, deltaSecs, m.duration)
     m.videoNode.seek = target
     m.position = target
     UpdateScrubber()
@@ -590,7 +558,7 @@ end sub
 ' ── Skip Intro / Binge ───────────────────────────────────────────────────────
 
 sub EvaluateSkipIntro()
-    inIntro = (m.introEnd > m.introStart) and (m.position >= m.introStart) and (m.position <= m.introEnd)
+    inIntro = VP_InIntroWindow(m.position, m.introStart, m.introEnd)
     if inIntro = m.skipVisible then return
     m.skipVisible = inIntro
     if m.skipIntroBtn <> invalid then m.skipIntroBtn.visible = inIntro
@@ -616,25 +584,21 @@ sub ApplySkipIntroColors()
 end sub
 
 sub DoSkipIntro()
-    if m.introEnd <= 0 then return
-    m.videoNode.seek = m.introEnd + 1
-    m.position = m.introEnd + 1
+    seekTo = VP_SkipIntroPosition(m.introEnd)
+    if seekTo <= 0 then return
+    m.videoNode.seek = seekTo
+    m.position = seekTo
     m.skipVisible = false
     if m.skipIntroBtn <> invalid then m.skipIntroBtn.visible = false
     RestoreControlsFocus()
 end sub
 
 sub EvaluateBinge()
-    show = false
-    if m.nextItem <> invalid and not m.isTrailer and m.duration > 0 then
-        remaining = m.duration - m.position
-        if remaining <= m.bingeTrigger then show = true
-    end if
+    show = VP_BingeShouldShow(m.nextItem, m.isTrailer, m.duration, m.position, m.bingeTrigger)
 
     if show then
         remaining = m.duration - m.position
-        cd = Int(remaining + 0.999)
-        if cd < 0 then cd = 0
+        cd = VP_BingeCountdownSeconds(m.duration, m.position)
         if not m.bingeVisible then
             m.bingeVisible = true
             BuildBingeCard()
@@ -649,7 +613,7 @@ sub EvaluateBinge()
             m.bingeCountdownLabel.text = "Starts in " + cd.ToStr() + "s"
         end if
         ' Auto-advance when the countdown elapses (parity with the countdown effect).
-        if remaining <= 0 then PlayNext()
+        if VP_BingeShouldAdvance(remaining) then PlayNext()
     else
         if m.bingeVisible then
             m.bingeVisible = false
@@ -730,11 +694,8 @@ end sub
 sub SendProgress()
     if m.disposed then return
     if m.detail = invalid then return
-    if m.isTrailer then return                ' trailers don't track progress
-    if m.isReel then return                   ' reels: parity — web reels never POST progress
     videoId = VideoProgressId(m.detail)
-    if videoId = "" then return
-    if m.position <= 0 then return
+    if not VP_ShouldPostProgress(m.isTrailer, m.isReel, m.position, videoId) then return
 
     total = Int(m.duration)
     posSecs = Int(m.position)
