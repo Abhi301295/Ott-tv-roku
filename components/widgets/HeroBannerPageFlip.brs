@@ -1,4 +1,5 @@
-' Page-flip hero — premium strip-curl (best possible 2D book page on Roku SceneGraph).
+' Page-flip hero — parity heroBanner.tsx (curl strip flip).
+' ⚠ Parity Note: no trailer playback; meta fades during curl (metaFadeAnim) then restores.
 
 function PF_StripCount() as integer
     return 40
@@ -65,7 +66,10 @@ sub init()
     m.top.appendChild(m.flipFinishTimer)
     m.flipFinishTimer.observeField("fire", "OnCurlComplete")
 
-    if m.swipeTimer <> invalid then m.swipeTimer.observeField("fire", "OnSwipeTimer")
+    if m.swipeTimer <> invalid then
+        m.swipeTimer.duration = HC_HeroPageFlipSwipeSec()
+        m.swipeTimer.observeField("fire", "OnSwipeTimer")
+    end if
     if m.activePoster <> invalid then m.activePoster.observeField("loadStatus", "OnPosterLoad")
     m.top.observeField("visible", "OnVisibleChanged")
     ApplyUpNextLayout()
@@ -194,22 +198,15 @@ sub PushAnim(node as object)
 end sub
 
 function ItemCount() as integer
-    if m.items = invalid then return 0
-    return m.items.Count()
+    return HeroSlideCount(m.items)
 end function
 
 function NextIndex(idx as integer) as integer
-    count = ItemCount()
-    if count < 2 then return idx
-    return (idx + 1) mod count
+    return HeroSlideNextIndex(idx, ItemCount())
 end function
 
 function PrevIndex(idx as integer) as integer
-    count = ItemCount()
-    if count < 2 then return idx
-    p = idx - 1
-    if p < 0 then p = count - 1
-    return p
+    return HeroSlidePrevIndex(idx, ItemCount())
 end function
 
 sub ShowSlide(index as integer)
