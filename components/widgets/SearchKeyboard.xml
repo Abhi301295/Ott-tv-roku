@@ -12,8 +12,15 @@
     <field id="cNeutral50" type="string" value="0xffffffff" onChange="OnThemeChanged" />
     <field id="panelWidth" type="integer" value="0" />
     <field id="panelHeight" type="integer" value="0" />
+    <field id="navFromRow" type="integer" value="0" />
+    <field id="navFromCol" type="integer" value="0" />
+    <field id="navToRow" type="integer" value="0" />
+    <field id="batchFocusRow" type="integer" value="0" />
+    <field id="batchFocusCol" type="integer" value="0" />
     <function name="PressFocusedKey" />
     <function name="RefreshKeyColors" />
+    <function name="MapColForVerticalNav" />
+    <function name="SetFocusedKey" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchConstants.brs" />

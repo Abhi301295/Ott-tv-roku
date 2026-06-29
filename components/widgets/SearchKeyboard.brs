@@ -3,6 +3,7 @@ sub init()
     m.panelDropShadow = m.top.findNode("panelDropShadow")
     m.rowsHost = m.top.findNode("rowsHost")
     m.keyRows = []
+    m.focusBatch = false
     m.letterRows = [
         ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"]
         ["A", "S", "D", "F", "G", "H", "J", "K", "L", SR_KeyAa()]
@@ -31,6 +32,7 @@ sub OnLayoutModeChanged()
 end sub
 
 sub OnFocusChanged()
+    if m.focusBatch = true then return
     ApplyKeyFocus()
 end sub
 
@@ -264,7 +266,7 @@ end sub
 sub ApplyKeyFocus()
     fr = m.top.focusedRow
     fc = m.top.focusedCol
-    active = m.top.focusActive = true
+    active = m.top.focusActive
     for r = 0 to m.keyRows.Count() - 1
         row = m.keyRows[r]
         for c = 0 to row.Count() - 1
@@ -299,10 +301,6 @@ sub ApplyKeyFocus()
         end for
     end for
 end sub
-
-function RefreshKeyColors() as void
-    ApplyKeyFocus()
-end function
 
 function KeyLabelAt(row as integer, col as integer) as string
     if row < 0 or row >= m.keyRows.Count() then return ""
@@ -343,4 +341,76 @@ function PressFocusedKey() as void
         end if
     end if
     m.top.keyPress = out
+end function
+
+function SetFocusedKey() as boolean
+    m.focusBatch = true
+    m.top.focusedRow = m.top.batchFocusRow
+    m.top.focusedCol = m.top.batchFocusCol
+    m.focusBatch = false
+    ApplyKeyFocus()
+    return true
+end function
+
+function RefreshKeyColors() as void
+    ApplyKeyFocus()
+end function
+
+function ActiveLayoutRows() as object
+    layout = m.letterRows
+    if m.top.numberMode = true then layout = m.numberRows
+    return layout
+end function
+
+function RowLabelData(row as integer) as object
+    layout = ActiveLayoutRows()
+    if row >= 0 and row < layout.Count() then return layout[row]
+    if row = 3 then return m.bottomRow
+    return []
+end function
+
+' Center X of a key within the centered keyboard row (matches BuildKeyboard geometry).
+function KeyCenterX(row as integer, col as integer) as integer
+    layout = ActiveLayoutRows()
+    maxRowW = KeyboardMaxRowWidth(layout)
+    rowData = RowLabelData(row)
+    if rowData.Count() = 0 then return 0
+    if col < 0 or col >= rowData.Count() then return 0
+
+    rowW = RowTotalWidth(rowData)
+    rowOffsetX = Int((maxRowW - rowW) / 2)
+    x = 0
+    for c = 0 to col - 1
+        x = x + KeyOuterWidth(rowData[c])
+        if c < rowData.Count() - 1 then
+            gap = SR_KeyGap()
+            if rowData.Count() = 2 and (rowData[0] = SR_KeySpace() or rowData[1] = SR_KeyClear()) then
+                gap = SR_KeyBottomGap()
+            end if
+            x = x + gap
+        end if
+    end for
+    return rowOffsetX + x + Int(KeyOuterWidth(rowData[col]) / 2)
+end function
+
+' Pick the target-row key whose center X is nearest (parity React spatial down/up).
+function MapColForVerticalNav() as integer
+    fromRow = m.top.navFromRow
+    fromCol = m.top.navFromCol
+    toRow = m.top.navToRow
+    cx = KeyCenterX(fromRow, fromCol)
+    rowData = RowLabelData(toRow)
+    if rowData.Count() < 1 then return 0
+
+    bestCol = 0
+    bestDist = 999999
+    for c = 0 to rowData.Count() - 1
+        tx = KeyCenterX(toRow, c)
+        dist = Abs(tx - cx)
+        if dist < bestDist then
+            bestDist = dist
+            bestCol = c
+        end if
+    end for
+    return bestCol
 end function
