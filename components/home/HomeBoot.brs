@@ -44,10 +44,6 @@ end sub
 ' ViewManager/AppShell sets shellEnterContent when the user leaves the header (DOWN on
 ' Netflix bar, DOWN on last sidebar item, RIGHT on sidebar). Home must land hero/rows here
 ' because HandleShellKey consumes the key before HomeScreen.OnKey runs.
-
-' ViewManager/AppShell sets shellEnterContent when the user leaves the header (DOWN on
-' Netflix bar, DOWN on last sidebar item, RIGHT on sidebar). Home must land hero/rows here
-' because HandleShellKey consumes the key before HomeScreen.OnKey runs.
 sub OnShellEnterContent()
     if m.top.shellEnterContent <> true then return
     m.top.shellEnterContent = false
@@ -488,9 +484,6 @@ sub OnSelectWatchdog()
     print "[HOME] select-profile watchdog fired -> back to profiles"
     SelectFailedToProfiles("watchdog-exhausted")
 end sub
-
-' Subscription/badge flags the home tree reads are static placeholders (same values
-' BootstrapActiveProfile wrote); set them once without another network round-trip.
 
 ' Subscription/badge flags the home tree reads are static placeholders (same values
 ' BootstrapActiveProfile wrote); set them once without another network round-trip.

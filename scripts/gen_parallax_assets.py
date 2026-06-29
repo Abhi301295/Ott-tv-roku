@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Parallax hero UI assets — frost strip + rounded thumbs + capsule dots."""
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw
 
 OUT = Path(__file__).resolve().parents[1] / "images" / "ui"
 
@@ -22,16 +22,6 @@ def frost_panel(w=800, h=58, radius=12):
     hd = ImageDraw.Draw(hi)
     rounded_rect(hd, (2, 2, w - 3, h // 2), max(1, radius - 2), fill=(255, 255, 255, 12))
     return Image.alpha_composite(img, hi)
-
-
-def frost_shadow(w=800, h=58, radius=12):
-    pad = 12
-    cw, ch = w + pad * 2, h + pad * 2
-    sil = Image.new("L", (w, h), 0)
-    ImageDraw.Draw(sil).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=255)
-    canvas = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
-    canvas.paste((0, 0, 0, 70), (pad, pad), sil)
-    return canvas.filter(ImageFilter.GaussianBlur(radius=8))
 
 
 def thumb_shell(tw, th, border_px, border_a, radius=6):
@@ -75,7 +65,6 @@ def capsule(w, h, color):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     frost_panel().save(OUT / "parallax_frost_panel.png")
-    frost_shadow().save(OUT / "parallax_frost_shadow.png")
     thumb_shell(72, 42, 2, 204).save(OUT / "parallax_thumb_active.png")
     thumb_shell(52, 32, 1, 51).save(OUT / "parallax_thumb_idle.png")
     thumb_mask_rgb(68, 38).save(OUT / "parallax_thumb_mask_lg.png")

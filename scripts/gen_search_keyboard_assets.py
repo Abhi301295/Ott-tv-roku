@@ -46,13 +46,6 @@ def search_card_corner(quadrant: str, radius: int) -> Image.Image:
     return img
 
 
-def search_card_mask(w: int, h: int, radius: int) -> Image.Image:
-    """Rounded-rect clip mask — white=visible (parity React overflow-hidden)."""
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(img).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=(255, 255, 255, 255))
-    return img
-
-
 def search_card_focus_ring(w: int, h: int, radius: int, thickness: int) -> Image.Image:
     """Inset border ring sharing the clip radius — tint via blendColor (parity inset-0 border-3)."""
     outer = Image.new("L", (w, h), 0)
@@ -159,9 +152,6 @@ def main() -> None:
         path = OUT / f"search_card_corner_{q}.png"
         search_card_corner(q, SEARCH_CARD_RADIUS).save(path)
         print("Wrote", path.name)
-    mask = OUT / f"search_card_mask_{SEARCH_CARD_W}x{SEARCH_CARD_H}.png"
-    search_card_mask(SEARCH_CARD_W, SEARCH_CARD_H, SEARCH_CARD_RADIUS).save(mask)
-    print("Wrote", mask.name)
     ring = OUT / "search_card_focus_ring.png"
     search_card_focus_ring(SEARCH_CARD_W, SEARCH_CARD_H, SEARCH_CARD_RADIUS, SEARCH_CARD_BORDER).save(ring)
     print("Wrote", ring.name)
