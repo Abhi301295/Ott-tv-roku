@@ -221,7 +221,7 @@ Roku:
 
 | Item | Rationale |
 |------|-----------|
-| Phase A–C | Shared libs + slim `HomeScreen` / grid screens (see architect plan) |
+| Phase A–C | Shared libs + slim `HomeScreen` / grid screens — **Phase C done** on `feature/m6-refactor-phase-c` |
 | Structured `[BOOT]` timeline logs | Easier profile→home regression triage |
 | Update `port-plan.md` Reels row | Docs still say placeholder; `ReelsScreen` is shipped |
 | M5 Ads | Only major feature area not ported |
