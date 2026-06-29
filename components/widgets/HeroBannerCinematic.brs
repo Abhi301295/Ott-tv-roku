@@ -22,7 +22,7 @@ sub init()
     m.counterCurrent = m.top.findNode("counterCurrent")
     m.counterTotal = m.top.findNode("counterTotal")
     m.swipeTimer = m.top.findNode("swipeTimer")
-    m.fadeAnim = m.top.findNode("fadeAnim")
+    m.slidePosterTimer = m.top.findNode("slidePosterTimer")
     m.zoomAnim = m.top.findNode("zoomAnim")
     m.nextZoomAnim = m.top.findNode("nextZoomAnim")
     m.barAnim = m.top.findNode("barAnim")
@@ -45,15 +45,8 @@ sub init()
     m.posterReadyFired = false
     m.firstReveal = true
     m.playingForIndex = -1
-    ' Index the in-progress crossfade is heading to (-1 = auto-advance to the next slide).
-    m.fadeTargetIndex = -1
-    ' True while a crossfade is settling onto the next slide: the already-loaded next
-    ' layer stays visible until the active layer's copy of the new poster decodes, so the
-    ' previous slide's image is never flashed back during the swap.
-    m.crossfadeLanding = false
-    ' Upcoming slide's poster, preloaded onto the next layer only AFTER the landing swap
-    ' (so the next layer keeps showing the just-revealed slide until then).
-    m.pendingNextUri = invalid
+    m.metaBeforePosterReady = false
+    m.awaitingPosterReveal = false
     m.trailerCache = {}
     m.detailTask = invalid
 
@@ -61,14 +54,13 @@ sub init()
     ApplyViewportLayout()
 
     m.swipeTimer.duration = HC_HeroSwipeMs() / 1000.0
-    m.fadeAnim.duration = HC_HeroCrossfadeSec()
     m.zoomAnim.duration = HC_HeroZoomSec()
     if m.nextZoomAnim <> invalid then m.nextZoomAnim.duration = HC_HeroZoomSec()
     m.barAnim.duration = HC_HeroSwipeMs() / 1000.0
     m.trailerTimer.duration = HC_HeroTrailerDelaySec()
 
     m.swipeTimer.observeField("fire", "OnSwipeTimer")
-    m.fadeAnim.observeField("state", "OnFadeAnimState")
+    if m.slidePosterTimer <> invalid then m.slidePosterTimer.observeField("fire", "OnSlidePosterTimer")
     m.trailerTimer.observeField("fire", "OnTrailerTimer")
     m.trailerVideo.observeField("state", "OnTrailerState")
     m.top.observeField("visible", "OnVisibleChanged")
@@ -92,8 +84,11 @@ sub ApplyViewportLayout()
     heroBg = m.top.findNode("heroBg")
     if heroBg <> invalid then heroBg.width = w
 
-    bottomVig = m.top.findNode("bottomVignette")
-    if bottomVig <> invalid then bottomVig.width = w
+    leftVig = m.top.findNode("leftVignette")
+    if leftVig <> invalid then
+        leftVig.width = Int(w * HC_HeroLeftGradWidthPct() + 0.5)
+        leftVig.height = HC_HeroLeftGradHeight()
+    end if
 
     if m.prevArrow <> invalid then m.prevArrow.translation = [10, 435]
     if m.nextArrow <> invalid then m.nextArrow.translation = [w - 58, 435]
@@ -189,8 +184,9 @@ sub OnBannerItemsChanged()
     m.activeIndex = 0
     m.posterReadyFired = false
     m.firstReveal = true
-    m.crossfadeLanding = false
-    m.pendingNextUri = invalid
+    m.metaBeforePosterReady = false
+    m.awaitingPosterReveal = false
+    if m.slidePosterTimer <> invalid then m.slidePosterTimer.control = "stop"
     if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
 
     items = m.top.bannerItems
@@ -200,12 +196,13 @@ sub OnBannerItemsChanged()
         m.items = items
     end if
 
-    ApplySlides()
     ApplyMeta()
     BuildBars()
     UpdateCounter()
     ApplyNavChromeVisibility()
     PlayMetaEntrance()
+    ApplySlides()
+    ArmPosterRevealTimer()
     if m.top.visible then ScheduleTrailer()
     if m.top.visible and m.items.Count() > 1 then StartSwipeTimer()
 end sub
@@ -256,36 +253,8 @@ sub ApplySlides()
     nextUri = GetHeroBannerImage(nxt)
     m.lastPosterUri = posterUri
 
-    if m.crossfadeLanding then
-        ' Settling onto the slide we just crossfaded to. The next layer already shows this
-        ' exact (decoded) image, so keep it visible and load the active poster's own copy
-        ' UNDER it at opacity 0. OnActivePosterLoad swaps them once it has decoded, so the
-        ' previous slide's image is never repainted on top during the handoff.
-        if m.nextLayer <> invalid then m.nextLayer.opacity = 1.0
-        if m.activeLayer <> invalid then m.activeLayer.opacity = 0.0
-        if m.activePoster <> invalid then
-            m.activePoster.opacity = 1.0
-            m.activePoster.uri = posterUri
-            m.activePoster.scale = [1.0, 1.0]
-            m.activePoster.translation = [0, 0]
-            m.activePoster.visible = true
-            ' Do NOT read loadStatus synchronously here: right after assigning a new .uri
-            ' it still reports the PREVIOUS image's "ready", so finishing now would reveal
-            ' the OLD poster for a frame before the new one decodes (the auto-advance
-            ' flash). Wait for OnActivePosterLoad to fire "ready" for the NEW uri — until
-            ' then the next layer keeps showing the correct (new) image.
-        end if
-        ' Hold the upcoming-slide preload until the swap (the next layer must keep showing
-        ' the current image, not the one after it).
-        m.pendingNextUri = nextUri
-        return
-    end if
-
-    ' Initial reveal (off the skeleton): poster shown directly, next layer hidden.
     if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
-    ' The next-slide layer is only shown DURING a crossfade (BeginCrossfade reveals it).
-    ' Keeping it hidden otherwise guarantees a transparent active poster can never expose
-    ' the wrong (next) image — the dark hero background shows through instead.
+    ' Keep the next slide hidden until a transition reveals the active poster.
     if m.nextLayer <> invalid then m.nextLayer.opacity = 0.0
     if m.activePoster <> invalid then
         ' Only the very first reveal glows in from transparent (coming off the skeleton).
@@ -304,72 +273,38 @@ sub ApplySlides()
         m.nextPoster.scale = [1.0, 1.0]
         m.nextPoster.translation = [0, 0]
     end if
-    ' Ken Burns must not run while the poster is invisible (first skeleton handoff) — the
-    ' 8s zoom would finish before the fade-in and the image looks static (no React glow).
-    if not m.firstReveal and not m.crossfadeLanding then
-        StartKenBurns()
-    end if
+    ' Ken Burns must not run while the poster is invisible (first skeleton handoff).
+    if not m.firstReveal then StartKenBurns()
     MaybeCompletePosterLoad()
 end sub
 
-' Cached posters can report loadStatus=ready before the observer fires — complete the
-' first-reveal glow + Ken Burns without waiting on a second event.
+' Cached posters can report loadStatus=ready before the observer fires.
 sub MaybeCompletePosterLoad()
     if m.activePoster = invalid then return
     if m.activePoster.loadStatus = "ready" then OnActivePosterLoad()
 end sub
 
-' Complete the crossfade handoff: the active poster now holds the new image too, so reveal
-' it and retire the next layer in the same frame (both show the same image → invisible
-' swap), then preload the upcoming slide onto the now-hidden next layer.
-sub FinishCrossfadeLanding()
-    m.crossfadeLanding = false
-    if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
-    if m.nextLayer <> invalid then m.nextLayer.opacity = 0.0
-    StopNextKenBurns()
-    if m.nextPoster <> invalid and m.pendingNextUri <> invalid then
-        m.nextPoster.uri = m.pendingNextUri
-        m.nextPoster.scale = [1.0, 1.0]
-        m.nextPoster.translation = [0, 0]
-    end if
-    m.pendingNextUri = invalid
-    StartKenBurns()
-end sub
-
-' Diagnostics: report whether the hero poster bitmap actually loaded. loadStatus goes
-' "loading" → "ready" on success, or "failed" if the URL/size can't be decoded.
 sub OnActivePosterLoad()
     if m.activePoster = invalid then return
     status = m.activePoster.loadStatus
-    expected = ""
-    if m.lastPosterUri <> invalid then expected = m.lastPosterUri
 
     if status = "ready" then
-        if m.crossfadeLanding then
-            ' Active poster now holds the new slide's bitmap — swap layers in one frame.
-            FinishCrossfadeLanding()
+        if m.metaBeforePosterReady and m.activePoster.opacity < 1.0 then
+            CompletePosterReveal()
         else if m.firstReveal then
-            ' Glow the first poster in (fade 0 → 1); Ken Burns starts once visible.
-            m.firstReveal = false
-            GlowPosterIn()
-            StartKenBurns()
-            print "[HERO_DBG] poster_glow_in ken_burns=start"
-        else
+            ' Poster stays hidden until the meta-first timer elapses.
+        else if not m.isVideoPlaying then
             m.activePoster.opacity = 1.0
-            if not m.isVideoPlaying then StartKenBurns()
+            StartKenBurns()
         end if
-        ' Signal the home screen the moment the first slide's poster has painted, so the
-        ' loading skeleton can drop straight onto a real hero (no black flash).
+    else if status = "failed" then
+        m.firstReveal = false
+        m.activePoster.opacity = 1.0
+        if not m.isVideoPlaying then StartKenBurns()
         if not m.posterReadyFired then
             m.posterReadyFired = true
             m.top.posterReady = true
         end if
-    else if status = "failed" then
-        ' Decode failed — don't leave the poster invisible.
-        if m.crossfadeLanding then FinishCrossfadeLanding()
-        m.firstReveal = false
-        m.activePoster.opacity = 1.0
-        if not m.isVideoPlaying then StartKenBurns()
     end if
 end sub
 
@@ -378,8 +313,72 @@ sub GlowPosterIn()
         if m.activePoster <> invalid then m.activePoster.opacity = 1.0
         return
     end if
+    if m.activePoster <> invalid then m.activePoster.opacity = 0.0
     m.posterGlowAnim.control = "stop"
     m.posterGlowAnim.control = "start"
+end sub
+
+sub ArmPosterRevealTimer()
+    if m.slidePosterTimer = invalid then return
+    m.metaBeforePosterReady = false
+    m.awaitingPosterReveal = true
+    m.slidePosterTimer.duration = HC_HeroMetaBeforePosterSec()
+    m.slidePosterTimer.control = "stop"
+    m.slidePosterTimer.control = "start"
+end sub
+
+sub OnSlidePosterTimer()
+    m.metaBeforePosterReady = true
+    if m.awaitingPosterReveal then
+        m.awaitingPosterReveal = false
+        RevealPosterAfterMeta()
+    end if
+end sub
+
+' Meta leads each slide change; the poster loads hidden, then glows in after a short gap.
+sub RevealPosterAfterMeta()
+    active = ItemAt(m.activeIndex)
+    if active = invalid then return
+    posterUri = GetHeroBannerImage(active)
+    m.lastPosterUri = posterUri
+    nxt = ItemAt(NextSlideIndex())
+    HideTrailerVideo()
+
+    if m.activePoster <> invalid then
+        m.activePoster.uri = posterUri
+        m.activePoster.scale = [1.0, 1.0]
+        m.activePoster.translation = [0, 0]
+        m.activePoster.visible = true
+        m.activePoster.opacity = 0.0
+    end if
+    if m.nextPoster <> invalid then
+        m.nextPoster.uri = GetHeroBannerImage(nxt)
+        m.nextPoster.scale = [1.0, 1.0]
+        m.nextPoster.translation = [0, 0]
+    end if
+    if m.nextLayer <> invalid then m.nextLayer.opacity = 0.0
+    if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
+
+    m.isFading = false
+
+    if m.activePoster <> invalid and m.activePoster.loadStatus = "ready" then
+        CompletePosterReveal()
+    else
+        MaybeCompletePosterLoad()
+    end if
+end sub
+
+sub CompletePosterReveal()
+    if m.activePoster = invalid then return
+    if m.activePoster.opacity >= 1.0 then return
+    if m.firstReveal then m.firstReveal = false
+    GlowPosterIn()
+    StartKenBurns()
+    if not m.posterReadyFired then
+        m.posterReadyFired = true
+        m.top.posterReady = true
+    end if
+    if m.top.visible then ScheduleTrailer()
 end sub
 
 ' Video must be invisible (not just opacity=0) when idle — otherwise it occludes poster.
@@ -610,19 +609,6 @@ sub StartKenBurns()
     m.zoomAnim.control = "start"
 end sub
 
-sub StartNextKenBurns()
-    if m.isVideoPlaying then return
-    if m.nextZoomAnim = invalid or m.nextPoster = invalid then return
-    m.nextPoster.scale = [1.0, 1.0]
-    m.nextZoomAnim.control = "stop"
-    m.nextZoomAnim.control = "start"
-end sub
-
-sub StopNextKenBurns()
-    if m.nextZoomAnim <> invalid then m.nextZoomAnim.control = "stop"
-    if m.nextPoster <> invalid then m.nextPoster.scale = [1.0, 1.0]
-end sub
-
 ' The slide runs for a FIXED duration (HC_HeroSwipeMs). The timer keeps running even
 ' while a trailer plays, so one slide is never stretched to the full trailer length —
 ' it always advances on the fixed window (parity intent + user requirement).
@@ -644,69 +630,30 @@ sub OnSwipeTimer()
     GoToSlide(NextSlideIndex())
 end sub
 
-' Crossfade to an arbitrary slide (auto-advance uses NextSlideIndex; the arrows can pass
-' any target so the user can step forward AND backward through the carousel).
+' Advance to a slide (auto-advance or prev/next arrows).
 sub GoToSlide(targetIndex as integer)
     if ItemCount() < 2 or m.isFading then return
     if targetIndex < 0 or targetIndex >= ItemCount() then return
     if targetIndex = m.activeIndex then return
-    m.fadeTargetIndex = targetIndex
-    ' Counter + progress bars update immediately on navigation (parity: the "01 / 04"
-    ' label and active bar track the click, not the 1.2s crossfade). The META text is
-    ' intentionally NOT animated here — it animates exactly once after the crossfade
-    ' settles (OnFadeAnimState), so the title/desc never play their entrance twice.
+
+    m.isFading = true
+    StopTrailer()
+    if m.slidePosterTimer <> invalid then m.slidePosterTimer.control = "stop"
+    if m.posterGlowAnim <> invalid then m.posterGlowAnim.control = "stop"
+    if m.zoomAnim <> invalid then m.zoomAnim.control = "stop"
+    if m.nextZoomAnim <> invalid then m.nextZoomAnim.control = "stop"
+    if m.nextPoster <> invalid then m.nextPoster.scale = [1.0, 1.0]
+
     m.activeIndex = targetIndex
     UpdateCounter()
     BuildBars()
-    ' The preloaded next layer holds the auto-advance image; for an explicit jump (e.g.
-    ' previous) repoint it at the chosen slide before revealing it in the crossfade.
-    if m.nextPoster <> invalid then
-        newUri = GetHeroBannerImage(ItemAt(targetIndex))
-        if m.nextPoster.uri <> newUri then m.nextPoster.uri = newUri
-        m.nextPoster.scale = [1.0, 1.0]
-        m.nextPoster.translation = [0, 0]
-    end if
-    BeginCrossfade()
-end sub
 
-sub BeginCrossfade()
-    if m.fadeAnim = invalid or m.activeLayer = invalid then return
-    ' Hide any playing trailer first so the poster crossfade isn't covered by the video.
-    StopTrailer()
-    m.isFading = true
-    m.activeLayer.opacity = 1.0
-    ' Reveal the preloaded next slide underneath so fading the active layer crossfades to it.
-    if m.nextLayer <> invalid then m.nextLayer.opacity = 1.0
-    if m.metaHost <> invalid then m.metaHost.opacity = 0.0
-    StartNextKenBurns()
-    m.fadeAnim.control = "stop"
-    m.fadeAnim.control = "start"
-end sub
+    if m.activeLayer <> invalid then m.activeLayer.opacity = 0.0
+    if m.nextLayer <> invalid then m.nextLayer.opacity = 0.0
 
-sub OnFadeAnimState()
-    if m.fadeAnim = invalid then return
-    if m.fadeAnim.state <> "stopped" then return
-    if not m.isFading then return
-
-    count = ItemCount()
-    target = m.fadeTargetIndex
-    if count > 0 and (target < 0 or target >= count) then target = (m.activeIndex + 1) mod count
-    ' activeIndex/counter/bars were already advanced in GoToSlide; reconcile only if the
-    ' fade somehow started without it (defensive — shouldn't happen).
-    if count > 0 and m.activeIndex <> target then
-        m.activeIndex = target
-        UpdateCounter()
-        BuildBars()
-    end if
-    m.fadeTargetIndex = -1
-    m.isFading = false
-    m.crossfadeLanding = true
-    ApplySlides()
-    ' The meta was hidden (opacity 0) for the whole crossfade; set the new slide's text
-    ' and play its entrance ONCE here — the only place the title/desc animate per slide.
     ApplyMeta()
     PlayMetaEntrance()
-    if m.top.visible then ScheduleTrailer()
+    ArmPosterRevealTimer()
 end sub
 
 ' ── Trailer autoplay (parity with hero trailer fetch + HLS playback) ─────────

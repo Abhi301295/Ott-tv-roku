@@ -49,9 +49,7 @@
     </Group>
 
     <Group id="activeLayer" translation="[0, 4]">
-      <!-- React: active layer top:4, bottom:0 → box is 914 tall (4..918). The poster bottom
-           lands exactly at 918 where the bottom gradient is fully solid, so no bright sliver
-           pokes out below the gradient (that was the seam). -->
+      <!-- Active layer top:4 → 914px tall; bottom aligns with the 85vh hero edge. -->
       <Group id="activeClip" clippingRect="[0, 0, 2458, 914]" clippingRectClipsChildren="true">
         <Poster id="activePoster" width="2458" height="914" translation="[0, 0]"
           loadWidth="2458" loadHeight="914" loadDisplayMode="scaleToFill" />
@@ -67,13 +65,9 @@
     <Video id="trailerVideo" width="1920" height="1080" translation="[0, -160]"
       visible="false" opacity="0.0" mute="true" enableUI="false" />
 
-    <!-- Smooth gradient vignettes (parity with the CSS linear-gradients), sized to the
-         85vh hero (918). The TOP tint is owned by the header gradient (HomeHeader scrim). -->
-    <Poster id="leftVignette" uri="pkg:/images/ui/grad_left.png" width="1248" height="918"
-      loadDisplayMode="scaleToFill" />
-    <!-- React bottom gradient: height 30% of 85vh = ~275px, bottom-aligned (643..918). -->
-    <Poster id="bottomVignette" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 643]"
-      width="1920" height="275" loadDisplayMode="scaleToFill" />
+    <!-- Left vignette (65% width); height from ApplyViewportLayout(). -->
+    <Poster id="leftVignette" uri="pkg:/images/ui/grad_left.png" width="1248" height="1118"
+      loadDisplayMode="scaleToFill" blendColor="0x0f1014ff" />
 
     <Group id="metaHost" translation="[64, 300]">
       <Label id="titleLabel" text="" width="760" height="90" wrap="false"
@@ -168,14 +162,10 @@
     </LayoutGroup>
 
     <Timer id="swipeTimer" repeat="true" duration="15" />
+    <Timer id="slidePosterTimer" repeat="false" duration="0.15" />
 
     <!-- Delay before fetching/loading the trailer (parity with TRAILER_LOAD_DELAY 2.5s). -->
     <Timer id="trailerTimer" repeat="false" duration="2.5" />
-
-    <Animation id="fadeAnim" duration="1.2" repeat="false" easeFunction="inOutCubic">
-      <FloatFieldInterpolator id="fadeInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]"
-        fieldToInterp="activeLayer.opacity" />
-    </Animation>
 
     <Animation id="zoomAnim" duration="8" repeat="false" easeFunction="outCubic">
       <Vector2DFieldInterpolator id="zoomInterp" key="[0.0, 1.0]"

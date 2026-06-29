@@ -64,12 +64,21 @@ function HC_HeroHeight() as integer
     return 918
 end function
 
-function HC_HeroSwipeMs() as integer
-    return 15000
+function HC_HeroLeftGradWidthPct() as float
+    return 0.65
 end function
 
-function HC_HeroCrossfadeSec() as float
-    return 1.2
+function HC_HeroLeftGradHeight() as integer
+    return HC_HeroHeight() + 200
+end function
+
+' Gap after meta entrance starts before the poster fades in (meta → poster ordering).
+function HC_HeroMetaBeforePosterSec() as float
+    return 0.15
+end function
+
+function HC_HeroSwipeMs() as integer
+    return 15000
 end function
 
 function HC_HeroZoomSec() as float
