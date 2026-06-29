@@ -36,6 +36,24 @@ sub init()
     m.trailerTimer = m.top.findNode("trailerTimer")
     m.videoFadeAnim = m.top.findNode("videoFadeAnim")
     m.posterGlowAnim = m.top.findNode("posterGlowAnim")
+    m.trailerVideoParent = invalid
+    m.trailerVideoIndex = -1
+    if m.trailerVideo <> invalid then
+        m.trailerVideoParent = m.trailerVideo.getParent()
+        if m.trailerVideoParent <> invalid then
+            for i = 0 to m.trailerVideoParent.getChildCount() - 1
+                if m.trailerVideoParent.getChild(i).isSameNode(m.trailerVideo) then
+                    m.trailerVideoIndex = i
+                    exit for
+                end if
+            end for
+        end if
+    end if
+    m.decoderReleaseTimer = CreateObject("roSGNode", "Timer")
+    m.decoderReleaseTimer.duration = 0.45
+    m.decoderReleaseTimer.repeat = false
+    m.top.appendChild(m.decoderReleaseTimer)
+    m.decoderReleaseTimer.observeField("fire", "OnDecoderReleaseTimer")
     m.muteBtn = m.top.findNode("muteBtn")
     m.muteIcon = m.top.findNode("muteIcon")
     m.prevArrow = m.top.findNode("prevArrow")
@@ -160,6 +178,91 @@ function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
     if not m.top.visible or ItemCount() < 2 then return true
     if m.isVideoPlaying then return true
     RestartSwipeTimer()
+    return true
+end function
+
+' Stack resume — hero.visible may stay true across push/pop, so OnVisibleChanged alone
+' never re-arms the trailer timer. After fullscreen VideoPlayer the trailer Video node
+' can stay stuck in state=stopped (play never reaches buffering); recreate it then defer
+' trailer load until the shared decoder is released.
+function ResumeHeroPlayback(dummy = invalid as dynamic) as boolean
+    if not m.top.visible or ItemCount() < 1 then return true
+    if HeroTrailerNeedsDecoderReset() then
+        ClearHeroTrailerDecoderReset()
+        HardResetTrailerVideo()
+        ArmTrailerAfterDecoderRelease()
+        return true
+    end if
+    if ItemCount() > 1 then StartSwipeTimer()
+    ScheduleTrailer()
+    return true
+end function
+
+sub ArmTrailerAfterDecoderRelease()
+    if m.decoderReleaseTimer = invalid then
+        if ItemCount() > 1 then StartSwipeTimer()
+        ScheduleTrailer()
+        return
+    end if
+    m.decoderReleaseTimer.control = "stop"
+    m.decoderReleaseTimer.control = "start"
+end sub
+
+sub OnDecoderReleaseTimer()
+    if not m.top.visible then return
+    if ItemCount() > 1 then StartSwipeTimer()
+    ScheduleTrailer()
+end sub
+
+function HeroTrailerNeedsDecoderReset() as boolean
+    if m.global = invalid then return false
+    if not m.global.hasField("heroTrailerNeedsReset") then return false
+    return m.global.heroTrailerNeedsReset = true
+end function
+
+sub ClearHeroTrailerDecoderReset()
+    if m.global = invalid then return
+    if m.global.hasField("heroTrailerNeedsReset") then m.global.heroTrailerNeedsReset = false
+end sub
+
+' Fullscreen VideoPlayer leaves the hero trailer Video stuck in state=stopped — recreate
+' the node so the next play() receives buffering/playing callbacks again.
+sub HardResetTrailerVideo()
+    if m.trailerVideo = invalid then return
+    parent = m.trailerVideoParent
+    idx = m.trailerVideoIndex
+    trans = m.trailerVideo.translation
+    width = m.trailerVideo.width
+    height = m.trailerVideo.height
+    m.trailerVideo.unobserveField("state")
+    if parent <> invalid then parent.removeChild(m.trailerVideo)
+    video = CreateObject("roSGNode", "Video")
+    video.id = "trailerVideo"
+    video.width = width
+    video.height = height
+    video.translation = trans
+    video.visible = false
+    video.opacity = 0.0
+    video.mute = true
+    video.enableUI = false
+    if parent <> invalid then
+        if idx >= 0 and idx <= parent.getChildCount() then
+            parent.insertChild(video, idx)
+        else
+            parent.appendChild(video)
+        end if
+    end if
+    m.trailerVideo = video
+    m.trailerVideo.observeField("state", "OnTrailerState")
+    m.isVideoPlaying = false
+    m.top.trailerPlaying = false
+    m.playingForIndex = -1
+end sub
+
+function PauseHeroPlayback(dummy = invalid as dynamic) as boolean
+    StopSwipeTimer()
+    StopTrailer()
+    CancelDetailFetch()
     return true
 end function
 
@@ -759,10 +862,7 @@ end sub
 
 sub LoadTrailer(url as string)
     if m.trailerVideo = invalid or url = "" then return
-    ' Remember which slide this trailer belongs to so a late "playing" event from a
-    ' previous slide can't fade an old video in over the new poster.
     m.playingForIndex = m.activeIndex
-    ' Tear the old stream down fully so the new one always begins from its initial state.
     m.trailerVideo.control = "stop"
     m.trailerVideo.content = invalid
     content = CreateObject("roSGNode", "ContentNode")

@@ -107,20 +107,20 @@
       <LoginTabButton id="loginBtn" label="Login" translation="[64, 247]" buttonWidth="794" buttonHeight="60"
         shapeUri="pkg:/images/ui/btn_login.png" shadowUri="pkg:/images/ui/btn_login_shadow.png"
         fontUri="pkg:/fonts/Inter-Bold.ttf" fontSize="22" />
-      <!-- In-button loader — ring + arc (size set in LoginScreen.brs LoginSpinnerPx) -->
+      <!-- In-button loader — arc only (web: animate-spin border-b-2 border-neutral-50). -->
       <Group id="loginSpinner" translation="[447, 263]" visible="false">
         <Group id="loginSpinnerSpin" translation="[14, 14]" rotation="0.0">
-          <Poster id="loginSpinnerRing" translation="[-14, -14]" width="28" height="28"
-            uri="pkg:/images/ui/spinner_ring.png" />
           <Poster id="loginSpinnerArc" translation="[-14, -14]" width="28" height="28"
             uri="pkg:/images/ui/spinner_arc.png" blendColor="0xf8f1f7ff" />
         </Group>
-        <Animation id="loginSpinnerAnim" duration="0.75" repeat="true" easeFunction="linear">
-          <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
-            fieldToInterp="loginSpinnerSpin.rotation" />
-        </Animation>
       </Group>
     </Group>
+
+    <!-- Animation at screen root so it keeps ticking (nested inside visible=false groups it may not run). -->
+    <Animation id="loginSpinnerAnim" duration="0.75" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+        fieldToInterp="loginSpinnerSpin.rotation" />
+    </Animation>
 
     <Timer id="pollTimer" repeat="true" duration="6" />
     <Timer id="pollTimeout" repeat="false" duration="300" />

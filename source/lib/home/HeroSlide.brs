@@ -2,7 +2,8 @@
 '
 ' HeroBannerHost dispatches by theme; each active child exposes the same callFunc
 ' surface for HomeScreen D-pad routing:
-'   HeroGoNext, HeroGoPrev, HeroToggleMute, PauseAutoAdvance, ResumeAutoAdvance
+'   HeroGoNext, HeroGoPrev, HeroToggleMute, PauseAutoAdvance, ResumeAutoAdvance,
+'   PauseHeroPlayback, ResumeHeroPlayback
 '
 ' ⚠ Parity Note — slide transition differs per variant (do not unify visuals here):
 '   Cinematic  — meta-first crossfade + optional trailer (heroBannerCinematic.tsx)

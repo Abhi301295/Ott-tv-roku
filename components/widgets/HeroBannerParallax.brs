@@ -837,3 +837,11 @@ function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
     RestartSwipeTimer()
     return true
 end function
+
+function ResumeHeroPlayback(dummy = invalid as dynamic) as boolean
+    return ResumeAutoAdvance(invalid)
+end function
+
+function PauseHeroPlayback(dummy = invalid as dynamic) as boolean
+    return PauseAutoAdvance(invalid)
+end function

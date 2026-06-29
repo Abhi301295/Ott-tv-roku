@@ -39,8 +39,8 @@ sub init()
     m.formErrorBorder = m.top.findNode("formErrorBorder")
     m.loginSpinner = m.top.findNode("loginSpinner")
     m.loginSpinnerAnim = m.top.findNode("loginSpinnerAnim")
+    m.loginSpinnerSpin = m.top.findNode("loginSpinnerSpin")
     m.loginSpinnerArc = m.top.findNode("loginSpinnerArc")
-    m.loginSpinnerRing = m.top.findNode("loginSpinnerRing")
     m.pollTimer = m.top.findNode("pollTimer")
     m.pollTimeout = m.top.findNode("pollTimeout")
     m.onboardRetry = m.top.findNode("onboardRetry")
@@ -134,13 +134,7 @@ sub ApplyLoginSpinnerGeometry()
     if m.loginSpinner = invalid then return
     sz = LoginSpinnerPx()
     half = Int(sz / 2)
-    spin = m.top.findNode("loginSpinnerSpin")
-    if spin <> invalid then spin.translation = [half, half]
-    if m.loginSpinnerRing <> invalid then
-        m.loginSpinnerRing.width = sz
-        m.loginSpinnerRing.height = sz
-        m.loginSpinnerRing.translation = [-half, -half]
-    end if
+    if m.loginSpinnerSpin <> invalid then m.loginSpinnerSpin.translation = [half, half]
     if m.loginSpinnerArc <> invalid then
         m.loginSpinnerArc.width = sz
         m.loginSpinnerArc.height = sz
@@ -280,14 +274,12 @@ end sub
 
 ' Toggle the in-button loader (spinner inside the Login button + disabled style).
 sub SetLoginLoading(loading as boolean)
-    if m.loginSpinnerAnim <> invalid then
-        if loading then
-            m.loginSpinnerAnim.control = "start"
-        else
-            m.loginSpinnerAnim.control = "stop"
-        end if
-    end if
     if m.loginSpinner <> invalid then m.loginSpinner.visible = loading
+    if m.loginSpinnerAnim <> invalid then
+        m.loginSpinnerAnim.control = "stop"
+        if m.loginSpinnerSpin <> invalid then m.loginSpinnerSpin.rotation = 0
+        if loading then m.loginSpinnerAnim.control = "start"
+    end if
     UpdateLoginButton()
 end sub
 

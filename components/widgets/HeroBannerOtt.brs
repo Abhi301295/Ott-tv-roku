@@ -175,3 +175,11 @@ end function
 function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
     return true
 end function
+
+function ResumeHeroPlayback(dummy = invalid as dynamic) as boolean
+    return true
+end function
+
+function PauseHeroPlayback(dummy = invalid as dynamic) as boolean
+    return true
+end function
