@@ -1150,11 +1150,20 @@ sub OnDispose()
 
     ' Stop + release the Video so no audio/decoder keeps running in the background.
     if m.videoNode <> invalid then
+        vstate = m.videoNode.state
         m.videoNode.unobserveField("state")
         m.videoNode.unobserveField("position")
         m.videoNode.unobserveField("duration")
         m.videoNode.control = "stop"
         m.videoNode.content = invalid
+        if m.global <> invalid then
+            if not m.global.hasField("heroTrailerNeedsReset") then
+                m.global.addFields({ heroTrailerNeedsReset: false })
+            end if
+            if vstate = "playing" or vstate = "buffering" or vstate = "paused" then
+                m.global.heroTrailerNeedsReset = true
+            end if
+        end if
     end if
 
     ' Drop observers + overlay flag.

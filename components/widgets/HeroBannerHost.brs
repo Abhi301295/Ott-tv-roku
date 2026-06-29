@@ -25,10 +25,9 @@ sub ApplyHeroSelection()
     else
         m.activeHero = m.heroCinematic
     end if
-    if m.activeHero <> invalid then
-        m.activeHero.visible = true
-    end if
+    ' Sync items before showing the child so OnVisibleChanged sees a populated slide list.
     SyncToActiveHero()
+    if m.activeHero <> invalid then m.activeHero.visible = true
     ApplyAutoAdvanceHold()
 end sub
 
@@ -43,9 +42,25 @@ end sub
 sub OnHostVisibleChanged()
     if m.top.visible = true then
         ApplyHeroSelection()
+        ResumeActiveHeroPlayback()
     else
-        HideAllHeroes()
+        PauseActiveHeroPlayback()
     end if
+end sub
+
+' Tear down swipe/trailer timers on every active child (host visible=false or explicit pause).
+sub PauseActiveHeroPlayback()
+    if m.activeHero <> invalid then m.activeHero.callFunc("PauseHeroPlayback", invalid)
+    HideAllHeroes()
+end sub
+
+' Re-arm swipe + trailer on the active child. Called when the host becomes visible and
+' from HomeScreen stack resume — hero.visible may already be true so OnVisibleChanged alone
+' is not enough to reschedule trailers after a push/pop.
+sub ResumeActiveHeroPlayback()
+    if m.top.visible <> true then return
+    if m.activeHero = invalid then return
+    m.activeHero.callFunc("ResumeHeroPlayback", invalid)
 end sub
 
 sub WireHeroObservers()
@@ -150,5 +165,20 @@ end function
 
 function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
     if m.activeHero <> invalid then m.activeHero.callFunc("ResumeAutoAdvance", invalid)
+    return true
+end function
+
+function PauseHeroPlayback(dummy = invalid as dynamic) as boolean
+    PauseActiveHeroPlayback()
+    return true
+end function
+
+function ResumeHeroPlayback(dummy = invalid as dynamic) as boolean
+    if m.top.visible <> true then return true
+    if m.activeHero = invalid then ApplyHeroSelection()
+    if m.activeHero <> invalid then
+        if m.activeHero.visible <> true then m.activeHero.visible = true
+        m.activeHero.callFunc("ResumeHeroPlayback", invalid)
+    end if
     return true
 end function

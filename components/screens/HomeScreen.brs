@@ -252,20 +252,22 @@ sub KillTask(task as object)
 end sub
 
 ' Pause/resume the hero when this screen is covered/revealed by the nav stack.
-' The hero's own OnVisibleChanged stops the trailer, swipe timer, video and pending
-' detail fetch when invisible, and reschedules them when visible — so we just mirror
-' the screen's visibility onto the hero (only showing it again if it has banners).
-
-' Pause/resume the hero when this screen is covered/revealed by the nav stack.
-' The hero's own OnVisibleChanged stops the trailer, swipe timer, video and pending
-' detail fetch when invisible, and reschedules them when visible — so we just mirror
-' the screen's visibility onto the hero (only showing it again if it has banners).
+' Push/pop keeps the same HomeScreen instance; hero.visible can stay true while covered
+' (e.g. a late UpdateHeroBanner), so always call ResumeHeroPlayback on reveal — not only
+' when the host visible observer fires.
 sub OnHomeVisibleChanged()
     if m.top.dispose = true then return
     if m.top.visible = true then
         if m.hero <> invalid then
             items = m.hero.bannerItems
-            m.hero.visible = (items <> invalid and items.Count() > 0)
+            showHero = ThemeIsOttHome()
+            if items <> invalid and items.Count() > 0 then showHero = true
+            if showHero then
+                m.hero.visible = true
+                m.hero.callFunc("ResumeHeroPlayback", invalid)
+            else
+                m.hero.visible = false
+            end if
         end if
         ' Resume any unfinished background row-building when revealed (the build cursor
         ' m.rowBuildIndex survives, so it picks up where it paused).
@@ -276,7 +278,10 @@ sub OnHomeVisibleChanged()
         ' Covered by another screen (e.g. Detail pushed on top): stop the hero AND pause
         ' background node-building so nothing competes with the foreground screen for the
         ' single render thread.
-        if m.hero <> invalid then m.hero.visible = false
+        if m.hero <> invalid then
+            m.hero.callFunc("PauseHeroPlayback", invalid)
+            m.hero.visible = false
+        end if
         if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
         if m.interactIdle <> invalid then m.interactIdle.control = "stop"
         CancelHomeSelect("covered")
@@ -538,9 +543,13 @@ sub UpdateHeroBanner()
     print "[HOME] UpdateHeroBanner bannerItems="; items.Count(); " layout="; m.homeLayout
     ApplyThemeToHero()
     m.hero.bannerItems = items
-    m.hero.visible = (items.Count() > 0 or ThemeIsOttHome())
     if ThemeIsOttHome() then
         m.hero.activeItem = ExtractOttActiveItem(m.categories)
+    end if
+    ' Do not re-show the hero while Home is covered — that leaves hero.visible=true under
+    ' a paused screen and blocks trailer resume when the user pops back.
+    if IsHomeForeground() then
+        m.hero.visible = (items.Count() > 0 or ThemeIsOttHome())
     end if
 end sub
 
