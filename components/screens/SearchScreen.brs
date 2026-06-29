@@ -669,7 +669,10 @@ sub OnKey()
     BeginGridInteraction()
     key = ev.key
     if m.focusZone = "input" then
-        if key = "up" then
+        if key = "up" and NavUpOpensHeaderFromContent() then
+            ShellEnterHeader(m.vm, invalid)
+            return
+        else if key = "left" and NavLeftOpensSidebarFromContent(true) then
             ShellEnterHeader(m.vm, invalid)
             return
         else if key = "down" then

@@ -1005,7 +1005,7 @@ end sub
 sub SwitchReel(dir as integer)
     if m.reels.Count() = 0 then return
     if dir = -1 and m.currentIndex = 0 then
-        EnterReelsHeader()
+        if NavUpOpensHeaderFromContent() then EnterReelsHeader()
         return
     end if
     n = m.reels.Count()
@@ -1030,10 +1030,12 @@ sub OnKey()
 
     if key = "up" then
         if m.currentIndex = 0 then
-            EnterReelsHeader()
+            if NavUpOpensHeaderFromContent() then EnterReelsHeader()
         else
             SwitchReel(-1)
         end if
+    else if key = "left" then
+        if NavLeftOpensSidebarFromContent(true) then EnterReelsHeader()
     else if key = "down" then
         SwitchReel(1)
     else if key = "back" then
