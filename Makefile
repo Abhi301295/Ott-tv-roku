@@ -3,6 +3,7 @@
 # Usage:
 #   make zip                           # validate (bsc) + zip into out/
 #   make sim                           # zip + install to BrightScript Simulator
+#   make smoke                         # validate + sim + scripts/smoke.sh (telnet assertions)
 #   make install ROKU_DEV_TARGET=<ip>  # zip + sideload to a physical Roku
 #   make clean
 #
@@ -17,7 +18,7 @@ ROKU_DEV_PASSWORD ?= rokudev
 ROKU_SIM_HOST     ?= 127.0.0.1
 ROKU_SIM_PORT     ?= 8080
 
-.PHONY: build zip validate install sim clean icons
+.PHONY: build zip validate install sim smoke clean icons
 
 build: zip
 
@@ -58,6 +59,10 @@ zip: validate
 
 sim: zip
 	@bash scripts/roku-sim-deploy.sh
+
+# Phase F: validate + sim deploy + telnet log assertions (requires brs-desktop).
+smoke:
+	@bash scripts/smoke.sh
 
 install: zip
 	@curl -s -S -F "mysubmit=Install" -F "archive=@$(OUT_DIR)/$(APP_NAME).zip" \
