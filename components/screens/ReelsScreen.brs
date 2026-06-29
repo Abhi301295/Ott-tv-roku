@@ -562,7 +562,6 @@ sub OnReelsResponse()
     m.initialLoad = false
 
     ReelsDbgApi("response", api)
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
     parsed = ReelsParseResponse(api)
     batch = parsed.items
     if api = invalid or api.ok <> true or (api.statusCode <> invalid and api.statusCode <> 200) then

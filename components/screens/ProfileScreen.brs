@@ -694,7 +694,7 @@ sub OnProfileFetchRefreshResponse()
     if api.httpStatus <> invalid then http = api.httpStatus
     print "[PROFILE_FETCH_DBG] refresh response http="; http; " ok="; CwPerfBool(api.ok = true)
 
-    if ProfileHandleSessionExpiry(api) then return
+    if api.shouldLogout = true then return
 
     if api.ok and ApplyRefreshTokens(api.result) then
         ProfileSelectLogNode("PROFILE_FETCH", "refresh ok -> retry list", m.top)
@@ -716,15 +716,6 @@ sub ProfileFetchAbort()
     KillProfileTask(m.refreshTask)
     ShowLoading(false)
 end sub
-
-function ProfileHandleSessionExpiry(api as object) as boolean
-    if HandleSessionExpiry(m.top, api) then
-        print "[PROFILE_FETCH_DBG] session expired -> login"
-        ProfileFetchAbort()
-        return true
-    end if
-    return false
-end function
 
 ' React profile.tsx catch -> handleLogout: clear loading, then navigate login.
 sub ProfileFetchGiveUp()
@@ -791,7 +782,7 @@ sub OnProfilesResponse(event as object)
     if api.httpStatus <> invalid then http = api.httpStatus
     print "[PROFILE_FETCH_DBG] profiles response http="; http; " ok="; CwPerfBool(api.ok = true); " refreshTried="; CwPerfBool(m.profileFetchRefreshTried = true)
 
-    if ProfileHandleSessionExpiry(api) then return
+    if api.shouldLogout = true then return
 
     if not api.ok or api.result = invalid then
         if api.httpStatus = 401 and m.profileFetchRefreshTried = true then
@@ -1140,7 +1131,7 @@ sub OnProfileSelectResponse()
     api = m.selectTask.apiResult
     if api = invalid then return
 
-    if HandleSessionExpiry(m.top, api) then
+    if api.shouldLogout = true then
         m.selecting = false
         ShowSelectingOverlay(false)
         ApplyProfileFocus()
@@ -1288,7 +1279,7 @@ sub OnPrefetchCwResponse()
     if m.prefetchCwTask = invalid then return
     api = m.prefetchCwTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then
+    if api.shouldLogout = true then
         CancelHomePrefetch()
         return
     end if
@@ -1313,7 +1304,7 @@ sub OnPrefetchCatResponse()
     if m.prefetchCatTask = invalid then return
     api = m.prefetchCatTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then
+    if api.shouldLogout = true then
         CancelHomePrefetch()
         return
     end if
@@ -1506,7 +1497,7 @@ sub OnVerifyResponse()
     api = m.verifyTask.apiResult
     if api = invalid then return
 
-    if HandleSessionExpiry(m.top, api) then return
+    if api.shouldLogout = true then return
 
     if IsPinVerified(api) then
         m.popup = ""

@@ -1,5 +1,9 @@
 ' AuthInterceptor.brs
-' Request auth header selection (parity with axios.instance.ts interceptors).
+' HTTP interceptors (parity with axios.instance.ts):
+'   ApplyAuthHeader     — request: pick Bearer / Basic per URL
+'   ProcessApiResponse  — response: parse envelope, flag shouldLogout
+' Session side-effects (toast + NavigateClearAndReplace) run in HttpClient via
+' SessionInterceptor.brs when any HttpRequest completes.
 
 function BuildDefaultHeaders() as object
     cfg = AppConfig()
@@ -180,6 +184,7 @@ function ProcessApiResponse(url as string, httpStatus as integer, responseText a
 
     if result.statusCode = 403 then
         result.shouldLogout = true
+        result.suppressToast = true
         result.ok = false
         return result
     end if
@@ -187,6 +192,7 @@ function ProcessApiResponse(url as string, httpStatus as integer, responseText a
     ' Some APIs return a login-required message without statusCode 403; treat like 403.
     if not IsAuthLogoutExemptUrl(url) and IsLoginRequiredMessage(result.message) then
         result.shouldLogout = true
+        result.suppressToast = true
         result.ok = false
         return result
     end if
@@ -194,6 +200,7 @@ function ProcessApiResponse(url as string, httpStatus as integer, responseText a
     ' Expired/missing Bearer on a content API — clear session and return to login.
     if result.statusCode = 401 and not IsAuthLogoutExemptUrl(url) and not IsSessionRefresh401ExemptUrl(url) and UrlMatchesAny(url, BearerContentPaths()) then
         result.shouldLogout = true
+        result.suppressToast = true
         result.ok = false
         return result
     end if

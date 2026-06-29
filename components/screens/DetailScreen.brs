@@ -217,7 +217,7 @@ sub OnDetailResponse()
     silent = m.detailFetchSilent = true
     m.detailFetchSilent = false
 
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
+    if api <> invalid and api.shouldLogout = true then return
 
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 then
         if silent then
@@ -538,7 +538,7 @@ sub OnWatchlistFoldersResponse()
     api = m.watchlistTask.apiResult
     m.watchlistTask = invalid
 
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
+    if api <> invalid and api.shouldLogout = true then return
 
     if api = invalid or api.ok <> true then
         m.watchlistBusy = false
@@ -592,7 +592,7 @@ sub OnWatchlistMutResponse()
     m.watchlistMutTask = invalid
     m.watchlistBusy = false
 
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
+    if api <> invalid and api.shouldLogout = true then return
 
     if api = invalid or api.ok <> true then
         UpdateWatchlistLabel()
@@ -675,7 +675,7 @@ sub OnMoreLikeResponse()
     api = m.moreLikeTask.apiResult
     m.moreLikeTask = invalid
 
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
+    if api <> invalid and api.shouldLogout = true then return
 
     items = []
     if api <> invalid and api.result <> invalid and api.result.data <> invalid then

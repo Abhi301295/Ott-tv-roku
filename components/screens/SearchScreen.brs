@@ -267,8 +267,6 @@ sub OnSearchResponse()
     respondedKw = m.inFlightKeyword
     m.searchTask = invalid
 
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
-
     if respondedKw <> CurrentSearchKeyword() then
         print "[SEARCH_DBG] stale response kw="; respondedKw; " current="; CurrentSearchKeyword()
         m.inFlightKeyword = ""

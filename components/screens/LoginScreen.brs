@@ -1,4 +1,8 @@
 sub init()
+    if m.global <> invalid and m.global.hasField("sessionLogoutInFlight") then
+        m.global.sessionLogoutInFlight = false
+    end if
+
     m.bgImage = m.top.findNode("bgImage")
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
@@ -436,7 +440,7 @@ sub OnOnboardResponse()
     if api = invalid then return
 
     m.onboardInFlight = false
-    if HandleSessionExpiry(m.top, api) then return
+    if api.shouldLogout = true then return
     if not api.ok or api.result = invalid then
         ShowQrError(CopyQrLoadFailed())
         MaybeToastApiError(api)
@@ -532,7 +536,7 @@ sub OnPollResponse()
 
     api = task.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then return
+    if api.shouldLogout = true then return
 
     ' Complete on tokens OR an explicit device-limit result; otherwise keep polling
     ' (pending/empty keeps the QR alive, web parity).
@@ -579,7 +583,7 @@ sub OnEmailResponse()
     if api = invalid then return
 
     SetLoginLoading(false)
-    if HandleSessionExpiry(m.top, api) then return
+    if api.shouldLogout = true then return
 
     ' Device limit exceeded → always a toast (web parity: showAlert(2, DEVICE_LIMIT_EXCEEDED)),
     ' never the inline error. Checked first so it works regardless of HTTP status.

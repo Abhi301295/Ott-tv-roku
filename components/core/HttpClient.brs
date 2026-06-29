@@ -25,9 +25,22 @@ end sub
 ' Public (callFunc): queue a request handle (HttpRequest node) for dispatch.
 function Submit(req as object) as void
     if req = invalid then return
+    req.observeField("apiResult", "OnRequestFinished")
     m.queue.Push(req)
     Pump()
 end function
+
+sub OnRequestFinished(event as object)
+    req = invalid
+    if event <> invalid then req = event.getRoSGNode()
+    if req = invalid then return
+    req.unobserveField("apiResult")
+
+    if req.warmOnly = true then return
+
+    api = req.apiResult
+    ApplyGlobalSessionExpiry(api)
+end sub
 
 ' Public (callFunc): open keep-alive on up to workerCount workers via a cheap GET.
 ' opts: path string, or { path, workerCount, warmOnly }. Results are discarded.

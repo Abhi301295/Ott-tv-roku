@@ -186,7 +186,6 @@ sub OnListResponse()
     m.initialLoad = false
 
     BrowseDbgApi("series_response", api)
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 then
         msg = ""
         status = 0

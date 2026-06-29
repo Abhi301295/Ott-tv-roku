@@ -282,7 +282,6 @@ sub OnCatalogueResponse()
     m.initialLoad = false
 
     BrowseDbgApi("genre_response", api)
-    if api <> invalid and HandleSessionExpiry(m.top, api) then return
     if api = invalid or api.ok <> true then
         BrowseDbg("genre_response", "fail: api not ok")
         m.hasMore = false

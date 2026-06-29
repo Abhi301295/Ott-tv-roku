@@ -156,28 +156,5 @@ sub HandleLoginRedirect(deviceToken as object, viewManager as object, fromNode =
     ' and re-fetches QR — stay on login until poll returns a known nextStep + tokens.
 end sub
 
-' Session-expiry handler — parity with axios.instance.ts 403 handler + logoutSession():
-' when an API result is flagged shouldLogout, clear all tokens and send the user back
-' to Login. Returns true when it handled a logout so the caller can stop processing
-' the (now invalid) response.
-function HandleSessionExpiry(fromNode as object, api as object) as boolean
-    if api = invalid then return false
-    if api.shouldLogout <> true then return false
-
-    ' HttpTask already clears storage on shouldLogout; repeat defensively (idempotent)
-    ' so this also works when called from non-task paths.
-    ClearStorage()
-
-    msg = "Session expired. Please log in again."
-    if api.message <> invalid and api.message <> "" then msg = api.message
-    ShowAlert(fromNode, 2, msg)
-
-    ' Replace with Login — but not if we're already on Login (avoids a reload loop
-    ' when a pre-login call on the login screen itself returns 403).
-    vm = FindViewManager(fromNode)
-    if vm <> invalid and vm.currentRoute <> RouteLogin() then
-        print "[AUTH_DBG] session expired -> NavigateClearAndReplace login route="; vm.currentRoute
-        vm.callFunc("NavigateClearAndReplace", RouteLogin(), {})
-    end if
-    return true
-end function
+' Session expiry is handled globally by HttpClient + SessionInterceptor.brs when
+' ProcessApiResponse sets shouldLogout on apiResult.
