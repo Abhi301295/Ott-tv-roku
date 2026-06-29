@@ -38,6 +38,9 @@ sub init()
     m.formErrorBg = m.top.findNode("formErrorBg")
     m.formErrorBorder = m.top.findNode("formErrorBorder")
     m.loginSpinner = m.top.findNode("loginSpinner")
+    m.loginSpinnerAnim = m.top.findNode("loginSpinnerAnim")
+    m.loginSpinnerArc = m.top.findNode("loginSpinnerArc")
+    m.loginSpinnerRing = m.top.findNode("loginSpinnerRing")
     m.pollTimer = m.top.findNode("pollTimer")
     m.pollTimeout = m.top.findNode("pollTimeout")
     m.onboardRetry = m.top.findNode("onboardRetry")
@@ -84,6 +87,7 @@ sub init()
     LoadThemeTokens()
     ApplyLoginBranding()
     ApplyThemeColors()
+    ApplyLoginSpinnerGeometry()
     UpdateTabColors()
     UpdateLoginButton()
 
@@ -119,6 +123,29 @@ sub LoadThemeTokens()
     ' Focused placeholder = browser-default muted gray (web drops the neutral-50
     ' override when focused). Not a theme token, so hardcode like the badge number.
     m.cFieldPlaceholderFocus = "0x9ea4b0ff"
+end sub
+
+function LoginSpinnerPx() as integer
+    ' Web h-5 w-5 (20px); slightly larger for TV legibility inside the 60px button.
+    return 28
+end function
+
+sub ApplyLoginSpinnerGeometry()
+    if m.loginSpinner = invalid then return
+    sz = LoginSpinnerPx()
+    half = Int(sz / 2)
+    spin = m.top.findNode("loginSpinnerSpin")
+    if spin <> invalid then spin.translation = [half, half]
+    if m.loginSpinnerRing <> invalid then
+        m.loginSpinnerRing.width = sz
+        m.loginSpinnerRing.height = sz
+        m.loginSpinnerRing.translation = [-half, -half]
+    end if
+    if m.loginSpinnerArc <> invalid then
+        m.loginSpinnerArc.width = sz
+        m.loginSpinnerArc.height = sz
+        m.loginSpinnerArc.translation = [-half, -half]
+    end if
 end sub
 
 function TC(name as string, fallbackHex as string) as string
@@ -198,6 +225,7 @@ sub ApplyThemeColors()
     m.passwordField.placeholderColor = m.cFieldText
     m.passwordField.placeholderColorFocused = m.cFieldPlaceholderFocus
     m.passwordField.borderColor = m.cFieldBorder
+    if m.loginSpinnerArc <> invalid then m.loginSpinnerArc.blendColor = m.cTabText
 end sub
 
 ' Tab colors follow selection (onFocus switches mode in the web app).
@@ -252,8 +280,14 @@ end sub
 
 ' Toggle the in-button loader (spinner inside the Login button + disabled style).
 sub SetLoginLoading(loading as boolean)
-    ' BusySpinner animates automatically while visible.
-    m.loginSpinner.visible = loading
+    if m.loginSpinnerAnim <> invalid then
+        if loading then
+            m.loginSpinnerAnim.control = "start"
+        else
+            m.loginSpinnerAnim.control = "stop"
+        end if
+    end if
+    if m.loginSpinner <> invalid then m.loginSpinner.visible = loading
     UpdateLoginButton()
 end sub
 
@@ -288,7 +322,9 @@ sub LayoutForm(hasError as boolean)
         m.loginBtn.translation = [64, 247]
     end if
     by = m.loginBtn.translation[1]
-    m.loginSpinner.translation = [443, by + 12]
+    spinnerSz = LoginSpinnerPx()
+    m.loginSpinner.translation = [64 + Int(794 / 2) - Int(spinnerSz / 2), by + Int(60 / 2) - Int(spinnerSz / 2)]
+    ApplyLoginSpinnerGeometry()
 end sub
 
 sub ApplyLoginBranding()
