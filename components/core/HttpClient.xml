@@ -5,11 +5,17 @@
 <component name="HttpClient" extends="Node">
   <interface>
     <function name="Submit" />
+    <function name="WatchRequest" />
     <function name="WarmAll" />
     <!-- Drop queued (not yet dispatched) requests on screen replace so a fast nav
          (e.g. Home → Movies) does not let stale boot fetches starve the foreground. -->
     <function name="ClearQueue" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/SessionInterceptor.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/HttpClient.brs" />
 </component>

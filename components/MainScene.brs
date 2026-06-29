@@ -14,6 +14,12 @@ sub init()
     m.themeManager.observeField("bootBackgroundColor", "OnBootColor")
     m.top.observeField("alertMessage", "OnAlertMessageChange")
     m.alertTimer.observeField("fire", "OnAlertTimerFire")
+
+    if m.global <> invalid then
+        m.global.addFields({ viewManager: m.viewManager })
+        m.global.viewManager = m.viewManager
+        m.global.addFields({ sessionLogoutInFlight: false })
+    end if
 end sub
 
 ' --- Global toast (parity with showAlert / react-toastify, 3s autoclose) ---

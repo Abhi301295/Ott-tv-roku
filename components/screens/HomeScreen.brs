@@ -1237,7 +1237,7 @@ end sub
 ' POST select-profile, retrying a few times on transient 401/404 (a freshly-issued token
 ' is briefly not yet active on the backend). On success: persist identity + boot content.
 ' On give-up: surface a toast and return to the picker — never log the user out for a
-' transient failure (only a real 403 session-expiry, handled by HandleSessionExpiry, does).
+' transient failure (only a real session-expiry ends the session via HttpClient).
 sub DoHomeSelect()
     m.selectInFlight = true
     m.selectAwaitingApiResult = false
@@ -1287,8 +1287,6 @@ sub OnHomeSelectResponse(event as object)
         CancelHomeSelect("response-not-foreground")
         return
     end if
-    if HandleSessionExpiry(m.top, api) then return
-
     if api.ok and ApplySelectProfileTokens(api.result) then
         PersistSelectedProfile(m.pendingSelectId, m.pendingSelectAvatar)
         if m.header <> invalid and m.pendingSelectAvatar <> invalid and m.pendingSelectAvatar <> "" then
@@ -1422,8 +1420,6 @@ sub OnProfilesBootstrapResponse()
     if m.profilesTask = invalid then return
     api = m.profilesTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then return
-
     if not api.ok or api.result = invalid then
         ClearAuthAndGoLogin()
         return
@@ -1452,8 +1448,6 @@ sub OnContinueWatchingResponse()
     if m.continueTask = invalid then return
     api = m.continueTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then return
-
     cwCount = 0
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
@@ -1494,8 +1488,6 @@ sub OnHomeCategoriesResponse()
     if m.categoryTask = invalid then return
     api = m.categoryTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then return
-
     catCount = 0
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)
@@ -1530,8 +1522,6 @@ sub OnLatestVersionResponse()
     if m.versionTask = invalid then return
     api = m.versionTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then return
-
     verdict = EvaluateVersionUpdate(api)
     m.showUpdate = verdict.showUpdate
     m.versionLoading = false
@@ -2393,8 +2383,6 @@ sub OnLoadMoreResponse()
     if m.loadMoreTask = invalid then return
     api = m.loadMoreTask.apiResult
     if api = invalid then return
-    if HandleSessionExpiry(m.top, api) then return
-
     prevCatCount = m.contentRowCats.Count()
     if api.ok and api.result <> invalid then
         listing = ExtractCategoryListing(api.result)

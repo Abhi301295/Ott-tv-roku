@@ -12,6 +12,10 @@
     <field id="httpStatus" type="integer" alwaysNotify="true" />
     <field id="errorMessage" type="string" alwaysNotify="true" />
     <field id="shouldLogout" type="boolean" alwaysNotify="true" />
+    <!-- Set by HttpClient.WatchRequest; prevents duplicate session observers. -->
+    <field id="sessionWatched" type="boolean" value="false" />
+    <!-- Set after session interceptor handles a completed apiResult envelope. -->
+    <field id="sessionHandled" type="boolean" value="false" />
   <!-- warmOnly: keep-alive probe — response discarded, tagged [HTTP_WARM] in logs. -->
     <field id="warmOnly" type="boolean" value="false" />
   </interface>

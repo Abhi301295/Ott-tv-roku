@@ -22,12 +22,35 @@ sub init()
     end if
 end sub
 
+' Attach the session interceptor before any screen observes apiResult (observer order).
+function WatchRequest(req as object) as void
+    if req = invalid then return
+    if req.sessionWatched = true then return
+    req.sessionWatched = true
+    req.observeField("apiResult", "OnRequestFinished")
+end function
+
 ' Public (callFunc): queue a request handle (HttpRequest node) for dispatch.
 function Submit(req as object) as void
     if req = invalid then return
+    WatchRequest(req)
     m.queue.Push(req)
     Pump()
 end function
+
+sub OnRequestFinished(event as object)
+    req = invalid
+    if event <> invalid then req = event.getRoSGNode()
+    if req = invalid then return
+    if req.warmOnly = true then return
+
+    api = req.apiResult
+    if api = invalid then return
+    if req.sessionHandled = true then return
+    req.sessionHandled = true
+
+    ApplyGlobalSessionExpiry(api)
+end sub
 
 ' Public (callFunc): open keep-alive on up to workerCount workers via a cheap GET.
 ' opts: path string, or { path, workerCount, warmOnly }. Results are discarded.

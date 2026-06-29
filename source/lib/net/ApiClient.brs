@@ -10,6 +10,8 @@ function CreateHttpTask(method as string, path as string, body = invalid as dyna
     if body <> invalid then
         req.body = FormatJson(body)
     end if
+    client = GetHttpClient()
+    if client <> invalid then client.callFunc("WatchRequest", req)
     return req
 end function
 
