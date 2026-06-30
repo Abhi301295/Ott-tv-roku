@@ -119,13 +119,9 @@ sub BeginHomeBootWork()
     else
         ShowHeroSkeleton(false)
     end if
-    if m.categoriesPrefetched = true then
-        ShowRowsSkeleton(false)
-    else
-        ShowRowsSkeleton(true)
-        m.cwShimmerSpan = CreateObject("roTimespan")
-        CwPerfMark(m.cwShimmerSpan, "shimmer ON (boot)")
-    end if
+    ShowRowsSkeleton(true)
+    m.cwShimmerSpan = CreateObject("roTimespan")
+    CwPerfMark(m.cwShimmerSpan, "shimmer ON (boot)")
     ' Rows timeout starts when BuildContentRows begins, not at boot (hero gate can take 3.5s+).
     ' Wall-clock from mount → hero poster painted = perceived first-content latency.
     m.bootSpan = CreateObject("roTimespan")
@@ -143,9 +139,15 @@ end sub
 
 sub OnTransitionSafetyTimer()
     if not ProfileTransitionActive() then return
-    print "[WELCOME_DBG] safety_timeout hide_overlay boot_started="; m.bootStarted; " content_boot="; m.contentBootStarted
-    HideProfileWelcomeTransition()
+    print "[WELCOME_DBG] safety_timeout boot_started="; m.bootStarted; " content_boot="; m.contentBootStarted; " rowsBuilt="; m.rowsBuilt
     if not m.contentBootStarted then BootHomeContent()
+    row0 = invalid
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
+    if row0 <> invalid then
+        row0.callFunc("ForceReveal", invalid)
+        if not m.rowsRevealed then PrepareFirstRowReveal()
+    end if
+    HideProfileWelcomeTransition()
 end sub
 
 
@@ -631,10 +633,10 @@ function AnyBootLoading() as boolean
     return m.initialLoading or m.continueLoading
 end function
 
-' Row build gate — OTT only needs categories (CW may arrive late); Netflix waits for both.
-
-' Row build gate — OTT only needs categories (CW may arrive late); Netflix waits for both.
+' Row build gate — OTT may build before CW on revisit; profile handoff and Netflix wait
+' for both APIs so row 0 is Continue Watching before the welcome overlay dismisses.
 function RowsBootLoading() as boolean
+    if ProfileTransitionActive() then return AnyBootLoading()
     if ThemeIsOttHome() then return m.initialLoading
     return AnyBootLoading()
 end function

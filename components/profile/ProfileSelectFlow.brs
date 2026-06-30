@@ -77,13 +77,7 @@ end sub
 ' ── Home catalog prefetch (welcome overlay) ───────────────────────────────────
 ' Keep: shell overlay + CW/categories prefetch into boot cache + status phases
 ' while APIs are in flight. Navigate as soon as both responses land (no artificial
-' dwell). Home dismisses the overlay when row 0 mediaReady (see HomeScreen.brs).
-
-
-' ── Home catalog prefetch (welcome overlay) ───────────────────────────────────
-' Keep: shell overlay + CW/categories prefetch into boot cache + status phases
-' while APIs are in flight. Navigate as soon as both responses land (no artificial
-' dwell). Home dismisses the overlay when row 0 mediaReady (see HomeScreen.brs).
+' dwell). Home dismisses the overlay when row 0 paintedReady (CW row when applicable).
 
 sub BeginHomePrefetch(profileId as string, avatar as string)
     HomeBootCacheClear()
