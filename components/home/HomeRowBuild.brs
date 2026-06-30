@@ -1,14 +1,23 @@
 ' HomeRowBuild.brs — incremental ContentRow creation and first-row reveal.
 
+' Welcome dismisses only when row 0 is Continue Watching if the catalogue includes CW.
+function WelcomeDismissReadyForRow0() as boolean
+    if not HomeHasContinueWatchingRow() then return true
+    if m.contentRowCats = invalid or m.contentRowCats.Count() = 0 then return false
+    cat = m.contentRowCats[0]
+    if cat = invalid then return false
+    return cat.type = HC_TypeContinueWatching()
+end function
 
 sub OnRowsSkeletonTimeout()
     print "[HOME] rows skeleton timeout -> force first row reveal"
     HomeBootLog(m.bootSpan, "rows skeleton timeout", "force reveal")
-    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then
-        row0 = m.rowWidgets[0]
-        if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
-    end if
-    if ThemeIsOttHome() and m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+    row0 = invalid
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
+    if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
+    painted = false
+    if row0 <> invalid and row0.hasField("paintedReady") then painted = row0.paintedReady
+    if painted and WelcomeDismissReadyForRow0() then
         PrepareFirstRowReveal()
         return
     end if
@@ -19,7 +28,6 @@ end sub
 sub DetachFirstRowWatch()
     if m.firstRowWatch = invalid then return
     if m.firstRowWatch.hasField("paintedReady") then m.firstRowWatch.unobserveField("paintedReady")
-    if m.firstRowWatch.hasField("mediaReady") then m.firstRowWatch.unobserveField("mediaReady")
     m.firstRowWatch = invalid
 end sub
 
@@ -31,7 +39,7 @@ sub OnRowsForceHideTimer()
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
     painted = false
     if row0 <> invalid and row0.hasField("paintedReady") then painted = row0.paintedReady
-    if painted and m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+    if painted and WelcomeDismissReadyForRow0() and m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
         CwPerfInstant("force-hide", "paintedReady=true -> reveal")
         PrepareFirstRowReveal()
     else
@@ -56,8 +64,13 @@ sub MaybeInsertLateContinueWatchingRow()
     end if
     HomeBootLog(m.bootSpan, "late CW merge", "rebuild row list")
     m.rowsBuilt = false
+    if m.rowsRevealed then
+        m.rowsRevealed = false
+        ShowRowsSkeleton(true)
+    end if
     m.rowsDataReady = true
     m.rowGateElapsed = true
+    DetachFirstRowWatch()
     MaybeStartRowBuild()
 end sub
 
@@ -192,17 +205,17 @@ sub OnRowBuildTick()
         WarmWelcomeRow(m.rowWidgets[addedIdx])
     end if
 
-    ' Drop welcome overlay as soon as row 0 media resolves; paintedReady is a fallback.
+    ' Welcome overlay waits for row 0 paintedReady (CW row when CW is in the catalogue).
     if m.rowBuildIndex = 0 then
         row.rowPeekVisible = true
+        row.callFunc("BuildCardsNow", 6)
         if row.cardCount = 0 then
-            OnFirstRowPainted()
+            if WelcomeDismissReadyForRow0() then OnFirstRowPainted()
         else
             DetachFirstRowWatch()
             m.firstRowWatch = row
-            row.observeField("mediaReady", "OnFirstRowMediaReady")
             row.observeField("paintedReady", "OnFirstRowPainted")
-            if row.hasField("mediaReady") and row.mediaReady = true then OnFirstRowMediaReady()
+            if row.hasField("paintedReady") and row.paintedReady = true then OnFirstRowPainted()
         end if
     end if
 
@@ -247,33 +260,22 @@ sub WarmWelcomeRowsWindow()
     end for
 end sub
 
-' Row 0 cards resolved (media loaded) — dismiss welcome overlay; paintedReady is fallback.
-
-' Row 0 cards resolved (media loaded) — dismiss welcome overlay; paintedReady is fallback.
-sub OnFirstRowMediaReady()
-    if m.top.dispose = true then return
-    row = invalid
-    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
-    if row = invalid then return
-    if row.hasField("mediaReady") and row.mediaReady <> true then return
-
-    HomeBootLog(m.bootSpan, "row0 mediaReady", "hide welcome overlay")
-    if m.rowBuildTimer <> invalid then m.rowBuildTimer.duration = 0.03
-    if ProfileTransitionActive() then HideProfileWelcomeTransition()
-    if not m.rowsRevealed then PrepareFirstRowReveal()
-end sub
-
-' The Continue Watching row finished painting — drop the shimmer over real cards.
-
-' The Continue Watching row finished painting — drop the shimmer over real cards.
+' Row 0 thumbnails painted — dismiss welcome overlay and drop the rows shimmer.
 sub OnFirstRowPainted()
+    if m.top.dispose = true then return
     if m.rowsRevealed then return
+    if not WelcomeDismissReadyForRow0() then
+        HomeBootLog(m.bootSpan, "row0 painted skip", "waiting for CW row")
+        return
+    end if
     row = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row = m.rowWidgets[0]
     if row <> invalid and row.hasField("paintedReady") and row.paintedReady <> true then return
     DetachFirstRowWatch()
     m.cwRevealAtMs = CwPerfMs(m.cwShimmerSpan)
+    HomeBootLog(m.bootSpan, "row0 paintedReady", "hide welcome overlay")
     LogCwRowState("paintedReady -> pre-hide")
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.duration = 0.03
     PrepareFirstRowReveal()
 end sub
 
