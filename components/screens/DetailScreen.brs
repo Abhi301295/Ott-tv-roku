@@ -34,6 +34,12 @@ sub init()
     m.moreLikeOpen = false
     m.moreLikeFocusZone = "cards"
     m.moreLikeCloseFrame = invalid
+    m.moreLikePaintPollCount = 0
+    m.moreLikePaintTimer = CreateObject("roSGNode", "Timer")
+    m.moreLikePaintTimer.duration = 0.05
+    m.moreLikePaintTimer.repeat = false
+    m.top.appendChild(m.moreLikePaintTimer)
+    m.moreLikePaintTimer.observeField("fire", "OnMoreLikePaintPoll")
     m.actionIndex = 0
     m.actionIds = []
     m.loading = true
@@ -83,6 +89,7 @@ sub OnDispose()
     KillDetailTask(m.moreLikeTask)
     KillDetailTask(m.watchlistTask)
     KillDetailTask(m.watchlistMutTask)
+    StopMoreLikePaintPoll()
     m.detailTask = invalid
     m.moreLikeTask = invalid
     m.watchlistTask = invalid
@@ -623,9 +630,9 @@ sub OpenMoreLike()
     PlayMoreLikeOpenAnim()
 
     if m.moreLikeVideos.Count() > 0 then
-        m.moreLikeSkeletonHost.visible = false
         m.moreLikeCardsHost.visible = true
         BuildMoreLikeCards()
+        FinishMoreLikeReveal()
         ApplyMoreLikeCloseFocus()
         ApplyMoreLikeCardFocus()
         ScrollMoreLikeToFocused()
@@ -674,15 +681,80 @@ sub OnMoreLikeResponse()
         items = api.result.data
     end if
     m.moreLikeVideos = items
-    m.moreLikeSkeletonHost.visible = false
-    m.moreLikeCardsHost.visible = true
-    for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
-        if sk <> invalid and sk.hasField("running") then sk.running = false
-    end for
     BuildMoreLikeCards()
     ApplyMoreLikeCloseFocus()
     ApplyMoreLikeCardFocus()
     ScrollMoreLikeToFocused()
+    if m.moreLikeVideos.Count() = 0 then
+        HideMoreLikeDrawerSkeleton()
+        return
+    end if
+    FinishMoreLikeReveal()
+end sub
+
+sub StopMoreLikePaintPoll()
+    if m.moreLikePaintTimer <> invalid then m.moreLikePaintTimer.control = "stop"
+    m.moreLikePaintPollCount = 0
+end sub
+
+' Drawer shimmer stays until the first on-screen card poster is ready to show.
+sub FinishMoreLikeReveal()
+    if m.moreLikeCardsHost <> invalid then m.moreLikeCardsHost.visible = true
+    if MoreLikeFirstCardPainted() then
+        HideMoreLikeDrawerSkeleton()
+        return
+    end if
+    if m.moreLikeSkeletonHost <> invalid then m.moreLikeSkeletonHost.visible = true
+    ApplyMoreLikeSkeletonColors()
+    m.moreLikePaintPollCount = 0
+    ArmMoreLikePaintPoll()
+end sub
+
+sub ArmMoreLikePaintPoll()
+    if m.moreLikePaintTimer = invalid then return
+    m.moreLikePaintTimer.control = "start"
+end sub
+
+function MoreLikeFirstCardPainted() as boolean
+    if m.moreLikeCards.Count() = 0 then return true
+    for each card in m.moreLikeCards
+        if card = invalid then continue for
+        if card.translation[0] >= 1920 then continue for
+        thumb = card.findNode("thumb")
+        skel = card.findNode("skeleton")
+        if thumb = invalid then return false
+        st = thumb.loadStatus
+        if st = "failed" then return true
+        if st <> "ready" then return false
+        if thumb.visible <> true then return false
+        if skel <> invalid and skel.visible = true then return false
+        return true
+    end for
+    return false
+end function
+
+sub OnMoreLikePaintPoll()
+    m.moreLikePaintPollCount = m.moreLikePaintPollCount + 1
+    if MoreLikeFirstCardPainted() then
+        HideMoreLikeDrawerSkeleton()
+        return
+    end if
+    if m.moreLikePaintPollCount >= 120 then
+        HideMoreLikeDrawerSkeleton()
+        return
+    end if
+    ArmMoreLikePaintPoll()
+end sub
+
+sub HideMoreLikeDrawerSkeleton()
+    StopMoreLikePaintPoll()
+    if m.moreLikeSkeletonHost <> invalid then
+        m.moreLikeSkeletonHost.visible = false
+        for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
+            if sk <> invalid and sk.hasField("running") then sk.running = false
+        end for
+    end if
+    if m.moreLikeCardsHost <> invalid then m.moreLikeCardsHost.visible = true
 end sub
 
 sub BuildMoreLikeCards()
@@ -787,19 +859,16 @@ sub CloseMoreLike(refocus as boolean)
     if not m.moreLikeOpen then return
     KillDetailTask(m.moreLikeTask)
     m.moreLikeTask = invalid
+    StopMoreLikePaintPoll()
     m.moreLikeOpen = false
     m.moreLikeFocusZone = "cards"
     if m.vm <> invalid then m.vm.overlayOpen = false
     m.moreLikeOverlay.visible = false
-    m.moreLikeSkeletonHost.visible = false
-    m.moreLikeCardsHost.visible = true
+    HideMoreLikeDrawerSkeleton()
     if m.moreLikeDrawer <> invalid then m.moreLikeDrawer.translation = [0, 1080]
     if m.moreLikeScrim <> invalid then m.moreLikeScrim.opacity = 0
     if m.moreLikeScrimIn <> invalid then m.moreLikeScrimIn.control = "stop"
     if m.moreLikeDrawerIn <> invalid then m.moreLikeDrawerIn.control = "stop"
-    for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
-        if sk <> invalid and sk.hasField("running") then sk.running = false
-    end for
     if m.moreLikeCloseFrame <> invalid then
         CardApplyFocusBorder(m.moreLikeCloseFrame, false, m.cPrimary500)
     end if
