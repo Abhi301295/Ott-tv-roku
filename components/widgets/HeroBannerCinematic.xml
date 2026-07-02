@@ -170,6 +170,8 @@
 
     <Timer id="swipeTimer" repeat="true" duration="15" />
     <Timer id="slidePosterTimer" repeat="false" duration="0.15" />
+    <!-- Parity TRAILER_LOAD_DELAY: poster stays up before trailer playback starts. -->
+    <Timer id="trailerLoadTimer" repeat="false" duration="2.5" />
 
     <Animation id="zoomAnim" duration="8" repeat="false" easeFunction="outCubic">
       <Vector2DFieldInterpolator id="zoomInterp" key="[0.0, 1.0]"
