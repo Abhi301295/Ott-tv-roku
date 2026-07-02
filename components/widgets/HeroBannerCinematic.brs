@@ -235,6 +235,7 @@ sub HardResetTrailerVideo()
     width = m.trailerVideo.width
     height = m.trailerVideo.height
     m.trailerVideo.unobserveField("state")
+    DetachTrailerDurationObserver()
     if parent <> invalid then parent.removeChild(m.trailerVideo)
     video = CreateObject("roSGNode", "Video")
     video.id = "trailerVideo"
@@ -650,16 +651,69 @@ sub BuildBars()
     StartPosterProgress()
 end sub
 
-' Blue tick fills over the FIXED slide window (15s) — its duration is tied to the slide
-' timer, never to the trailer length (parity: progress = SWIPE_INTERVAL for the slide).
-sub StartPosterProgress()
+function HeroPosterProgressSec() as float
+    return HC_HeroSwipeMs() / 1000.0
+end function
+
+function HeroTrailerDurationSec() as float
+    if m.trailerVideo = invalid then return 0.0
+    d = m.trailerVideo.duration
+    if d = invalid or d <= 0 then return 0.0
+    return d
+end function
+
+' Mirrors heroBannerCinematic.tsx progressDuration: trailer length while playing,
+' otherwise the fixed 15s poster window.
+function HeroProgressDurationSec() as float
+    if m.isVideoPlaying then
+        trailerSec = HeroTrailerDurationSec()
+        if trailerSec > 0 then return trailerSec
+    end if
+    return HeroPosterProgressSec()
+end function
+
+sub ApplyHeroProgressDuration()
     if m.barAnim = invalid then return
-    m.barAnim.duration = HC_HeroSwipeMs() / 1000.0
+    m.barAnim.duration = HeroProgressDurationSec()
+end sub
+
+sub DetachTrailerDurationObserver()
+    if m.trailerVideo = invalid then return
+    m.trailerVideo.unobserveField("duration")
+end sub
+
+sub ArmTrailerDurationObserver()
+    if m.trailerVideo = invalid then return
+    if not m.isVideoPlaying then return
+    if HeroTrailerDurationSec() > 0 then return
+    DetachTrailerDurationObserver()
+    m.trailerVideo.observeField("duration", "OnTrailerDurationReady")
+end sub
+
+sub OnTrailerDurationReady()
+    if m.trailerVideo = invalid then return
+    if not m.isVideoPlaying then
+        DetachTrailerDurationObserver()
+        return
+    end if
+    if HeroTrailerDurationSec() <= 0 then return
+    DetachTrailerDurationObserver()
+    RestartHeroProgressBar()
+end sub
+
+sub RestartHeroProgressBar()
+    if m.barAnim = invalid or m.barInterp = invalid or m.heroBarFill = invalid then return
+    ApplyHeroProgressDuration()
     StartBarFill()
 end sub
 
+' Poster window — 15s when no trailer is playing (parity SWIPE_INTERVAL).
+sub StartPosterProgress()
+    RestartHeroProgressBar()
+end sub
+
 sub StartBarFill()
-    if m.barAnim = invalid or m.barInterp = invalid or m.heroBarFill = invalid then return
+    if m.heroBarFill = invalid then return
     m.heroBarFill.width = 0
     m.barAnim.control = "stop"
     m.barAnim.control = "start"
@@ -702,11 +756,8 @@ sub StartKenBurns()
     m.zoomAnim.control = "start"
 end sub
 
-' The slide runs for a FIXED duration (HC_HeroSwipeMs). The timer keeps running even
-' while a trailer plays, so one slide is never stretched to the full trailer length —
-' it always advances on the fixed window (parity intent + user requirement).
-' LG pauses the 15s auto-advance while a trailer plays (heroBannerCinematic.tsx clears the
-' setInterval on isVideoPlaying) and advances on the trailer "ended" event instead.
+' Auto-advance: 15s poster window, or hold until the trailer ends when one is playing
+' (parity heroBannerCinematic.tsx — setInterval pauses while isVideoPlaying).
 sub StartSwipeTimer()
     if m.swipeTimer = invalid or ItemCount() < 2 then return
     if m.isVideoPlaying then return
@@ -905,8 +956,11 @@ sub OnTrailerState()
             UpdateMuteIcon()
             ' Ken Burns stops while the video covers the poster (parity isVideoPlaying).
             if m.zoomAnim <> invalid then m.zoomAnim.control = "stop"
-            ' Hold this slide for the full trailer: pause the fixed auto-advance window.
+            ' Hold this slide for the full trailer: pause auto-advance and stretch the
+            ' progress bar to the trailer runtime (parity progressDuration).
             StopSwipeTimer()
+            RestartHeroProgressBar()
+            ArmTrailerDurationObserver()
         end if
     else if state = "finished" then
         ' Parity handleEnded: the trailer ended, so advance to the next slide now.
@@ -942,8 +996,12 @@ sub RevealPoster()
     m.isVideoPlaying = false
     m.top.trailerPlaying = false
     m.playingForIndex = -1
+    DetachTrailerDurationObserver()
     StartKenBurns()
-    if m.top.visible then StartSwipeTimer()
+    if m.top.visible then
+        StartSwipeTimer()
+        StartPosterProgress()
+    end if
 end sub
 
 ' Parity with React handleEnded: when the trailer's "ended" event fires it sets
@@ -952,6 +1010,7 @@ end sub
 sub AdvanceAfterTrailer()
     if m.videoFadeAnim <> invalid then m.videoFadeAnim.control = "stop"
     if m.trailerVideo <> invalid then
+        DetachTrailerDurationObserver()
         m.trailerVideo.control = "stop"
         m.trailerVideo.content = invalid
         HideTrailerVideo()
@@ -970,6 +1029,7 @@ sub StopTrailer()
     if m.trailerTimer <> invalid then m.trailerTimer.control = "stop"
     if m.videoFadeAnim <> invalid then m.videoFadeAnim.control = "stop"
     if m.trailerVideo <> invalid then
+        DetachTrailerDurationObserver()
         m.trailerVideo.control = "stop"
         m.trailerVideo.content = invalid
         HideTrailerVideo()
