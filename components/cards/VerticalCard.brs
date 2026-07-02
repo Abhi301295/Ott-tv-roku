@@ -63,16 +63,29 @@ sub ApplyAll()
 
     uri = m.top.thumbnailUri
     if uri <> invalid and uri <> "" then
-        CardHideThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo)
         m.thumb.uri = uri
-        m.thumb.visible = true
-        m.skeleton.visible = true
-        m.skeleton.running = true
-        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
+        status = m.thumb.loadStatus
+        ' Parity verticalCard.tsx / seriesCard.tsx — pulse until onLoad; poster stays hidden.
+        if status = "ready" or status = "failed" then
+            CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, w, h)
+        else
+            ShowThumbLoading()
+        end if
     else
         CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, w, h)
     end if
     ApplyFocusVisual()
+end sub
+
+sub ShowThumbLoading()
+    if m.thumb <> invalid then m.thumb.visible = false
+    if m.thumbFallback <> invalid then m.thumbFallback.visible = false
+    if m.thumbFallbackLogo <> invalid then m.thumbFallbackLogo.visible = false
+    if m.skeleton <> invalid then
+        m.skeleton.visible = true
+        m.skeleton.running = true
+        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
+    end if
 end sub
 
 sub ApplyFocusVisual()
