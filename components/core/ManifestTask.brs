@@ -3,38 +3,132 @@ sub init()
 end sub
 
 sub runFetch()
+    m.top.done = false
     url = m.top.manifestUrl
     levels = []
+    firstMedia = ""
+    isHls = false
+    status = 0
+    resolvedUrl = ""
+    streamFormat = ""
+    resolvePath = ""
+
     if url <> invalid and url <> "" then
-        text = FetchText(url)
-        if text <> "" then levels = ParseMasterPlaylist(text, url)
+        if not m.top.forceProbe and not TrailerNeedsResolve(url) then
+            resolvedUrl = url
+            streamFormat = TrailerStreamFormat(url)
+            resolvePath = "direct_ext"
+        else
+        cookies = m.top.httpCookies
+        if cookies = invalid then cookies = ""
+
+        probe = FetchProbeSample(url, cookies)
+        status = 0
+        sample = ""
+        probeFullText = ""
+        if probe <> invalid then
+            status = probe.status
+            sample = probe.text
+            if probe.fullText <> invalid then probeFullText = probe.fullText
+        end if
+        statusCode = 0
+        if status <> invalid then statusCode = CInt(status)
+
+        if statusCode = 200 or statusCode = 206 then
+            if sample <> "" and IsHlsPlaylistText(sample) then
+                text = probeFullText
+                if text = "" then
+                    fetched = FetchUrlText(url, cookies)
+                    if fetched <> invalid then
+                        text = fetched.text
+                        status = fetched.status
+                        if status <> invalid then statusCode = CInt(status)
+                    end if
+                end if
+                if text <> "" then
+                    isHls = true
+                    levels = ParseMasterPlaylist(text, url)
+                    firstMedia = ParseFirstMediaUri(text, url)
+                    if firstMedia <> "" then
+                        resolvedUrl = firstMedia
+                        streamFormat = TrailerStreamFormat(firstMedia)
+                        resolvePath = "manifest_segment"
+                    else
+                        resolvedUrl = url
+                        streamFormat = "hls"
+                        resolvePath = "manifest_hls"
+                    end if
+                end if
+            else if sample <> "" and IsRawMp4Sample(sample) then
+                resolvedUrl = url
+                streamFormat = "mp4"
+                resolvePath = "raw_mp4"
+            else if sample <> "" then
+                probeText = probeFullText
+                if probeText = "" then probeText = sample
+                lineMedia = ParseFirstMediaUri(probeText, url)
+                if lineMedia <> "" then
+                    resolvedUrl = lineMedia
+                    streamFormat = TrailerStreamFormat(lineMedia)
+                    resolvePath = "manifest_line"
+                end if
+            end if
+        end if
+
+        if resolvedUrl = "" then
+            cands = BuildMp4CandidateUrls(url)
+            for each cand in cands
+                hs = HeadStatus(cand, cookies)
+                if hs = 200 or hs = 206 then
+                    resolvedUrl = cand
+                    streamFormat = "mp4"
+                    resolvePath = "head_mp4"
+                    exit for
+                end if
+            end for
+        end if
+
+        if resolvedUrl = "" then
+            resolvedUrl = url
+            streamFormat = "hls"
+            resolvePath = "hls_direct"
+        end if
+
+        if firstMedia = "" and resolvedUrl <> "" and resolvePath = "head_mp4" then
+            firstMedia = resolvedUrl
+        end if
+        end if
     end if
+
+    m.top.fetchStatus = status
+    m.top.isHlsManifest = isHls
+    m.top.firstMediaUrl = firstMedia
     m.top.levels = levels
+    m.top.resolvedUrl = resolvedUrl
+    m.top.streamFormat = streamFormat
+    m.top.resolvePath = resolvePath
     m.top.done = true
 end sub
 
-function FetchText(url as string) as string
-    xfer = CreateObject("roUrlTransfer")
-    xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
-    xfer.InitClientCertificates()
-    xfer.SetUrl(url)
-    xfer.EnableEncodings(true)
-    port = CreateObject("roMessagePort")
-    xfer.SetPort(port)
-    if not xfer.AsyncGetToString() then return ""
-    msg = wait(15000, port)
-    if msg = invalid then
-        xfer.AsyncCancel()
-        return ""
-    end if
-    if type(msg) = "roUrlEvent" and msg.GetInt() = 1 and msg.GetResponseCode() = 200 then
-        return msg.GetString()
-    end if
+function IsHlsPlaylistText(text as string) as boolean
+    if text = "" then return false
+    return Instr(1, text, "#EXTM3U") > 0 or Instr(1, text, "#EXTINF") > 0 or Instr(1, text, "#EXT-X-STREAM-INF") > 0
+end function
+
+function ParseFirstMediaUri(text as string, baseUrl as string) as string
+    lines = text.Split(Chr(10))
+    for each raw in lines
+        line = StripCR(raw)
+        if line <> "" and Left(line, 1) <> "#" then
+            lc = LCase(line)
+            if Left(lc, 4) = "http" or Instr(1, lc, ".mp4") > 0 or Instr(1, lc, ".m3u8") > 0 or Instr(1, lc, ".ts") > 0 then
+                return ResolveUrl(baseUrl, line)
+            end if
+        end if
+    end for
     return ""
 end function
 
-' Parse #EXT-X-STREAM-INF RESOLUTION/BANDWIDTH + the following variant URL line.
-' Returns [{ label, url, height, bandwidth }] deduped by height, highest first.
 function ParseMasterPlaylist(text as string, masterUrl as string) as object
     out = []
     seenHeights = {}
@@ -47,7 +141,6 @@ function ParseMasterPlaylist(text as string, masterUrl as string) as object
             attrs = Mid(line, 19)
             height = ParseResolutionHeight(attrs)
             bandwidth = ParseAttrInt(attrs, "BANDWIDTH")
-            ' Next non-empty, non-comment line is the variant URI.
             j = i + 1
             uri = ""
             while j < count
@@ -76,7 +169,6 @@ function ParseMasterPlaylist(text as string, masterUrl as string) as object
         end if
     end while
 
-    ' Sort highest resolution first (simple insertion sort; lists are tiny).
     for a = 1 to out.Count() - 1
         cur = out[a]
         b = a - 1
@@ -126,9 +218,6 @@ function ParseAttrInt(attrs as string, key as string) as integer
     return Int(Val(num))
 end function
 
-' Resolve a variant URI against the master URL (absolute / host-relative / path-relative).
-' For path-relative URIs with no query of their own we carry over the master's query
-' string, since token-in-query CDNs sign relative children with the same token.
 function ResolveUrl(masterUrl as string, uri as string) as string
     if Left(LCase(uri), 4) = "http" then return uri
 

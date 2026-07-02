@@ -111,11 +111,6 @@ function HC_HeroZoomSec() as float
     return 8.0
 end function
 
-' Delay before fetching/loading a slide's trailer (parity TRAILER_LOAD_DELAY 2500ms).
-function HC_HeroTrailerDelaySec() as float
-    return 2.5
-end function
-
 ' Max time the loading skeleton waits for the hero poster to paint before it drops
 ' anyway, so a slow/blocked image can never strand the shimmer on screen.
 function HC_HomeSkeletonMaxSec() as float
@@ -129,9 +124,8 @@ function HC_SelectWatchdogSec() as float
 end function
 
 ' How long row building may wait for the hero trailer to go live before it builds
-' anyway. The hero schedules its trailer ~2.5s after the poster paints, so this gives
-' the preview the render thread first; if a slide has no trailer, rows still appear
-' promptly. The rows shimmer keeps animating during this window.
+' anyway. Trailer resolve starts when the poster paints; this window gives the preview
+' the render thread first. If a slide has no trailer, rows still appear promptly.
 function HC_RowBuildGateSec() as float
     return 3.5
 end function

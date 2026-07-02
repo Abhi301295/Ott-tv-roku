@@ -36,6 +36,9 @@
   <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/MediaUrl.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/TrailerResolver.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/HeroBannerCinematic.brs" />
 
   <children>
@@ -167,9 +170,6 @@
 
     <Timer id="swipeTimer" repeat="true" duration="15" />
     <Timer id="slidePosterTimer" repeat="false" duration="0.15" />
-
-    <!-- Delay before fetching/loading the trailer (parity with TRAILER_LOAD_DELAY 2.5s). -->
-    <Timer id="trailerTimer" repeat="false" duration="2.5" />
 
     <Animation id="zoomAnim" duration="8" repeat="false" easeFunction="outCubic">
       <Vector2DFieldInterpolator id="zoomInterp" key="[0.0, 1.0]"
