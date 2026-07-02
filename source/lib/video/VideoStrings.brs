@@ -4,10 +4,6 @@ function CopyVideoSettings() as string
     return "Settings"
 end function
 
-function CopyVideoSpeed() as string
-    return "Speed"
-end function
-
 function CopyVideoQuality() as string
     return "Quality"
 end function

@@ -78,12 +78,6 @@ sub init()
     m.qualityOptions = []         ' [{ label, url, height }] — Auto + parsed variant ladder
     m.selectedQualityHeight = -1  ' -1 = Auto (ABR)
 
-    ' Playback speed (parity with settingPopUp.tsx speedItems). Roku's Video node has no
-    ' public variable-rate playback API, so the selection is tracked/highlighted and
-    ' applied best-effort; it does not re-rate HLS the way the web <video> playbackRate does.
-    m.speedOptions = [{ label: "0.5x", rate: 0.5 }, { label: "1x", rate: 1.0 }, { label: "2x", rate: 2.0 }]
-    m.selectedSpeed = 1.0
-
     ' Collapsible settings model (parity with settingPopUp.tsx accordion).
     m.sections = []               ' [{ kind:"quality"|"caption", title, expanded }]
     m.settingsFlat = []           ' flattened focusable rows (close + headers + options)
@@ -802,13 +796,10 @@ sub OpenSettings()
     ApplyControlColors()
 
     ' Build accordion sections (parity with settingPopUp.tsx): Quality (Auto + ladder)
-    ' and Caption (off + langs). Both start collapsed.
+    ' and Caption (off + langs). Speed is omitted — Roku Video has no variable-rate API.
     m.sections = []
     if m.qualityOptions.Count() > 0 then
         m.sections.Push({ kind: "quality", title: CopyVideoQuality(), expanded: false })
-    end if
-    if m.speedOptions.Count() > 0 then
-        m.sections.Push({ kind: "speed", title: CopyVideoSpeed(), expanded: false })
     end if
     if m.capOptions.Count() > 1 then
         m.sections.Push({ kind: "caption", title: CopyVideoCaptions(), expanded: false })
@@ -835,7 +826,6 @@ end sub
 ' The option list backing a section.
 function SectionOptions(section as object) as object
     if section.kind = "quality" then return m.qualityOptions
-    if section.kind = "speed" then return m.speedOptions
     return m.capOptions
 end function
 
@@ -950,7 +940,6 @@ end sub
 
 function OptionIsSelected(section as object, opt as object) as boolean
     if section.kind = "quality" then return opt.height = m.selectedQualityHeight
-    if section.kind = "speed" then return opt.rate = m.selectedSpeed
     return opt.lang = m.selectedSubtitle
 end function
 
@@ -1029,20 +1018,10 @@ sub SelectOption(si as integer, oi as integer)
     section = m.sections[si]
     if section.kind = "quality" then
         SelectQuality(oi)
-    else if section.kind = "speed" then
-        SelectSpeed(oi)
     else
         SelectCaption(oi)
     end if
     CloseSettings()
-end sub
-
-sub SelectSpeed(oi as integer)
-    if oi < 0 or oi >= m.speedOptions.Count() then return
-    m.selectedSpeed = m.speedOptions[oi].rate
-    ' Best-effort: Roku exposes no playbackRate on the Video node (only trick-mode FF/RW),
-    ' so unlike the web player the rate cannot be re-applied to the live HLS stream. The
-    ' selection is persisted/highlighted for parity with the React settings popup.
 end sub
 
 sub SelectQuality(oi as integer)
