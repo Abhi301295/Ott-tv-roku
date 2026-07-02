@@ -1,6 +1,18 @@
 ' Cinematic hero — parity heroBannerCinematic.tsx.
 ' ⚠ Parity Note: meta animates before poster on every slide (meta-first ordering);
 ' trailer auto-advance pauses while isVideoPlaying. Do not reorder meta/poster here.
+
+' API marks many hero keys as mpegurl while React still sets video.src without an .m3u8 extension.
+function BannerTrailerForceResolve(item as object) as boolean
+    if item = invalid or item.trailer = invalid or item.trailer.type = invalid then return false
+    return Instr(1, LCase(item.trailer.type.ToStr()), "mpegurl") > 0
+end function
+
+function DetailTrailerForceResolve(res as object) as boolean
+    if res = invalid or res.trailer = invalid or res.trailer.type = invalid then return false
+    return Instr(1, LCase(res.trailer.type.ToStr()), "mpegurl") > 0
+end function
+
 sub init()
     m.items = []
     m.activeIndex = 0
@@ -33,7 +45,6 @@ sub init()
     m.metaAnim = m.top.findNode("metaAnim")
 
     m.trailerVideo = m.top.findNode("trailerVideo")
-    m.trailerTimer = m.top.findNode("trailerTimer")
     m.videoFadeAnim = m.top.findNode("videoFadeAnim")
     m.posterGlowAnim = m.top.findNode("posterGlowAnim")
     m.trailerVideoParent = invalid
@@ -69,7 +80,18 @@ sub init()
     m.metaBeforePosterReady = false
     m.awaitingPosterReveal = false
     m.trailerCache = {}
+    m.trailerPlayCache = {}
+    m.trailerLastUrl = ""
+    m.trailerDetailRecoveryUsed = false
+    m.trailerFromDirectUrl = false
+    m.trailerDetailRecovery = false
+    m.trailerDetailPrefetch = false
+    m.detailResult = invalid
     m.detailTask = invalid
+    m.manifestProbeTask = invalid
+    m.manifestProbeUrl = ""
+    m.trailerResolveSeq = 0
+    m.manifestProbeSeq = 0
 
     m.viewportW = 1920
     ApplyViewportLayout()
@@ -78,12 +100,10 @@ sub init()
     m.zoomAnim.duration = HC_HeroZoomSec()
     if m.nextZoomAnim <> invalid then m.nextZoomAnim.duration = HC_HeroZoomSec()
     m.barAnim.duration = HC_HeroSwipeMs() / 1000.0
-    m.trailerTimer.duration = HC_HeroTrailerDelaySec()
     if m.metaAnim <> invalid then m.metaAnim.duration = HC_HeroMetaEntranceSec()
 
     m.swipeTimer.observeField("fire", "OnSwipeTimer")
     if m.slidePosterTimer <> invalid then m.slidePosterTimer.observeField("fire", "OnSlidePosterTimer")
-    m.trailerTimer.observeField("fire", "OnTrailerTimer")
     m.trailerVideo.observeField("state", "OnTrailerState")
     m.top.observeField("visible", "OnVisibleChanged")
     if m.activePoster <> invalid then m.activePoster.observeField("loadStatus", "OnActivePosterLoad")
@@ -309,7 +329,6 @@ sub OnBannerItemsChanged()
     PlayMetaEntrance()
     ApplySlides()
     ArmPosterRevealTimer()
-    if m.top.visible then ScheduleTrailer()
     if m.top.visible and m.items.Count() > 1 then StartSwipeTimer()
 end sub
 
@@ -802,44 +821,121 @@ end sub
 
 ' ── Trailer autoplay (parity with hero trailer fetch + HLS playback) ─────────
 
-' Reset any current trailer and arm the 2.5s load delay for the active slide.
+' Start resolving/loading the active slide's trailer as soon as the poster is ready.
 sub ScheduleTrailer()
     StopTrailer()
-    CancelDetailFetch()
-    if m.trailerTimer = invalid or ItemCount() < 1 then return
-    m.trailerTimer.control = "stop"
-    m.trailerTimer.control = "start"
+    BeginTrailerPrepare()
 end sub
 
-' Drop the in-flight detail request so a late response from a previous slide can never
-' resolve a trailer onto the wrong slide (stops poster/label/video desync).
-sub CancelDetailFetch()
-    if m.detailTask <> invalid then
-        m.detailTask.unobserveField("apiResult")
-        m.detailTask.control = "stop"
-        m.detailTask = invalid
-    end if
-end sub
-
-sub OnTrailerTimer()
-    if not m.top.visible then return
+sub BeginTrailerPrepare()
+    if not m.top.visible or ItemCount() < 1 then return
     item = ItemAt(m.activeIndex)
     if item = invalid then return
 
+    cached = CachedTrailerPlay(item)
+    if cached <> invalid and cached.url <> invalid and cached.url <> "" then
+        m.trailerFromDirectUrl = true
+        LoadTrailerWithFormat(cached.url, HeroNormalizeTrailerFmt(cached.url, cached.fmt))
+        return
+    end if
+
     url = DirectTrailerUrl(item)
     if url <> "" then
-        LoadTrailer(url)
+        m.trailerFromDirectUrl = true
+        if BannerTrailerNeedsFreshUrl(item, url) then
+            FetchTrailerDetailPrefetch(item)
+            return
+        end if
+        StartTrailerResolve(url, BannerTrailerForceResolve(item))
         return
     end if
 
     id = ""
     if item._id <> invalid then id = item._id
     if id <> "" and m.trailerCache[id] <> invalid then
-        LoadTrailer(m.trailerCache[id])
+        StartTrailerResolve(m.trailerCache[id])
         return
     end if
 
     FetchTrailerDetail(item)
+end sub
+
+' Presigned banner keys often 403 on probe; detail returns a fresh playable URL.
+function BannerTrailerNeedsFreshUrl(item as object, url as string) as boolean
+    if url = "" then return false
+    streamUrl = MediaStreamUrl(url)
+    if not TrailerUrlIsPresigned(streamUrl) then return false
+    return BannerTrailerForceResolve(item) or TrailerNeedsResolve(streamUrl)
+end function
+
+function CachedTrailerPlay(item as object) as object
+    if item = invalid or item._id = invalid then return invalid
+    id = item._id
+    if id = "" then return invalid
+    cached = m.trailerPlayCache[id]
+    if cached = invalid then return invalid
+    if not CachedTrailerUrlIsValid(cached.url) then
+        m.trailerPlayCache.Delete(id)
+        return invalid
+    end if
+    return cached
+end function
+
+function CachedTrailerUrlIsValid(url as string) as boolean
+    if url = "" then return false
+    if TrailerUrlIsPresigned(url) then return true
+    lc = LCase(url)
+    if Left(lc, 4) = "http" and Instr(1, lc, ".mp4") > 0 then return true
+    return false
+end function
+
+function HeroNormalizeTrailerFmt(url as string, fmt as string) as string
+    if url = "" then return fmt
+    lc = LCase(url)
+    if Instr(1, lc, ".mp4") > 0 then return "mp4"
+    if Instr(1, lc, ".m3u8") > 0 or Instr(1, lc, ".ts") > 0 then return "hls"
+    return fmt
+end function
+
+sub CacheResolvedTrailer(url as string, fmt as string, path as string)
+    if path = "hls_direct" or path = "manifest_hls" then return
+    if not CachedTrailerUrlIsValid(url) then return
+    item = ItemAt(m.activeIndex)
+    if item = invalid or item._id = invalid then return
+    id = item._id
+    if id = "" then return
+    fmt = HeroNormalizeTrailerFmt(url, fmt)
+    if m.trailerPlayCache.Count() >= 5 then
+        for each k in m.trailerPlayCache
+            m.trailerPlayCache.Delete(k)
+            exit for
+        end for
+    end if
+    m.trailerPlayCache[id] = { url: url, fmt: fmt }
+end sub
+
+sub FetchTrailerDetailPrefetch(item as object)
+    m.trailerDetailPrefetch = true
+    m.trailerFromDirectUrl = true
+    FetchTrailerDetail(item)
+end sub
+
+' Drop in-flight detail/manifest work without clearing prefetch/recovery intent.
+sub CancelDetailTasks()
+    if m.detailTask <> invalid then
+        m.detailTask.unobserveField("apiResult")
+        m.detailTask.control = "stop"
+        m.detailTask = invalid
+    end if
+    CancelManifestProbe()
+end sub
+
+' Drop the in-flight detail request so a late response from a previous slide can never
+' resolve a trailer onto the wrong slide (stops poster/label/video desync).
+sub CancelDetailFetch()
+    m.trailerDetailPrefetch = false
+    m.trailerDetailRecovery = false
+    CancelDetailTasks()
 end sub
 
 ' item.trailer.url is prioritised over item.preview.url (parity fetchTrailerUrl).
@@ -854,6 +950,102 @@ function DirectTrailerUrl(item as object) as string
     return ""
 end function
 
+function DirectTrailerStreamFormat(item as object, url as string) as string
+    ' Parity loadTrailer(): format from URL extension only — trailer.type is not consulted.
+    return VideoStreamFormat(url)
+end function
+
+' Extension-less keys are resolved before play (browser-style sniff + segment discovery).
+sub CancelManifestProbe()
+    if m.manifestProbeTask <> invalid then
+        m.trailerResolveSeq = m.trailerResolveSeq + 1
+        m.manifestProbeTask.unobserveField("resolvePath")
+        m.manifestProbeTask.control = "stop"
+        m.manifestProbeTask = invalid
+    end if
+    m.manifestProbeUrl = ""
+end sub
+
+sub StartTrailerResolve(url as string, forceResolve = false as boolean)
+    if url = "" then return
+    url = MediaStreamUrl(url)
+    if not forceResolve and not TrailerNeedsResolve(url) then
+        LoadTrailerWithFormat(url, TrailerStreamFormat(url))
+        return
+    end if
+
+    CancelManifestProbe()
+    m.trailerResolveSeq = m.trailerResolveSeq + 1
+    m.manifestProbeSeq = m.trailerResolveSeq
+    m.manifestProbeUrl = url
+
+    task = CreateObject("roSGNode", "ManifestTask")
+    task.manifestUrl = url
+    task.resolvedUrl = ""
+    task.resolvePath = ""
+    task.streamFormat = ""
+    task.fetchStatus = 0
+    task.done = false
+    task.forceProbe = forceResolve
+    m.manifestProbeTask = task
+    task.observeField("resolvePath", "OnTrailerResolveDone")
+    task.control = "RUN"
+end sub
+
+sub OnTrailerResolveDone()
+    if m.manifestProbeTask = invalid then return
+    if m.manifestProbeSeq <> m.trailerResolveSeq then return
+
+    reqIdx = m.activeIndex
+    task = m.manifestProbeTask
+    resolved = task.resolvedUrl
+    fmt = task.streamFormat
+    path = task.resolvePath
+
+    if path = "" and (resolved = invalid or resolved = "") then return
+
+    CancelManifestProbe()
+
+    if reqIdx <> m.activeIndex or not m.top.visible then return
+    if resolved = invalid or resolved = "" then return
+
+    if path = "hls_direct" or path = "manifest_hls" then
+        if TryTrailerRecovery() then return
+        RevealPoster()
+        return
+    end if
+
+    fmt = HeroNormalizeTrailerFmt(resolved, fmt)
+    CacheResolvedTrailer(resolved, fmt, path)
+    LoadTrailerWithFormat(resolved, fmt)
+end sub
+
+function TrailerUrlFromDetail(res as object, trailerOnly as boolean) as string
+    if res = invalid then return ""
+    url = ""
+    if trailerOnly then
+        if res.trailer <> invalid and res.trailer.url <> invalid and res.trailer.url <> "" then
+            url = res.trailer.url
+        end if
+        if url = "" and res.preview <> invalid and res.preview.url <> invalid and res.preview.url <> "" then
+            url = res.preview.url
+        end if
+        return MediaStreamUrl(url)
+    end if
+    if res.playList <> invalid and res.playList.hls <> invalid and res.playList.hls.url <> invalid then
+        url = res.playList.hls.url
+    end if
+    if url = "" and res.preview <> invalid and res.preview.url <> invalid and res.preview.url <> "" then
+        url = res.preview.url
+    end if
+    return MediaStreamUrl(url)
+end function
+
+sub FetchTrailerDetailRecovery(item as object)
+    m.trailerDetailRecovery = true
+    FetchTrailerDetail(item)
+end sub
+
 sub FetchTrailerDetail(item as object)
     id = ""
     if item._id <> invalid then id = item._id
@@ -861,9 +1053,7 @@ sub FetchTrailerDetail(item as object)
     if item.type <> invalid then tp = item.type
     if id = "" or tp = "" then return
 
-    ' Cancel any previous request before starting a new one — only the live request may
-    ' call back, so OnDetailResponse always reads the task for the CURRENT slide.
-    CancelDetailFetch()
+    CancelDetailTasks()
 
     path = Endpoints().DETAIL.CONTENT_VIEW + "/" + id
     task = ApiGetQuery(path, { type: tp })
@@ -878,21 +1068,60 @@ sub OnDetailResponse()
     if m.detailTask = invalid then return
     api = m.detailTask.apiResult
     m.detailTask = invalid
-    if api = invalid or api.ok <> true or api.result = invalid then return
+    recovering = m.trailerDetailRecovery
+    if recovering then m.trailerDetailRecovery = false
+    prefetching = m.trailerDetailPrefetch
+    if prefetching then m.trailerDetailPrefetch = false
 
-    res = api.result
-    ' Same resolution order as fetchTrailerUrl() in heroBannerCinematic.tsx.
-    url = ""
-    if res.playList <> invalid and res.playList.hls <> invalid and res.playList.hls.url <> invalid then
-        url = res.playList.hls.url
-    end if
-    if url = "" and res.preview <> invalid and res.preview.url <> invalid then
-        url = res.preview.url
-    end if
-    ' No trailer/preview for this slide — poster simply stays for the fixed window.
-    if url = "" then
+    if api = invalid or api.ok <> true or api.result = invalid then
+        if (recovering or prefetching) and m.detailReqIndex = m.activeIndex and m.top.visible then
+            if prefetching then
+                item = ItemAt(m.activeIndex)
+                url = DirectTrailerUrl(item)
+                if url <> "" then
+                    StartTrailerResolve(url, BannerTrailerForceResolve(item))
+                else
+                    RevealPoster()
+                end if
+            else
+                RevealPoster()
+            end if
+        end if
         return
     end if
+
+    res = api.result
+    m.detailResult = res
+
+    if prefetching then
+        url = TrailerUrlFromDetail(res, true)
+        if m.detailReqIndex <> m.activeIndex or not m.top.visible then return
+        if url = "" then
+            item = ItemAt(m.activeIndex)
+            bannerUrl = DirectTrailerUrl(item)
+            if bannerUrl <> "" then
+                StartTrailerResolve(bannerUrl, BannerTrailerForceResolve(item))
+            end if
+            return
+        end if
+        StartTrailerResolve(url, true)
+        return
+    end if
+
+    if recovering then
+        url = TrailerUrlFromDetail(res, true)
+        if m.detailReqIndex <> m.activeIndex or not m.top.visible then return
+        if url = "" then
+            RevealPoster()
+            return
+        end if
+        m.trailerFromDirectUrl = false
+        StartTrailerResolve(url, DetailTrailerForceResolve(res))
+        return
+    end if
+
+    url = TrailerUrlFromDetail(res, false)
+    if url = "" then return
 
     if m.detailItemId <> invalid and m.detailItemId <> "" then
         if m.trailerCache.Count() >= 5 then
@@ -904,25 +1133,61 @@ sub OnDetailResponse()
         m.trailerCache[m.detailItemId] = url
     end if
 
-    ' Only start if the user is still on the slide we fetched for.
     if m.detailReqIndex = m.activeIndex and m.top.visible then
-        LoadTrailer(url)
-    else
+        StartTrailerResolve(url, DetailTrailerForceResolve(res))
     end if
 end sub
 
-sub LoadTrailer(url as string)
+sub ResetTrailerLoadFlags()
+    m.trailerDetailRecoveryUsed = false
+    m.trailerFromDirectUrl = false
+    m.trailerDetailRecovery = false
+    m.trailerDetailPrefetch = false
+end sub
+
+function IsTrailerDetailPending() as boolean
+    return m.detailTask <> invalid or m.trailerDetailRecovery = true or m.trailerDetailPrefetch = true or m.manifestProbeTask <> invalid
+end function
+
+function TryTrailerRecovery() as boolean
+    if m.trailerDetailRecoveryUsed then return false
+    m.trailerDetailRecoveryUsed = true
+    m.isVideoPlaying = false
+    m.top.trailerPlaying = false
+    item = ItemAt(m.activeIndex)
+    if item = invalid then return false
+    m.trailerFromDirectUrl = true
+    FetchTrailerDetailRecovery(item)
+    return true
+end function
+
+function IsPrematureTrailerFinish() as boolean
+    if m.trailerVideo = invalid then return false
+    dur = m.trailerVideo.duration
+    playbackPos = m.trailerVideo.position
+    if dur = invalid or dur <= 5 then return false
+    if playbackPos >= dur - 3 then return false
+    return true
+end function
+
+sub LoadTrailerWithFormat(url as string, formatOverride as string, isFormatRetry = false as boolean)
     if m.trailerVideo = invalid or url = "" then return
+    if not isFormatRetry then
+        fromDirect = m.trailerFromDirectUrl
+        ResetTrailerLoadFlags()
+        m.trailerFromDirectUrl = fromDirect
+    end if
+    url = MediaStreamUrl(url)
+    item = ItemAt(m.activeIndex)
+    fmt = formatOverride
+    if fmt = "" then fmt = DirectTrailerStreamFormat(item, url)
+    m.trailerLastUrl = url
     m.playingForIndex = m.activeIndex
     m.trailerVideo.control = "stop"
     m.trailerVideo.content = invalid
     content = CreateObject("roSGNode", "ContentNode")
     content.url = url
-    if Instr(1, LCase(url), ".m3u8") > 0 then
-        content.streamFormat = "hls"
-    else
-        content.streamFormat = "mp4"
-    end if
+    content.streamFormat = fmt
     m.trailerVideo.mute = true
     HideTrailerVideo()
     m.trailerVideo.seek = 0
@@ -934,7 +1199,6 @@ sub OnTrailerState()
     if m.trailerVideo = invalid then return
     state = m.trailerVideo.state
 
-    ' Ignore state from a stream that belongs to a slide we've already left.
     if m.playingForIndex <> m.activeIndex then
         if state = "playing" or state = "buffering" then
             m.trailerVideo.control = "stop"
@@ -963,10 +1227,15 @@ sub OnTrailerState()
             ArmTrailerDurationObserver()
         end if
     else if state = "finished" then
-        ' Parity handleEnded: the trailer ended, so advance to the next slide now.
+        if IsPrematureTrailerFinish() then
+            if IsTrailerDetailPending() then return
+            if TryTrailerRecovery() then return
+            RevealPoster()
+            return
+        end if
         AdvanceAfterTrailer()
     else if state = "error" then
-        ' Stall/error: fall back to the poster and resume the fixed auto-advance window.
+        if TryTrailerRecovery() then return
         RevealPoster()
     end if
 end sub
@@ -1026,7 +1295,9 @@ end sub
 
 ' Fully tear down the trailer (slide change / banner hidden). Poster is restored.
 sub StopTrailer()
-    if m.trailerTimer <> invalid then m.trailerTimer.control = "stop"
+    ResetTrailerLoadFlags()
+    CancelDetailFetch()
+    CancelManifestProbe()
     if m.videoFadeAnim <> invalid then m.videoFadeAnim.control = "stop"
     if m.trailerVideo <> invalid then
         DetachTrailerDurationObserver()

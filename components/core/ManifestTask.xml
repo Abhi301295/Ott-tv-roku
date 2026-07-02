@@ -5,8 +5,17 @@
 <component name="ManifestTask" extends="Task">
   <interface>
     <field id="manifestUrl" type="string" />
+    <field id="httpCookies" type="string" />
     <field id="levels" type="array" />
+    <field id="firstMediaUrl" type="string" />
+    <field id="isHlsManifest" type="boolean" value="false" />
+    <field id="fetchStatus" type="integer" value="0" />
+    <field id="resolvedUrl" type="string" />
+    <field id="streamFormat" type="string" />
+    <field id="resolvePath" type="string" alwaysNotify="true" />
+    <field id="forceProbe" type="boolean" value="false" />
     <field id="done" type="boolean" value="false" alwaysNotify="true" />
   </interface>
+  <script type="text/brightscript" uri="pkg:/source/lib/video/TrailerResolver.brs" />
   <script type="text/brightscript" uri="pkg:/components/core/ManifestTask.brs" />
 </component>
