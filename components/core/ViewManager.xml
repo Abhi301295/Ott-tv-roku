@@ -18,6 +18,9 @@
     <function name="GetHomeBootCacheEntry" />
     <function name="SetHomeBootCacheEntry" />
     <function name="ClearHomeBootCacheEntry" />
+    <function name="MarkHomeCatalogDirty" />
+    <function name="IsHomeCatalogDirty" />
+    <function name="ClearHomeCatalogDirty" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />

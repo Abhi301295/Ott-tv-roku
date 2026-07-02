@@ -3,6 +3,8 @@ sub init()
     m.cardsHost = m.top.findNode("cardsHost")
     m.cards = []
     m.cardWidths = []
+    m.cardItemIds = []
+    m.suppressCategoryRebuild = false
     m.seeAllOrientation = HC_CardTypeVertical()
     if m.rowTitle <> invalid then m.rowTitle.opacity = 0.0
     ApplyRowTitleFont()
@@ -45,6 +47,10 @@ sub init()
 end sub
 
 sub OnCategoryChanged()
+    if m.suppressCategoryRebuild = true then
+        m.suppressCategoryRebuild = false
+        return
+    end if
     BuildRowCards()
 end sub
 
@@ -310,6 +316,7 @@ sub AppendNextCardFromPlan()
         w = CardComponentWidth("SeeAllCard", m.seeAllOrientation)
         m.cards.Push(seeAll)
         m.cardWidths.Push(w)
+        m.cardItemIds.Push("__see_all__")
         m.buildX = m.buildX + w + gap
     else
         card = m.cardsHost.createChild(plan.comp)
@@ -319,6 +326,9 @@ sub AppendNextCardFromPlan()
         w = CardComponentWidth(plan.comp)
         m.cards.Push(card)
         m.cardWidths.Push(w)
+        itemId = ""
+        if plan.item <> invalid and plan.item._id <> invalid then itemId = plan.item._id
+        m.cardItemIds.Push(itemId)
         m.buildX = m.buildX + w + gap
     end if
 
@@ -584,6 +594,7 @@ sub ClearCards()
     m.shellCat = invalid
     m.cards = []
     m.cardWidths = []
+    m.cardItemIds = []
     if m.cardsHost = invalid then return
     count = m.cardsHost.getChildCount()
     for i = count - 1 to 0 step -1
@@ -593,3 +604,298 @@ sub ClearCards()
     m.top.mediaReady = false
     m.top.paintedReady = false
 end sub
+
+' ── Continue Watching in-place refresh (home resume after playback) ───────────
+
+function CwItemId(item as object) as string
+    if item = invalid then return ""
+    if item._id <> invalid then return item._id
+    return ""
+end function
+
+function CwSlotIdForPlanEntry(p as object) as string
+    if p = invalid then return ""
+    if p.kind = "seeAll" then return "__see_all__"
+    return CwItemId(p.item)
+end function
+
+function CwNormalizeSlotId(slotId as string) as string
+    if slotId = "" then return "__see_all__"
+    return slotId
+end function
+
+sub EnsureCardItemIdsFromPlan(plan as object)
+    if plan = invalid then return
+    if m.cardItemIds.Count() = m.cards.Count() and m.cardItemIds.Count() > 0 then return
+    m.cardItemIds = []
+    for i = 0 to plan.Count() - 1
+        m.cardItemIds.Push(CwSlotIdForPlanEntry(plan[i]))
+    end for
+end sub
+
+function CwIdsMatchPlan(plan as object) as boolean
+    if plan = invalid then return false
+    if plan.Count() <> m.cards.Count() then return false
+    for i = 0 to plan.Count() - 1
+        want = CwSlotIdForPlanEntry(plan[i])
+        have = ""
+        if m.cardItemIds.Count() > i then have = CwNormalizeSlotId(m.cardItemIds[i])
+        if have <> want then return false
+    end for
+    return true
+end function
+
+function CwExistingPrefixMatchesPlan(plan as object) as boolean
+    if plan = invalid then return false
+    n = plan.Count()
+    if m.cards.Count() <= n then return false
+    for i = 0 to n - 1
+        want = CwSlotIdForPlanEntry(plan[i])
+        have = ""
+        if m.cardItemIds.Count() > i then have = CwNormalizeSlotId(m.cardItemIds[i])
+        if have <> want then return false
+    end for
+    return true
+end function
+
+function CwPrefixOfPlanMatchesCards(plan as object) as boolean
+    if plan = invalid then return false
+    n = m.cards.Count()
+    if plan.Count() <= n then return false
+    for i = 0 to n - 1
+        want = CwSlotIdForPlanEntry(plan[i])
+        have = ""
+        if m.cardItemIds.Count() > i then have = CwNormalizeSlotId(m.cardItemIds[i])
+        if have <> want then return false
+    end for
+    return true
+end function
+
+sub PatchCwPlanSlots(plan as object)
+    if plan = invalid then return
+    for i = 0 to plan.Count() - 1
+        p = plan[i]
+        if p = invalid or p.kind <> "card" then continue for
+        if i >= m.cards.Count() then continue for
+        PatchCwCardProgress(m.cards[i], p.item)
+    end for
+end sub
+
+sub FinalizeCwRowAfterPatch()
+    m.buildComplete = true
+    m.buildActive = false
+    m.top.cardCount = m.cards.Count()
+    OnCardFocusChanged()
+end sub
+
+' Planning pass with no row-title / opacity side effects (safe during live paint).
+function PlanRowCardsData(cat as object) as object
+    if cat = invalid then return invalid
+
+    rowType = ""
+    if cat.type <> invalid then rowType = cat.type
+    cardType = HC_CardTypeVertical()
+    if cat.cardType <> invalid and cat.cardType <> "" then cardType = cat.cardType
+
+    items = cat.result
+    if items = invalid or items.Count() = 0 then return invalid
+
+    compName = CardComponentForRow(rowType, cardType)
+    if compName = "BannerCard" and rowType <> HC_PromotionalCard() then return invalid
+
+    maxItems = items.Count()
+    if rowType <> HC_PromotionalCard() then
+        limit = HC_SeeAllThreshold() + 1
+        if maxItems > limit then maxItems = limit
+    else
+        maxItems = 1
+    end if
+
+    plan = []
+    for i = 0 to maxItems - 1
+        item = items[i]
+        if item <> invalid then
+            plan.Push({ kind: "card", item: item, comp: compName, cardType: cardType, rank: i })
+        end if
+    end for
+    if rowType <> HC_PromotionalCard() and items.Count() >= HC_SeeAllThreshold() + 1 then
+        plan.Push({ kind: "seeAll" })
+    end if
+    return plan
+end function
+
+sub AppendCwPlanEntry(plan as object)
+    if plan = invalid then return
+    gap = HC_CardGap()
+
+    if plan.kind = "seeAll" then
+        seeAll = m.cardsHost.createChild("SeeAllCard")
+        seeAll.orientation = m.seeAllOrientation
+        CardInjectTheme(seeAll, m.top.cPrimary500, m.top.cPrimary600, m.top.cPrimary700, m.top.cNeutral50, m.top.cNeutral800, m.top.cNeutral700)
+        seeAll.translation = [m.buildX, 0]
+        w = CardComponentWidth("SeeAllCard", m.seeAllOrientation)
+        m.cards.Push(seeAll)
+        m.cardWidths.Push(w)
+        m.cardItemIds.Push("__see_all__")
+        m.buildX = m.buildX + w + gap
+    else if plan.kind = "card" then
+        card = m.cardsHost.createChild(plan.comp)
+        ConfigureCard(card, plan.comp, plan.item, plan.cardType, plan.rank)
+        card.translation = [m.buildX, 0]
+        w = CardComponentWidth(plan.comp)
+        m.cards.Push(card)
+        m.cardWidths.Push(w)
+        m.cardItemIds.Push(CwItemId(plan.item))
+        m.buildX = m.buildX + w + gap
+        idx = m.cards.Count() - 1
+        if card.hasField("focusedState") then card.focusedState = (idx = m.top.cardFocusIndex)
+    end if
+    m.top.cardCount = m.cards.Count()
+end sub
+
+sub PatchCwCardProgress(card as object, item as object)
+    if card = invalid or item = invalid then return
+    pct = GetContinueProgressPercent(item)
+    if card.hasField("progress") then card.progress = pct
+end sub
+
+sub SyncCategoryDataSilent(cat as object)
+    m.suppressCategoryRebuild = true
+    m.top.categoryData = cat
+end sub
+
+sub TrimCwCardsFromIndex(fromIdx as integer)
+    if fromIdx < 0 then fromIdx = 0
+    while m.cards.Count() > fromIdx
+        idx = m.cards.Count() - 1
+        card = m.cards[idx]
+        CardDetachMediaObservers(card)
+        if m.cardsHost <> invalid then m.cardsHost.removeChild(card)
+        m.cards.Pop()
+        if m.cardItemIds.Count() > idx then m.cardItemIds.Pop()
+        if m.cardWidths.Count() > idx then m.cardWidths.Pop()
+    end while
+    RecalcCwStripLayout()
+    m.top.cardCount = m.cards.Count()
+end sub
+
+sub RecalcCwStripLayout()
+    gap = HC_CardGap()
+    x = 0
+    for i = 0 to m.cards.Count() - 1
+        card = m.cards[i]
+        if card = invalid then continue for
+        card.translation = [x, 0]
+        w = 0
+        if m.cardWidths.Count() > i then w = m.cardWidths[i]
+        x = x + w + gap
+    end for
+    m.buildX = x
+end sub
+
+sub AppendCwCardFromPlan(plan as object)
+    AppendCwPlanEntry(plan)
+end sub
+
+' Drop card nodes but keep the revealed strip visible (no skeleton re-arm).
+sub ClearCwCardsPreserveReveal()
+    if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+    if m.revealTimer <> invalid then m.revealTimer.control = "stop"
+    if m.paintTimer <> invalid then m.paintTimer.control = "stop"
+    for each card in m.cards
+        CardDetachMediaObservers(card)
+    end for
+    m.buildPlan = []
+    m.buildIdx = 0
+    m.buildX = 0
+    m.pendingMediaLoads = 0
+    m.buildComplete = false
+    m.buildActive = false
+    m.shellCat = invalid
+    m.cards = []
+    m.cardWidths = []
+    m.cardItemIds = []
+    if m.cardsHost = invalid then return
+    count = m.cardsHost.getChildCount()
+    for i = count - 1 to 0 step -1
+        m.cardsHost.removeChildIndex(i)
+    end for
+    m.top.cardCount = 0
+end sub
+
+sub RebuildCwRowPreserveReveal(cat as object)
+    plan = PlanRowCardsData(cat)
+    if plan = invalid then return
+    hostOp = 1.0
+    titleOp = 1.0
+    if m.cardsHost <> invalid then hostOp = m.cardsHost.opacity
+    if m.rowTitle <> invalid then titleOp = m.rowTitle.opacity
+    ClearCwCardsPreserveReveal()
+    m.buildPlan = plan
+    m.buildIdx = 0
+    m.buildX = 0
+    m.buildComplete = false
+    m.buildActive = true
+    while m.buildIdx < m.buildPlan.Count()
+        AppendNextCardFromPlan()
+    end while
+    FinishCardBuildIfDone()
+    if m.cardsHost <> invalid then m.cardsHost.opacity = hostOp
+    if m.rowTitle <> invalid then m.rowTitle.opacity = titleOp
+    if m.top.paintedReady <> true then m.top.paintedReady = true
+    if m.top.mediaReady <> true then m.top.mediaReady = true
+    FinalizeCwRowAfterPatch()
+end sub
+
+' Returns true when the row was patched without a full strip teardown.
+function PatchContinueWatching(cat as object) as boolean
+    if cat = invalid then return false
+    if m.buildComplete <> true then return false
+    tp = ""
+    if cat.type <> invalid then tp = cat.type
+    if tp <> HC_TypeContinueWatching() then return false
+
+    plan = PlanRowCardsData(cat)
+    if plan = invalid then return false
+    if plan.Count() = 0 then return false
+
+    EnsureCardItemIdsFromPlan(plan)
+
+    ' Same visible strip (content + See All) — update progress bars in place.
+    if plan.Count() = m.cards.Count() and CwIdsMatchPlan(plan) then
+        PatchCwPlanSlots(plan)
+        SyncCategoryDataSilent(cat)
+        FinalizeCwRowAfterPatch()
+        print "[CONTENT_ROW_DBG] PatchContinueWatching progress_only slots="; plan.Count()
+        return true
+    end if
+
+    ' Shorter row — tail cards removed (e.g. finished watching).
+    if CwExistingPrefixMatchesPlan(plan) then
+        TrimCwCardsFromIndex(plan.Count())
+        PatchCwPlanSlots(plan)
+        SyncCategoryDataSilent(cat)
+        FinalizeCwRowAfterPatch()
+        print "[CONTENT_ROW_DBG] PatchContinueWatching trimmed slots="; plan.Count()
+        return true
+    end if
+
+    ' Longer row — append new slots at the end; prefix unchanged.
+    if CwPrefixOfPlanMatchesCards(plan) then
+        PatchCwPlanSlots(plan)
+        for i = m.cards.Count() to plan.Count() - 1
+            AppendCwPlanEntry(plan[i])
+        end for
+        SyncCategoryDataSilent(cat)
+        FinalizeCwRowAfterPatch()
+        print "[CONTENT_ROW_DBG] PatchContinueWatching appended slots="; plan.Count()
+        return true
+    end if
+
+    ' Order or membership changed — rebuild nodes but keep the strip visible.
+    print "[CONTENT_ROW_DBG] PatchContinueWatching resync slots="; plan.Count()
+    RebuildCwRowPreserveReveal(cat)
+    SyncCategoryDataSilent(cat)
+    FinalizeCwRowAfterPatch()
+    return true
+end function

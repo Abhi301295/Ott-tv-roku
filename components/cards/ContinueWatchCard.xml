@@ -3,7 +3,7 @@
 <component name="ContinueWatchCard" extends="Group">
   <interface>
     <field id="thumbnailUri" type="string" value="" onChange="OnDataChanged" />
-    <field id="progress" type="float" value="0.0" onChange="OnDataChanged" />
+    <field id="progress" type="float" value="0.0" onChange="OnProgressChanged" />
     <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="loaded" type="boolean" value="false" alwaysNotify="true" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
