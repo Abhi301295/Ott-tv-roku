@@ -38,6 +38,7 @@ sub init()
     m.counterTotal = m.top.findNode("counterTotal")
     m.swipeTimer = m.top.findNode("swipeTimer")
     m.slidePosterTimer = m.top.findNode("slidePosterTimer")
+    m.trailerLoadTimer = m.top.findNode("trailerLoadTimer")
     m.zoomAnim = m.top.findNode("zoomAnim")
     m.nextZoomAnim = m.top.findNode("nextZoomAnim")
     m.barAnim = m.top.findNode("barAnim")
@@ -92,6 +93,7 @@ sub init()
     m.manifestProbeUrl = ""
     m.trailerResolveSeq = 0
     m.manifestProbeSeq = 0
+    m.trailerLoadReady = false
 
     m.viewportW = 1920
     ApplyViewportLayout()
@@ -104,6 +106,10 @@ sub init()
 
     m.swipeTimer.observeField("fire", "OnSwipeTimer")
     if m.slidePosterTimer <> invalid then m.slidePosterTimer.observeField("fire", "OnSlidePosterTimer")
+    if m.trailerLoadTimer <> invalid then
+        m.trailerLoadTimer.duration = HC_HeroTrailerDelaySec()
+        m.trailerLoadTimer.observeField("fire", "OnTrailerLoadTimer")
+    end if
     m.trailerVideo.observeField("state", "OnTrailerState")
     m.top.observeField("visible", "OnVisibleChanged")
     if m.activePoster <> invalid then m.activePoster.observeField("loadStatus", "OnActivePosterLoad")
@@ -821,23 +827,37 @@ end sub
 
 ' ── Trailer autoplay (parity with hero trailer fetch + HLS playback) ─────────
 
-' Start resolving/loading the active slide's trailer as soon as the poster is ready.
+' Resolve in the background when the poster is ready; playback waits TRAILER_LOAD_DELAY.
 sub ScheduleTrailer()
     StopTrailer()
-    BeginTrailerPrepare()
+    BeginTrailerPrefetch()
+    StartTrailerLoadTimer()
 end sub
 
-sub BeginTrailerPrepare()
+sub StartTrailerLoadTimer()
+    if m.trailerLoadTimer = invalid then return
+    m.trailerLoadTimer.duration = HC_HeroTrailerDelaySec()
+    m.trailerLoadTimer.control = "stop"
+    m.trailerLoadTimer.control = "start"
+end sub
+
+sub StopTrailerLoadTimer()
+    if m.trailerLoadTimer <> invalid then m.trailerLoadTimer.control = "stop"
+end sub
+
+sub OnTrailerLoadTimer()
+    if not m.top.visible then return
+    m.trailerLoadReady = true
+    TryPlayTrailerForActiveSlide()
+end sub
+
+' Prefetch only — never starts Video playback before the load-delay timer fires.
+sub BeginTrailerPrefetch()
     if not m.top.visible or ItemCount() < 1 then return
     item = ItemAt(m.activeIndex)
     if item = invalid then return
 
-    cached = CachedTrailerPlay(item)
-    if cached <> invalid and cached.url <> invalid and cached.url <> "" then
-        m.trailerFromDirectUrl = true
-        LoadTrailerWithFormat(cached.url, HeroNormalizeTrailerFmt(cached.url, cached.fmt))
-        return
-    end if
+    if CachedTrailerPlay(item) <> invalid then return
 
     url = DirectTrailerUrl(item)
     if url <> "" then
@@ -858,6 +878,55 @@ sub BeginTrailerPrepare()
     end if
 
     FetchTrailerDetail(item)
+end sub
+
+sub TryPlayTrailerForActiveSlide()
+    if not m.top.visible or ItemCount() < 1 then return
+    item = ItemAt(m.activeIndex)
+    if item = invalid then return
+
+    cached = CachedTrailerPlay(item)
+    if cached <> invalid and cached.url <> invalid and cached.url <> "" then
+        m.trailerFromDirectUrl = true
+        LoadTrailerWithFormat(cached.url, HeroNormalizeTrailerFmt(cached.url, cached.fmt))
+        return
+    end if
+
+    if IsTrailerDetailPending() then return
+
+    BeginTrailerPlayFallback()
+end sub
+
+sub BeginTrailerPlayFallback()
+    if not m.top.visible or ItemCount() < 1 then return
+    item = ItemAt(m.activeIndex)
+    if item = invalid then return
+
+    url = DirectTrailerUrl(item)
+    if url <> "" then
+        m.trailerFromDirectUrl = true
+        if BannerTrailerNeedsFreshUrl(item, url) then
+            FetchTrailerDetailPrefetch(item)
+            return
+        end if
+        StartTrailerResolve(url, BannerTrailerForceResolve(item))
+        return
+    end if
+
+    id = ""
+    if item._id <> invalid then id = item._id
+    if id <> "" and m.trailerCache[id] <> invalid then
+        StartTrailerResolve(m.trailerCache[id])
+        return
+    end if
+
+    FetchTrailerDetail(item)
+end sub
+
+sub MaybeLoadTrailer(url as string, fmt as string, immediate = false as boolean)
+    if url = "" then return
+    if not immediate and not m.trailerLoadReady then return
+    LoadTrailerWithFormat(url, fmt)
 end sub
 
 ' Presigned banner keys often 403 on probe; detail returns a fresh playable URL.
@@ -970,7 +1039,9 @@ sub StartTrailerResolve(url as string, forceResolve = false as boolean)
     if url = "" then return
     url = MediaStreamUrl(url)
     if not forceResolve and not TrailerNeedsResolve(url) then
-        LoadTrailerWithFormat(url, TrailerStreamFormat(url))
+        fmt = TrailerStreamFormat(url)
+        CacheResolvedTrailer(url, fmt, "direct")
+        MaybeLoadTrailer(url, fmt)
         return
     end if
 
@@ -1017,7 +1088,7 @@ sub OnTrailerResolveDone()
 
     fmt = HeroNormalizeTrailerFmt(resolved, fmt)
     CacheResolvedTrailer(resolved, fmt, path)
-    LoadTrailerWithFormat(resolved, fmt)
+    MaybeLoadTrailer(resolved, fmt)
 end sub
 
 function TrailerUrlFromDetail(res as object, trailerOnly as boolean) as string
@@ -1295,6 +1366,8 @@ end sub
 
 ' Fully tear down the trailer (slide change / banner hidden). Poster is restored.
 sub StopTrailer()
+    m.trailerLoadReady = false
+    StopTrailerLoadTimer()
     ResetTrailerLoadFlags()
     CancelDetailFetch()
     CancelManifestProbe()
