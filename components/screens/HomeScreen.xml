@@ -4,6 +4,7 @@
 <component name="HomeScreen" extends="Group">
   <interface>
     <field id="navState" type="assocarray" onChange="OnNavStateReady" />
+    <field id="stackResumed" type="boolean" value="false" alwaysNotify="true" onChange="OnStackResumed" />
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
     <field id="shellEnterContent" type="boolean" value="false" alwaysNotify="true" onChange="OnShellEnterContent" />
     <field id="shellEnterAction" type="string" value="" />
@@ -30,11 +31,13 @@
   <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeBootCache.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeCatalogDirty.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomePerf.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/ContentRowCatalogue.brs" />
   <script type="text/brightscript" uri="pkg:/components/home/HomeBoot.brs" />
+  <script type="text/brightscript" uri="pkg:/components/home/HomeResumeRefresh.brs" />
   <script type="text/brightscript" uri="pkg:/components/home/HomeRowBuild.brs" />
   <script type="text/brightscript" uri="pkg:/components/home/HomeScroll.brs" />
   <script type="text/brightscript" uri="pkg:/components/home/HomeFocus.brs" />

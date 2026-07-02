@@ -706,6 +706,7 @@ sub SendProgress()
     ' reference so it isn't collected mid-flight.
     m.progressTask = task
     StartHttpTask(task)
+    HomeCatalogMarkDirty(m.top)
 end sub
 
 ' ── Keys ─────────────────────────────────────────────────────────────────────

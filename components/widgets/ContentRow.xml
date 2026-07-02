@@ -43,6 +43,9 @@
     <!-- Hard stop for screen dispose — kills row timers so a removed Home cannot keep
          building cards on the single render thread. -->
     <function name="AbortBuild" />
+    <!-- In-place CW sync after playback — updates progress (and trims/appends) without
+         clearing the row strip or re-arming card skeletons. -->
+    <function name="PatchContinueWatching" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />

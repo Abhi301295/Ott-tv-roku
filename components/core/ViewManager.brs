@@ -7,8 +7,21 @@ sub init()
     m.shellMenuReels = invalid
     m.top.overlayOpen = false
     m.homeBootCache = invalid
+    m.homeCatalogDirty = false
     m.top.observeField("overlayDismiss", "OnOverlayDismissChanged")
 end sub
+
+function MarkHomeCatalogDirty() as void
+    m.homeCatalogDirty = true
+end function
+
+function IsHomeCatalogDirty() as boolean
+    return m.homeCatalogDirty = true
+end function
+
+function ClearHomeCatalogDirty() as void
+    m.homeCatalogDirty = false
+end function
 
 function GetHomeBootCacheEntry() as object
     return m.homeBootCache
@@ -36,6 +49,7 @@ end function
 function NavigateClearAndReplace(route as string, state = {} as object) as void
     ProfileTransitionHide(m.top)
     ClearHomeBootCacheEntry()
+    m.homeCatalogDirty = false
     depth = m.stack.Count()
     ProfileSelectLog("NAV_CLEAR", "route=" + route + " stackDepth=" + ProfileSelectFmt(depth))
     while m.stack.Count() > 0

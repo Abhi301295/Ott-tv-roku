@@ -29,6 +29,11 @@ sub OnDataChanged()
     ApplyAll()
 end sub
 
+' Progress-only refresh (home CW resume) — repaint the bar without reloading the poster.
+sub OnProgressChanged()
+    ApplyProgressFill()
+end sub
+
 sub OnFocusChanged()
     ApplyFocusVisual()
 end sub

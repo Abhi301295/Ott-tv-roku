@@ -170,6 +170,8 @@ sub init()
     m.cwShimmerSpan = invalid
     m.cwRowBuildSpan = invalid
     m.cwRevealAtMs = -1
+    m.cwRefreshTask = invalid
+    m.cwRefreshInFlight = false
 
     if m.layoutAnim <> invalid then m.layoutAnim.observeField("state", "OnLayoutAnimState")
 end sub
@@ -225,6 +227,7 @@ sub OnDispose()
     KillTask(m.categoryTask)
     KillTask(m.versionTask)
     KillTask(m.loadMoreTask)
+    KillHomeCwRefreshTask()
     m.selectTask = invalid
     m.profilesTask = invalid
     m.continueTask = invalid
