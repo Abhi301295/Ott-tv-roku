@@ -27,9 +27,8 @@
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/search/SearchTheme.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowsePageLoader.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/grid/GridFlatFocus.brs" />
-  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
-  <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SearchScreen.brs" />
 
   <children>
@@ -47,8 +46,25 @@
         <Group id="rightPanel" translation="[768, 0]">
           <Group id="gridViewport" clippingRect="[0, 0, 1152, 952]">
             <Group id="gridScrollHost" translation="[60, 0]">
+              <!-- searchgrid.tsx loading: bg-black + centered primary-500 spinner in right pane only -->
               <Group id="loadingHost" visible="false">
-                <Group id="skeletonHost" />
+                <Rectangle id="searchLoaderBg" width="1152" height="952" color="0x000000ff" />
+                <Group id="searchLoaderCenter" translation="[576, 476]">
+                  <Group id="searchLoaderSpin" rotation="0.0">
+                    <Poster id="searchLoaderRing" translation="[-32, -32]" width="64" height="64"
+                      uri="pkg:/images/ui/spinner_ring.png" />
+                    <Poster id="searchLoaderArc" translation="[-32, -32]" width="64" height="64"
+                      uri="pkg:/images/ui/spinner_arc.png" blendColor="0x0092ffff" />
+                  </Group>
+                  <Label id="searchLoaderText" translation="[-100, 48]" width="200" height="36"
+                    horizAlign="center" vertAlign="top" text="Loading" color="0xffffffff">
+                    <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
+                  </Label>
+                  <Animation id="searchLoaderAnim" duration="0.9" repeat="true" easeFunction="linear">
+                    <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+                      fieldToInterp="searchLoaderSpin.rotation" />
+                  </Animation>
+                </Group>
               </Group>
               <Group id="gridHost" />
             </Group>

@@ -19,7 +19,7 @@ function ThemeBrowsePalette(fromNode as object) as object
         cPrimary600: ThemeTokenColor(tokens, "primary-600", "#0760bb")
         cPrimary700: ThemeTokenColor(tokens, "primary-700", "#04478b")
         cNeutral50: ThemeTokenColor(tokens, "neutral-50", "#f5f5f5")
-        cNeutral700: ThemeTokenColor(tokens, "neutral-700", "#404040")
+        cNeutral700: ThemeTokenColor(tokens, "neutral-700", "#181818")
         cNeutral800: ThemeTokenColor(tokens, "neutral-800", "#262626")
     }
 end function
@@ -32,7 +32,7 @@ function ThemeWatchlistPalette(fromNode as object) as object
         cPrimary600: ThemeTokenColor(tokens, "primary-600", "#459adb")
         cPrimary700: ThemeTokenColor(tokens, "primary-700", "#80bbe9")
         cNeutral50: ThemeTokenColor(tokens, "neutral-50", "#ffffff")
-        cNeutral700: ThemeTokenColor(tokens, "neutral-700", "#404040")
+        cNeutral700: ThemeTokenColor(tokens, "neutral-700", "#181818")
         cNeutral800: ThemeTokenColor(tokens, "neutral-800", "#262626")
         cPageBg: ThemeTokenColor(tokens, "background", "#0a0a0a")
     }

@@ -1,4 +1,4 @@
-' HomeBoot.brs — home mount, select-profile, category fetch, shimmer gate.
+' HomeBoot.brs — home mount, select-profile, category fetch, page loader.
 
 
 ' ViewManager assigns navState after SetupAppHeader — see OnNavStateReady.
@@ -111,21 +111,19 @@ sub BeginHomeBootWork()
 
     ConsumeHomeBootCacheIfReady()
 
-    ' Shimmer regions follow layout; Netflix shows hero metadata placeholders, OTT relies on
-    ' the banner fallback and only needs the row strip (parity: React Spinner until rows).
-    ApplySkeletonLayout()
-    if ThemeIsNetflixHome() then
-        ShowHeroSkeleton(true)
-    else
-        ShowHeroSkeleton(false)
-    end if
-    ShowRowsSkeleton(true)
+    ' Page loader follows layout; React Spinner covers the home canvas until data lands.
+    ApplyHomeLoaderColors()
+    ShowHomeLoader(true)
+    if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "start"
     m.cwShimmerSpan = CreateObject("roTimespan")
-    CwPerfMark(m.cwShimmerSpan, "shimmer ON (boot)")
+    CwPerfMark(m.cwShimmerSpan, "loader ON (boot)")
     ' Rows timeout starts when BuildContentRows begins, not at boot (hero gate can take 3.5s+).
     ' Wall-clock from mount → hero poster painted = perceived first-content latency.
     m.bootSpan = CreateObject("roTimespan")
     HomeBootLog(m.bootSpan, "boot start", "layout=" + m.homeLayout + " ott=" + CwPerfBool(ThemeIsOttHome()) + " prefetch=" + CwPerfBool(m.categoriesPrefetched = true))
+    if HomeLoadTurboEnabled() and m.hero <> invalid and m.hero.hasField("holdTrailerBoot") then
+        m.hero.holdTrailerBoot = true
+    end if
     StartBootSequence()
 end sub
 
@@ -654,8 +652,6 @@ sub MaybeBuildHero()
     items = ExtractBannerItems(m.categories)
     print "[HOME] MaybeBuildHero bannerItems="; items.Count()
     if items.Count() = 0 then
-        ' Nothing to show in the hero — drop its shimmer immediately.
-        ShowHeroSkeleton(false)
         UpdateHeroBanner()
         ' No hero means no trailer to wait for: let the rows build right away.
         m.rowGateElapsed = true
@@ -667,12 +663,7 @@ sub MaybeBuildHero()
 end sub
 
 ' ── Rows / Continue Watching (waits for BOTH categories and CW) ───────────────
-' The rows shimmer (which reads as the Continue-Watching shimmer) stays up until CW
-' has resolved AND categories are in, so the hero can be live above a still-loading row.
-
-' ── Rows / Continue Watching (waits for BOTH categories and CW) ───────────────
-' The rows shimmer (which reads as the Continue-Watching shimmer) stays up until CW
-' has resolved AND categories are in, so the hero can be live above a still-loading row.
+' Page loader stays up until row 0 is revealed (parity with React Spinner until rows).
 sub MaybeBuildRows()
     if m.rowsBuilt then return
     if RowsBootLoading() then
@@ -690,6 +681,15 @@ end sub
 sub MaybeStartRowBuild()
     if m.rowsBuilt then return
     if not m.rowsDataReady then return
+
+    if HomeLoadTurboEnabled() then
+        m.rowGateElapsed = true
+        m.rowsBuilt = true
+        HomeBootLog(m.bootSpan, "row gate open", "turbo immediate")
+        print "[HOME] turbo row gate -> build rows immediately"
+        BuildContentRows()
+        return
+    end if
 
     if ThemeIsOttHome() then m.rowGateElapsed = true
     ' Profile handoff: user already waited on welcome overlay — build rows immediately.
@@ -728,73 +728,43 @@ sub OnRowBuildGate()
     MaybeStartRowBuild()
 end sub
 
-' Hero poster has painted — drop the hero shimmer (rows shimmer is untouched).
-
-' Hero poster has painted — drop the hero shimmer (rows shimmer is untouched).
+' Hero poster has painted — stop the loader safety timer (page loader hides when rows land).
 sub OnHeroPosterReady()
     if m.hero = invalid or m.hero.posterReady <> true then return
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
-    ShowHeroSkeleton(false)
 end sub
 
-' Safety net: never let the hero shimmer outlive the wait.
-
-' Safety net: never let the hero shimmer outlive the wait.
-sub OnSkeletonTimeout()
-    print "[HOME] hero skeleton timeout -> hide shimmer"
-    ShowHeroSkeleton(false)
+' Safety net: hide the page loader if content never signals ready.
+sub OnHomeLoaderTimeout()
+    ShowHomeLoader(false)
 end sub
 
-
-' Skeleton bars — same palette as Profile / SkeletonConfig.brs (login excluded).
-sub ApplyHomeSkeletonColors()
-    if m.homeSkeleton = invalid then return
-    colors = SkeletonResolveColors(CardSkeletonThemeTokens(m.top))
-    m.homeSkeleton.boxColor = colors.base
-    m.homeSkeleton.shineColor = colors.highlight
-    bg = HomeRowPageBg()
-    if bg = invalid or bg = "" then bg = SK_DefaultPageBg()
-    m.homeSkeleton.backdropColor = bg
+sub ApplyHomeLoaderColors()
+    BrowseApplyPageLoaderColors(m)
+    if BrowsePageLoaderRunning(m) then BrowseApplyLoaderVeil(m, true, m.pageBgRest)
 end sub
 
-
-sub ShowHeroSkeleton(show as boolean)
-    if m.homeSkeleton = invalid then return
-    ApplyHomeSkeletonColors()
-    m.homeSkeleton.heroRunning = show
-end sub
-
-
-sub ShowRowsSkeleton(show as boolean)
-    if m.homeSkeleton = invalid then return
+sub ShowHomeLoader(show as boolean)
+    if m.homeLoader = invalid then return
     if show then
         if m.cwShimmerSpan = invalid then m.cwShimmerSpan = CreateObject("roTimespan")
-        CwPerfMark(m.cwShimmerSpan, "shimmer ON")
+        CwPerfMark(m.cwShimmerSpan, "loader ON")
+        BrowseShowPageLoader(m, m.pageBgRest)
     else
-        shimmerMs = CwPerfMs(m.cwShimmerSpan)
+        loaderMs = CwPerfMs(m.cwShimmerSpan)
         bootMs = -1
         if m.bootSpan <> invalid then bootMs = m.bootSpan.TotalMilliseconds()
-        gapMs = -1
-        if m.cwRevealAtMs >= 0 and shimmerMs >= 0 then gapMs = shimmerMs - m.cwRevealAtMs
-        detail = "shimmerVisible=" + Str(shimmerMs) + "ms"
+        detail = "loaderVisible=" + Str(loaderMs) + "ms"
         if bootMs >= 0 then detail = detail + " boot=" + Str(bootMs) + "ms"
-        if gapMs >= 0 then detail = detail + " revealToShimmerOff=" + Str(gapMs) + "ms"
-        CwPerfMark(m.cwShimmerSpan, "shimmer OFF", detail)
+        CwPerfMark(m.cwShimmerSpan, "loader OFF", detail)
         m.cwShimmerSpan = invalid
-    end if
-    ApplyHomeSkeletonColors()
-    m.homeSkeleton.rowsRunning = show
-    if m.rowsSkeletonTimeout <> invalid then
-        if not show then
-            m.rowsSkeletonTimeout.control = "stop"
-            if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
-        end if
+        if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
+        if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
+        if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
+        BrowseHidePageLoader(m, m.pageBgRest, false)
+        ApplyHomePageBackground()
     end if
 end sub
-
-' ── Content rows (parity with netflixContent.tsx row list) ───────────────────
-
-' OTT may build rows before CW lands; prepend CW into the visible list when it arrives late.
 
 sub ClearAuthAndGoLogin()
     ProfileSelectLogNode("HOME_AUTH_CLEAR", "session expired -> login", m.top)

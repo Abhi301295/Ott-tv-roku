@@ -26,6 +26,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/SeriesEpisodesService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowsePageLoader.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SeriesEpisodesScreen.brs" />
@@ -69,58 +70,11 @@
       <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
     </Label>
 
-    <!-- Loading skeletons — native-size PNG shapes (same technique as DetailScreen).
-         brs-engine does NOT stretch skeleton art; boxWidth/boxHeight must match each PNG. -->
-    <Group id="leftHeaderSkeleton" visible="false">
-      <Skeleton id="skLogo" translation="[60, 64]" boxWidth="160" boxHeight="40"
-        shapeUri="pkg:/images/ui/sk_series_logo.png" baseColor="0x404040ff" />
-      <Skeleton id="skTitle" translation="[60, 172]" boxWidth="400" boxHeight="80"
-        shapeUri="pkg:/images/ui/sk_detail_title.png" baseColor="0x404040ff" />
-      <Skeleton id="skMeta" translation="[60, 268]" boxWidth="300" boxHeight="20"
-        shapeUri="pkg:/images/ui/sk_detail_line_300.png" baseColor="0x404040ff" />
-    </Group>
-    <Group id="seasonSkeletonHost" translation="[40, 330]" visible="false">
-      <Skeleton id="skTab0" translation="[20, 0]" boxWidth="560" boxHeight="32"
-        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
-      <Skeleton id="skTab1" translation="[20, 80]" boxWidth="560" boxHeight="32"
-        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
-      <Skeleton id="skTab2" translation="[20, 160]" boxWidth="560" boxHeight="32"
-        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
-      <Skeleton id="skTab3" translation="[20, 240]" boxWidth="560" boxHeight="32"
-        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
-      <Skeleton id="skTab4" translation="[20, 320]" boxWidth="560" boxHeight="32"
-        shapeUri="pkg:/images/ui/sk_series_tab.png" baseColor="0x404040ff" />
-    </Group>
-    <Group id="rightHeaderSkeleton" visible="false">
-      <Skeleton id="skHeading" translation="[700, 120]" boxWidth="200" boxHeight="20"
-        shapeUri="pkg:/images/ui/sk_detail_line_200.png" baseColor="0x404040ff" />
-      <Skeleton id="skSubtitle" translation="[700, 156]" boxWidth="230" boxHeight="20"
-        shapeUri="pkg:/images/ui/sk_detail_line_230.png" baseColor="0x404040ff" />
-    </Group>
-    <Group id="episodeSkeletonHost" translation="[700, 250]" visible="false">
-      <Group id="epSkRow0">
-        <Skeleton translation="[16, 10]" boxWidth="320" boxHeight="180"
-          shapeUri="pkg:/images/ui/sk_episode_thumb.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 14]" boxWidth="400" boxHeight="24"
-          shapeUri="pkg:/images/ui/sk_detail_line_400.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 62]" boxWidth="600" boxHeight="16"
-          shapeUri="pkg:/images/ui/sk_detail_line_600.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 86]" boxWidth="500" boxHeight="16"
-          shapeUri="pkg:/images/ui/sk_detail_line_500.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 140]" boxWidth="260" boxHeight="20"
-          shapeUri="pkg:/images/ui/sk_detail_line_260.png" baseColor="0x404040ff" />
-      </Group>
-      <Group id="epSkRow1" translation="[0, 224]">
-        <Skeleton translation="[16, 10]" boxWidth="320" boxHeight="180"
-          shapeUri="pkg:/images/ui/sk_episode_thumb.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 14]" boxWidth="400" boxHeight="24"
-          shapeUri="pkg:/images/ui/sk_detail_line_400.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 62]" boxWidth="600" boxHeight="16"
-          shapeUri="pkg:/images/ui/sk_detail_line_600.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 86]" boxWidth="500" boxHeight="16"
-          shapeUri="pkg:/images/ui/sk_detail_line_500.png" baseColor="0x404040ff" />
-        <Skeleton translation="[360, 140]" boxWidth="260" boxHeight="20"
-          shapeUri="pkg:/images/ui/sk_detail_line_260.png" baseColor="0x404040ff" />
+    <!-- bg-neutral-700 veil + Spinner while series detail loads. -->
+    <Group id="loaderHost" translation="[0, 0]" visible="false">
+      <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
+      <Group id="loaderCenter" translation="[960, 518]">
+        <HomeLoader id="pageLoader" />
       </Group>
     </Group>
   </children>

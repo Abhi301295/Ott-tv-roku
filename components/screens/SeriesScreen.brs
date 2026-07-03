@@ -3,7 +3,9 @@
 sub init()
     m.bg = m.top.findNode("bg")
     m.contentHost = m.top.findNode("contentHost")
-    m.skeletonHost = m.top.findNode("skeletonHost")
+    m.loaderHost = m.top.findNode("loaderHost")
+    m.loaderPageBg = m.top.findNode("loaderPageBg")
+    m.pageLoader = m.top.findNode("pageLoader")
     m.titleLabel = m.top.findNode("titleLabel")
     m.emptyLabel = m.top.findNode("emptyLabel")
     m.rowsHost = m.top.findNode("rowsHost")
@@ -16,6 +18,7 @@ sub init()
     m.loading = false
     m.initialLoad = true
     m.contentRevealed = false
+    m.thumbPaintWatch = invalid
     m.rows = []
     m.rowNodes = []
     m.rowIdx = 0
@@ -86,6 +89,8 @@ end sub
 
 sub OnDispose()
     if not m.top.dispose then return
+    DetachSeriesPaintWatch()
+    BrowseDisarmLoaderTimeout(m)
     StopSeriesGridBuild()
     KillListTask(m.listTask)
     m.listTask = invalid
@@ -104,8 +109,9 @@ sub OnBusinessResolved()
     LoadBrowseTokens()
     ApplyStaticColors()
     RefreshCardThemes()
-    if m.skeletonHost <> invalid and m.skeletonHost.visible = true then
-        SkeletonApplyTree(m.skeletonHost, m.tokens, true)
+    if BrowsePageLoaderRunning(m) then
+        BrowseApplyPageLoaderColors(m)
+        BrowseApplyLoaderVeil(m, true, m.pageBgRest)
     end if
 end sub
 
@@ -115,27 +121,81 @@ end sub
 
 sub ApplyStaticColors()
     if m.bg <> invalid then m.bg.color = m.cNeutral800
+    m.pageBgRest = m.cNeutral800
     if m.titleLabel <> invalid then m.titleLabel.color = m.cNeutral50
     if m.emptyLabel <> invalid then m.emptyLabel.color = m.cNeutral50
+    ApplyPageLoaderColors()
 end sub
 
-sub ShowSkeleton(show as boolean)
-    if m.skeletonHost = invalid then return
-    m.skeletonHost.visible = show
-    SkeletonApplyTree(m.skeletonHost, m.tokens, show)
-    BrowseDbg("series_skeleton", "visible=" + BrowseDbgStr(show))
+sub ApplyPageLoaderColors()
+    BrowseApplyPageLoaderColors(m)
+end sub
+
+sub ShowLoader(show as boolean)
     if show then
-        if m.contentHost <> invalid then m.contentHost.opacity = 0.0
-        if m.titleLabel <> invalid then m.titleLabel.opacity = 0.0
-        m.contentRevealed = false
+        BrowseShowPageLoader(m, m.pageBgRest)
+    else
+        BrowseDetachHostPaintWatch(m)
+        BrowseHidePageLoader(m, m.pageBgRest)
+    end if
+end sub
+
+sub OnBrowseLoaderTimeout()
+    if m.contentRevealed then return
+    BrowseDetachHostPaintWatch(m)
+    RevealContent()
+    if m.page = 1 then
+        SeriesHandoffContentFocus()
+    else
+        ClampCol()
+        ApplyFocus()
+    end if
+end sub
+
+sub DetachSeriesPaintWatch()
+    BrowseDetachHostPaintWatch(m)
+end sub
+
+sub AttachSeriesPaintWatch()
+    if m.contentRevealed or m.page <> 1 then return
+    if m.rowNodes.Count() = 0 then
+        RevealContent()
+        return
+    end if
+    entry = m.rowNodes[0]
+    if entry = invalid or entry.cards = invalid or entry.cards.Count() = 0 then
+        RevealContent()
+        return
+    end if
+    card = entry.cards[0]
+    if card = invalid then
+        RevealContent()
+        return
+    end if
+    thumb = card.findNode("thumb")
+    if thumb = invalid then
+        RevealContent()
+        return
+    end if
+    if BrowseAttachThumbPaintWatch(m, thumb, "OnSeriesFirstPainted") then OnSeriesFirstPainted()
+end sub
+
+sub OnSeriesFirstPainted()
+    if m.contentRevealed then return
+    if not BrowsePageLoaderRunning(m) then return
+    BrowseDetachHostPaintWatch(m)
+    RevealContent()
+    if m.page = 1 then
+        SeriesHandoffContentFocus()
+    else
+        ClampCol()
+        ApplyFocus()
     end if
 end sub
 
 sub RevealContent()
     if m.contentRevealed then return
-    ShowSkeleton(false)
-    if m.contentHost <> invalid then m.contentHost.opacity = 1.0
-    if m.titleLabel <> invalid then m.titleLabel.opacity = 1.0
+    BrowseHidePageLoader(m, m.pageBgRest)
     m.contentRevealed = true
     BrowseDbg("series_reveal", "content visible title=" + m.titleLabel.text)
 end sub
@@ -153,9 +213,7 @@ sub ResetAndFetch()
     m.rowScrollX = []
     ClearRows()
     ShowEmpty(false)
-    if m.contentHost <> invalid then m.contentHost.opacity = 0.0
-    if m.titleLabel <> invalid then m.titleLabel.opacity = 0.0
-    ShowSkeleton(true)
+    ShowLoader(true)
     FetchNextPage()
 end sub
 
@@ -164,7 +222,7 @@ sub FetchNextPage()
     if not m.hasMore then return
     m.page = m.page + 1
     m.loading = true
-    if m.page = 1 then ShowSkeleton(true)
+    if m.page = 1 then ShowLoader(true)
     path = Endpoints().SERIES.SERIES_LIST
     q = SL_BuildQuery(m.page, m.listType, m.categoryId, m.genreId)
     KillListTask(m.listTask)
@@ -192,7 +250,7 @@ sub OnListResponse()
         end if
         BrowseDbg("series_response", "fail: bad status — show empty=" + BrowseDbgStr(m.rows.Count() = 0))
         m.hasMore = false
-        ShowSkeleton(false)
+        ShowLoader(false)
         if m.rows.Count() = 0 then ShowEmpty(true)
         return
     end if
@@ -202,7 +260,7 @@ sub OnListResponse()
     if listing.Count() = 0 and m.rows.Count() = 0 then
         m.hasMore = false
         BrowseDbg("series_response", "empty listing — show empty state")
-        ShowSkeleton(false)
+        ShowLoader(false)
         ShowEmpty(true)
         return
     end if
@@ -220,13 +278,10 @@ end sub
 
 sub ShowEmpty(show as boolean)
     BrowseDbg("series_empty", "visible=" + BrowseDbgStr(show))
-    if show then ShowSkeleton(false)
+    if show then ShowLoader(false)
     if m.emptyLabel <> invalid then m.emptyLabel.visible = show
     if m.rowsHost <> invalid then m.rowsHost.visible = not show
-    if show then
-        if m.contentHost <> invalid then m.contentHost.opacity = 0.0
-        m.contentRevealed = false
-    end if
+    if show then m.contentRevealed = false
 end sub
 
 sub ClearRows()
@@ -265,13 +320,7 @@ sub StartSeriesGridBuild(fresh as boolean)
             EnsureSeriesRow(i, row)
             m.rowBuildIdx = i + 1
         end for
-        RevealContent()
-        if m.page = 1 then
-            SeriesHandoffContentFocus()
-        else
-            ClampCol()
-            ApplyFocus()
-        end if
+        AttachSeriesPaintWatch()
         print "[SERIES_DBG] grid_sync rows="; syncMax; " total="; m.rows.Count()
     end if
 

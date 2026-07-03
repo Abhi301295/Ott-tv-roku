@@ -13,6 +13,8 @@
     <field id="contentWidth" type="integer" value="1920" onChange="OnContentWidthChanged" />
     <!-- Tracks input-priority pause; Resume/Pause are driven explicitly from HomeScreen. -->
     <field id="autoAdvanceHold" type="boolean" value="false" onChange="OnAutoAdvanceHoldChanged" />
+    <!-- While true, cinematic hero defers trailer resolve/playback until rows are visible. -->
+    <field id="holdTrailerBoot" type="boolean" value="false" onChange="OnHoldTrailerBootChanged" />
     <function name="HeroGoNext" />
     <function name="HeroGoPrev" />
     <function name="HeroToggleMute" />
