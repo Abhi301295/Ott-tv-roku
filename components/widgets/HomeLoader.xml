@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Home page loader — parity with utils/loader/spinner.tsx (ring + "Loading" label). -->
+<component name="HomeLoader" extends="Group">
+  <interface>
+    <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
+    <field id="neutral50" type="string" value="" onChange="OnColorsChanged" />
+    <field id="primary600" type="string" value="" onChange="OnColorsChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/HomeLoader.brs" />
+
+  <children>
+    <!-- spinner.tsx: w-48 ht-48 (48px) centered; label fs-22 text-neutral-50 -->
+    <Group id="loaderHost" translation="[0, 0]" opacity="1.0" visible="true">
+      <Group id="loaderSpin" translation="[0, 0]" rotation="0.0">
+        <Poster id="loaderRing" translation="[-24, -24]" width="48" height="48"
+          uri="pkg:/images/ui/spinner_ring.png" />
+        <Poster id="loaderArc" translation="[-24, -24]" width="48" height="48"
+          uri="pkg:/images/ui/spinner_arc.png" />
+      </Group>
+      <Label id="loaderText" translation="[-100, 40]" width="200" height="32"
+        horizAlign="center" vertAlign="top" text="Loading">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
+      </Label>
+    </Group>
+
+    <Animation id="loaderAnim" duration="0.9" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+        fieldToInterp="loaderSpin.rotation" />
+    </Animation>
+  </children>
+</component>

@@ -381,8 +381,9 @@ function BuildCardsNow(maxCards as dynamic) as boolean
     if m.top.ottRowReveal = true and m.cards.Count() > 0 then RevealStripNow()
     if m.buildIdx >= m.buildPlan.Count() then
         FinishCardBuildIfDone()
-    else if m.cardTimer <> invalid then
-        m.cardTimer.control = "start"
+    else
+        if m.top.ottRowReveal = true and m.cards.Count() > 0 then MaybeStartPaintGate()
+        if m.cardTimer <> invalid then m.cardTimer.control = "start"
     end if
     return true
 end function
@@ -392,7 +393,7 @@ end function
 ' Genre / OTT catalogue: reveal once nodes exist — card skeletons cover thumb fetch.
 sub MaybeReveal()
     if not m.buildComplete then return
-    if m.pendingMediaLoads > 0 and m.top.ottRowReveal <> true then return
+    if m.pendingMediaLoads > 0 then return
     RevealNow()
 end sub
 
@@ -404,19 +405,29 @@ sub RevealNow()
     m.top.built = true
     if m.top.mediaReady <> true then m.top.mediaReady = true
     CwPerfMark(m.cwPerfSpan, "row RevealNow", "pendingLoads=0 cards=" + Str(m.cards.Count()))
-    ' OTT home + genre catalogue: media loaded — skip paint-poll (sim often never passes it).
-    if ThemeIsOttHome() or m.top.ottRowReveal = true then
+    m.paintPollCount = 0
+    m.paintStableCount = 0
+    if m.cards.Count() = 0 then
         MarkPaintedReady(false)
         return
     end if
-    m.paintPollCount = 0
-    m.paintStableCount = 0
     StartPaintPoll()
 end sub
 
 sub StartPaintPoll()
     if m.paintTimer = invalid then return
     m.paintTimer.control = "start"
+end sub
+
+' Start the compositor paint gate without waiting for the full row build to finish.
+sub MaybeStartPaintGate()
+    if m.top.paintedReady = true then return
+    if m.cards.Count() = 0 then return
+    if m.rowTitle <> invalid and m.rowTitle.opacity < 1.0 then m.rowTitle.opacity = 1.0
+    if m.cardsHost <> invalid and m.cardsHost.opacity < 1.0 then m.cardsHost.opacity = 1.0
+    m.paintPollCount = 0
+    m.paintStableCount = 0
+    StartPaintPoll()
 end sub
 
 function FirstVisibleCardPainted() as boolean
@@ -452,10 +463,8 @@ sub OnPaintPoll()
         if m.cardsHost <> invalid then chop = m.cardsHost.opacity
         CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " stable=" + Str(m.paintStableCount) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
     end if
-    ' Two consecutive painted frames — avoids cutting shimmer before compositor shows cards.
-    ' OTT home: one stable frame is enough (faster handoff off the rows shimmer).
+    ' Two consecutive painted frames — page loader drops only after compositor shows cards.
     needStable = 2
-    if ThemeIsOttHome() or m.top.ottRowReveal = true then needStable = 1
     if m.paintStableCount >= needStable then
         MarkPaintedReady(false)
         return

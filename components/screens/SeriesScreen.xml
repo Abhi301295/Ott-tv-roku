@@ -34,6 +34,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/debug/OttDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowseDebug.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailStrings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowsePageLoader.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SeriesScreen.brs" />
@@ -41,28 +42,9 @@
   <children>
     <Rectangle id="bg" width="1920" height="1080" color="0x121212ff" />
 
-    <!-- Shimmer grid — visible until the first page title + cards reveal together. -->
-    <Group id="skeletonHost" translation="[56, 72]" visible="false">
-      <Skeleton id="skTitle" translation="[0, 0]" boxWidth="360" boxHeight="40"
-        baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk00" translation="[0, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk01" translation="[282, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk02" translation="[564, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk03" translation="[846, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk04" translation="[1128, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk05" translation="[1410, 90]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk10" translation="[0, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk11" translation="[282, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk12" translation="[564, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk13" translation="[846, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk14" translation="[1128, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-      <Skeleton id="sk15" translation="[1410, 440]" boxWidth="272" boxHeight="340" baseColor="0x404040ff" running="false" />
-    </Group>
-
-    <!-- Real content stays transparent until thumbnails are ready. -->
-    <Group id="contentHost" opacity="0.0">
+    <Group id="contentHost">
       <Label id="titleLabel" translation="[56, 72]" width="1700" height="56" wrap="false"
-        color="0xf5f5f5ff" text="" opacity="0.0">
+        color="0xf5f5f5ff" text="">
         <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="43" />
       </Label>
 
@@ -76,6 +58,14 @@
         <Vector2DFieldInterpolator id="hScrollInterp" key="[0.0, 1.0]"
           fieldToInterp="rowsHost.translation" />
       </Animation>
+    </Group>
+
+    <!-- series/index.tsx inside PageContainer bg-neutral-700 + Spinner -->
+    <Group id="loaderHost" translation="[0, 0]" visible="false">
+      <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
+      <Group id="loaderCenter" translation="[960, 518]">
+        <HomeLoader id="pageLoader" />
+      </Group>
     </Group>
 
     <Label id="emptyLabel" translation="[360, 420]" width="1200" height="80" wrap="true"

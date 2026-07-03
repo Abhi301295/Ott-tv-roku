@@ -29,10 +29,10 @@ sub init()
     m.sectionSubtitle = m.top.findNode("sectionSubtitle")
     m.leftMask = m.top.findNode("leftMask")
     m.rightMask = m.top.findNode("rightMask")
-    m.leftHeaderSkeleton = m.top.findNode("leftHeaderSkeleton")
-    m.seasonSkeletonHost = m.top.findNode("seasonSkeletonHost")
-    m.rightHeaderSkeleton = m.top.findNode("rightHeaderSkeleton")
-    m.episodeSkeletonHost = m.top.findNode("episodeSkeletonHost")
+    m.loaderHost = m.top.findNode("loaderHost")
+    m.loaderPageBg = m.top.findNode("loaderPageBg")
+    m.pageLoader = m.top.findNode("pageLoader")
+    m.loaderCenter = m.top.findNode("loaderCenter")
 
     m.contentId = ""
     m.contentType = ""
@@ -59,11 +59,13 @@ sub init()
     m.prevEpisodeFocusIndex = -1
     m.seasonFocusFullRefresh = true
     m.episodeFocusFullRefresh = true
+    m.episodesRevealed = false
+    m.thumbPaintWatch = invalid
 
     m.vm = FindViewManager(m.top)
     LoadSeriesTokens()
     ApplyStaticColors()
-    ApplySkeletonColors()
+    ApplyPageLoaderColors()
 
     m.top.observeField("keyEvent", "OnKey")
     if m.global <> invalid and m.global.hasField("businessResolved") then
@@ -84,7 +86,8 @@ end sub
 
 sub OnDispose()
     if not m.top.dispose then return
-    SetSkeletonRunning(false)
+    DetachEpisodesPaintWatch()
+    BrowseDisarmLoaderTimeout(m)
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")
     end if
@@ -101,9 +104,10 @@ end sub
 sub OnBusinessResolved()
     LoadSeriesTokens()
     ApplyStaticColors()
-    if m.loading then
-        ApplySkeletonColors()
-    else
+    if BrowsePageLoaderRunning(m) then
+        BrowseApplyPageLoaderColors(m)
+        BrowseApplyLoaderVeil(m, true, m.pageBgRest)
+    else if not m.loading then
         ApplyBranding()
         RebuildSeasonTabs()
         RebuildEpisodeCards()
@@ -131,6 +135,7 @@ end function
 
 sub ApplyStaticColors()
     if m.bg <> invalid then m.bg.color = m.cNeutral800
+    m.pageBgRest = m.cNeutral800
     if m.leftMask <> invalid then m.leftMask.color = m.cNeutral800
     if m.rightMask <> invalid then m.rightMask.color = m.cNeutral800
     if m.seriesTitle <> invalid then m.seriesTitle.color = m.cNeutral50
@@ -139,23 +144,8 @@ sub ApplyStaticColors()
     if m.sectionSubtitle <> invalid then m.sectionSubtitle.color = m.cNeutral300
 end sub
 
-sub ApplySkeletonToTree(node as object, running as boolean)
-    SkeletonApplyTree(node, m.tokens, running)
-end sub
-
-' Skeleton shimmer — unified neutral-700 palette (≤20 nodes after ep row trim).
-sub ApplySkeletonColors()
-    ApplySkeletonToTree(m.leftHeaderSkeleton, true)
-    ApplySkeletonToTree(m.seasonSkeletonHost, true)
-    ApplySkeletonToTree(m.rightHeaderSkeleton, true)
-    ApplySkeletonToTree(m.episodeSkeletonHost, true)
-end sub
-
-sub SetSkeletonRunning(running as boolean)
-    ApplySkeletonToTree(m.leftHeaderSkeleton, running)
-    ApplySkeletonToTree(m.seasonSkeletonHost, running)
-    ApplySkeletonToTree(m.rightHeaderSkeleton, running)
-    ApplySkeletonToTree(m.episodeSkeletonHost, running)
+sub ApplyPageLoaderColors()
+    BrowseApplyPageLoaderColors(m)
 end sub
 
 ' Brand logo / app-name fallback in the left header (parity with getLogoSvg(resolved.brandingLogo
@@ -184,29 +174,88 @@ sub ApplyBranding()
     end if
 end sub
 
-sub ShowLoading(show as boolean)
-    m.loading = show
-    if m.leftHeaderSkeleton <> invalid then m.leftHeaderSkeleton.visible = show
-    if m.seasonSkeletonHost <> invalid then m.seasonSkeletonHost.visible = show
-    if m.rightHeaderSkeleton <> invalid then m.rightHeaderSkeleton.visible = show
-    if m.episodeSkeletonHost <> invalid then m.episodeSkeletonHost.visible = show
-
+sub SetContentVisible(show as boolean)
+    if m.seasonsHost <> invalid then m.seasonsHost.visible = show
+    if m.episodesHost <> invalid then m.episodesHost.visible = show
+    if m.seriesTitle <> invalid then m.seriesTitle.visible = show
+    if m.seriesMeta <> invalid then m.seriesMeta.visible = show
+    if m.sectionHeading <> invalid then m.sectionHeading.visible = show
+    if m.sectionSubtitle <> invalid then m.sectionSubtitle.visible = show
     if show then
+        ApplyBranding()
+    else
         if m.brandLogo <> invalid then m.brandLogo.visible = false
         if m.brandLabel <> invalid then m.brandLabel.visible = false
-        if m.seriesTitle <> invalid then m.seriesTitle.visible = false
-        if m.seriesMeta <> invalid then m.seriesMeta.visible = false
-        if m.sectionHeading <> invalid then m.sectionHeading.visible = false
-        if m.sectionSubtitle <> invalid then m.sectionSubtitle.visible = false
-        ApplySkeletonColors()
-    else
-        SetSkeletonRunning(false)
-        if m.seriesTitle <> invalid then m.seriesTitle.visible = true
-        if m.seriesMeta <> invalid then m.seriesMeta.visible = true
-        if m.sectionHeading <> invalid then m.sectionHeading.visible = true
-        if m.sectionSubtitle <> invalid then m.sectionSubtitle.visible = true
-        ApplyBranding()
     end if
+end sub
+
+sub ShowLoading(show as boolean)
+    m.loading = show
+    if show then
+        m.episodesRevealed = false
+        BrowseShowPageLoader(m, m.pageBgRest)
+        SetContentVisible(false)
+    else
+        BrowseDetachHostPaintWatch(m)
+        BrowseHidePageLoader(m, m.pageBgRest)
+    end if
+end sub
+
+function SE_FirstEpisodeThumb() as object
+    if m.epCards = invalid or m.epCards.Count() < 1 then return invalid
+    card = m.epCards[0]
+    if card = invalid then return invalid
+    count = card.getChildCount()
+    for i = 0 to count - 1
+        ch = card.getChild(i)
+        if ch <> invalid and ch.subtype() = "Poster" then return ch
+    end for
+    return invalid
+end function
+
+function EpisodesPaintGateOpen() as boolean
+    return BrowseThumbPaintComplete(SE_FirstEpisodeThumb())
+end function
+
+sub DetachEpisodesPaintWatch()
+    BrowseDetachHostPaintWatch(m)
+end sub
+
+sub AttachEpisodesPaintWatch()
+    if BrowseAttachThumbPaintWatch(m, SE_FirstEpisodeThumb(), "OnEpisodesFirstPainted") then
+        OnEpisodesFirstPainted()
+    end if
+end sub
+
+sub OnEpisodesFirstPainted()
+    TryCompleteEpisodesReveal()
+end sub
+
+sub TryCompleteEpisodesReveal()
+    if not BrowsePageLoaderRunning(m) then return
+    if EpisodesPaintGateOpen() then CompleteEpisodesReveal()
+end sub
+
+sub PrepareEpisodesReveal()
+    if m.episodesRevealed then return
+    m.episodesRevealed = true
+    SetContentVisible(true)
+    AttachEpisodesPaintWatch()
+    TryCompleteEpisodesReveal()
+end sub
+
+sub CompleteEpisodesReveal()
+    if not BrowsePageLoaderRunning(m) then return
+    BrowseHidePageLoader(m, m.pageBgRest)
+    m.loading = false
+    ApplySeasonFocus()
+    ApplyEpisodeFocus()
+end sub
+
+sub OnBrowseLoaderTimeout()
+    if not BrowsePageLoaderRunning(m) then return
+    if not m.episodesRevealed then PrepareEpisodesReveal()
+    if BrowsePageLoaderRunning(m) then CompleteEpisodesReveal()
 end sub
 
 ' ── Fetch ────────────────────────────────────────────────────────────────────
@@ -231,6 +280,7 @@ sub OnSeriesResponse()
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 or api.result = invalid then
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         ShowLoading(false)
+        m.loading = false
         return
     end if
 
@@ -247,13 +297,11 @@ sub OnSeriesResponse()
 
     m.trailerList = SE_BuildTrailerList(m.seasons, data.thumbnails)
 
-    ShowLoading(false)
     BuildTabModel()
     SelectInitialSeason(data)
     RebuildSeasonTabs()
     RebuildEpisodeCards()
-    ApplySeasonFocus()
-    ApplyEpisodeFocus()
+    PrepareEpisodesReveal()
 end sub
 
 function SE_SeriesMetaLine(data as object) as string
