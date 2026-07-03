@@ -34,6 +34,9 @@ function CreateScreenForRoute(route as string, state as object) as object
     if route = RouteReels() then
         return CreateObject("roSGNode", "ReelsScreen")
     end if
+    if route = RouteLiveTv() then
+        return CreateObject("roSGNode", "LiveTvScreen")
+    end if
     return CreatePlaceholderScreen(route, state)
 end function
 

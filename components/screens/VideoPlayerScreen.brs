@@ -18,6 +18,7 @@ sub init()
     m.timeLabel = m.top.findNode("timeLabel")
     m.scrubFill = m.top.findNode("scrubFill")
     m.scrubKnob = m.top.findNode("scrubKnob")
+    m.scrubber = m.top.findNode("scrubber")
     m.skipIntroBtn = m.top.findNode("skipIntroBtn")
     m.skipIntroBg = m.top.findNode("skipIntroBg")
     m.skipIntroLabel = m.top.findNode("skipIntroLabel")
@@ -43,6 +44,7 @@ sub init()
     m.startOver = false
     m.isTrailer = false
     m.isReel = false
+    m.isLive = false
     m.resumeSecs = 0
     ' Resume position to apply once playback is seekable. content.playStart resumes
     ' instantly on devices, but the brs-desktop simulator ignores playStart for HLS,
@@ -131,6 +133,21 @@ sub OnNavStateReady()
     if key <> "" and key = m.playbackKey and m.playbackInitialized = true then
         return
     end if
+    m.isLive = false
+    if state.type <> invalid and state.type = "LIVE" then
+        m.isLive = true
+        m.detail = invalid
+        if state.detail <> invalid then m.detail = state.detail
+        if state.contentId <> invalid then m.contentId = state.contentId
+        if m.detail = invalid then return
+        m.playbackKey = key
+        m.playbackInitialized = true
+        m.subtitlesAttached = false
+        m.ignoredSpuriousFinish = false
+        ApplyLiveControlLayout()
+        LoadAndPlay()
+        return
+    end if
     if state.detail <> invalid then m.detail = state.detail
     if state.contentId <> invalid then m.contentId = state.contentId
     if state.nextVideoList <> invalid then m.nextList = state.nextVideoList
@@ -196,6 +213,11 @@ end sub
 
 sub LoadAndPlay()
     if m.videoNode = invalid or m.detail = invalid then return
+    if m.isLive or VideoIsLive(m.detail) then
+        m.isLive = true
+        LoadAndPlayLive()
+        return
+    end if
 
     url = VideoStreamUrl(m.detail)
     if url = "" then
@@ -231,6 +253,47 @@ sub LoadAndPlay()
     m.videoNode.control = "play"
 
     if fmt = "hls" then FetchQualityLadder(url)
+end sub
+
+' Live TV nav passes type LIVE with a synthetic detail (mock stream until BE ships).
+sub LoadAndPlayLive()
+    url = VideoStreamUrl(m.detail)
+    if url = "" then
+        ShowAlert(m.top, 2, CopyVideoLoadFailed())
+        return
+    end if
+    print "[LIVETV_DBG] player_live url=" + Left(url, 80)
+    MediaLogPlayUrl("video.player.live", url)
+
+    m.isTrailer = false
+    m.isReel = false
+    m.resumeSecs = 0
+    m.introStart = 0
+    m.introEnd = 0
+    m.bingeTrigger = 0
+    m.nextItem = invalid
+    m.duration = 0.0
+    m.position = 0.0
+    m.masterUrl = url
+    m.selectedQualityHeight = -1
+    m.qualityOptions = [{ label: CopyVideoQualityAuto(), url: url, height: -1 }]
+    m.capOptions = [{ label: CopyVideoCaptionsOff(), lang: "off" }]
+    m.selectedSubtitle = "off"
+
+    ApplyLiveControlLayout()
+    ShowSpinner(true)
+    m.videoNode.content = BuildContent(url, 0, false)
+    m.videoNode.control = "play"
+end sub
+
+sub ApplyLiveControlLayout()
+    if m.scrubber <> invalid then m.scrubber.visible = false
+    if m.timeLabel <> invalid then m.timeLabel.text = "LIVE"
+    if m.btnFwd <> invalid then m.btnFwd.opacity = 0.15
+    m.skipVisible = false
+    m.bingeVisible = false
+    if m.skipIntroBtn <> invalid then m.skipIntroBtn.visible = false
+    if m.bingeCard <> invalid then m.bingeCard.visible = false
 end sub
 
 ' Build the playback ContentNode — delegates to VP_BuildContent.
@@ -462,6 +525,10 @@ sub UpdatePlayIcon()
 end sub
 
 sub UpdateScrubber()
+    if m.isLive then
+        if m.timeLabel <> invalid then m.timeLabel.text = "LIVE"
+        return
+    end if
     if m.duration <= 0 then return
     frac = m.position / m.duration
     if frac < 0 then frac = 0
@@ -689,7 +756,7 @@ sub SendProgress()
     if m.disposed then return
     if m.detail = invalid then return
     videoId = VideoProgressId(m.detail)
-    if not VP_ShouldPostProgress(m.isTrailer, m.isReel, m.position, videoId) then return
+    if not VP_ShouldPostProgress(m.isTrailer, m.isReel, m.isLive, m.position, videoId) then return
 
     total = Int(m.duration)
     posSecs = Int(m.position)
@@ -736,6 +803,10 @@ sub OnKey()
 end sub
 
 sub HandleControlsKey(key as string)
+    if m.isLive then
+        HandleLiveControlsKey(key)
+        return
+    end if
     if key = "up" then
         if m.skipVisible then
             m.focusMode = "skip"
@@ -764,6 +835,32 @@ sub HandleControlsKey(key as string)
         SeekBy(-10)
     else if key = "fwd" then
         SeekBy(10)
+    end if
+end sub
+
+sub HandleLiveControlsKey(key as string)
+    if key = "left" then
+        if m.controlIndex > 0 then m.controlIndex = m.controlIndex - 1
+        if m.controlIndex = 1 and m.btnFwd <> invalid then m.controlIndex = 0
+        ApplyControlFocus()
+    else if key = "right" then
+        maxIdx = 2
+        if m.controlIndex < maxIdx then m.controlIndex = m.controlIndex + 1
+        if m.controlIndex = 2 then m.controlIndex = 1
+        ApplyControlFocus()
+    else if key = "OK" or key = "ok" then
+        id = m.controlIds[m.controlIndex]
+        if id = "back" then
+            if m.vm <> invalid then m.vm.callFunc("NavigateBack", "", invalid)
+        else if id = "play" then
+            TogglePlayPause()
+        else if id = "settings" then
+            OpenSettings()
+        end if
+    else if key = "play" then
+        TogglePlayPause()
+    else if key = "back" then
+        if m.vm <> invalid then m.vm.callFunc("NavigateBack", "", invalid)
     end if
 end sub
 

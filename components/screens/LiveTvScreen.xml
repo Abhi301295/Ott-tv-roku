@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Live TV + mock EPG — parity with src/features/livetv/index.tsx -->
+<component name="LiveTvScreen" extends="Group">
+  <interface>
+    <field id="navState" type="assocarray" onChange="OnNavStateReady" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="shellEnterContent" type="boolean" value="false" alwaysNotify="true" onChange="OnShellEnterContent" />
+    <field id="shellLayoutRev" type="integer" value="0" alwaysNotify="true" onChange="OnShellLayoutRev" />
+    <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Routes.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/MediaUrl.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoPlayback.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvMockData.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvService.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/LiveTvScreen.brs" />
+
+  <children>
+    <Rectangle id="bg" width="1920" height="1080" color="0x0C111Aff" />
+
+    <Group id="contentHost" translation="[0, 0]">
+      <!-- Hero (~45% height) -->
+      <Group id="heroHost" translation="[0, 0]">
+        <Poster id="heroBackdrop" width="1920" height="486" loadDisplayMode="scaleToZoom" opacity="0.7" />
+        <Rectangle id="heroGradL" width="1152" height="486" color="0x0C111Aff" opacity="0.85" />
+        <Rectangle id="heroGradT" translation="[0, 340]" width="1920" height="146" color="0x0C111Aff" opacity="0.6" />
+
+        <Group id="heroMeta" translation="[40, 300]">
+          <Label id="spotlightLbl" width="900" height="28" wrap="false" color="0xec4899ff">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="18" />
+          </Label>
+          <Label id="titleLbl" width="900" height="56" wrap="true" maxLines="2" color="0xffffffff">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="40" />
+          </Label>
+          <Label id="timeLbl" width="900" height="28" wrap="false" color="0xd1d5dbff">
+            <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="18" />
+          </Label>
+          <Label id="descLbl" width="760" height="72" wrap="true" maxLines="3" color="0x9ca3afff">
+            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
+          </Label>
+          <Group id="playNowBtn" translation="[0, 88]">
+            <Rectangle id="playNowBg" width="200" height="52" color="0xE5007Aff" />
+            <Label id="playNowLbl" text="Play Now" width="200" height="52" horizAlign="center" vertAlign="center" color="0xffffffff">
+              <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="20" />
+            </Label>
+          </Group>
+          <Group id="playBeginningBtn" translation="[220, 88]">
+            <Rectangle id="playBeginningBg" width="260" height="52" color="0x00000000" />
+            <Rectangle id="playBeginningBorder" width="260" height="52" color="0xffffff66" />
+            <Label id="playBeginningLbl" text="Play From Beginning" width="260" height="52" horizAlign="center" vertAlign="center" color="0xd1d5dbff">
+              <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="20" />
+            </Label>
+          </Group>
+        </Group>
+      </Group>
+
+      <!-- EPG grid -->
+      <Group id="epgHost" translation="[0, 486]">
+        <Group id="timelineHost" translation="[200, 0]" />
+        <Group id="gridClip" translation="[0, 48]" clippingRect="[0, 0, 1920, 546]">
+          <Group id="rowsHost" translation="[0, 0]" />
+          <Rectangle id="liveLine" width="2" height="546" color="0xE5007Aff" visible="false" />
+        </Group>
+      </Group>
+    </Group>
+
+    <Timer id="nowTimer" duration="15" repeat="true" />
+  </children>
+</component>

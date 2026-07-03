@@ -110,7 +110,7 @@ sub LoadThemeTokens()
     ' Cache the colors used by interactive states (parity with Tailwind tokens).
     m.cActive = TC("primary-600", "#0760bb")        ' bg-primary-600 (active tab / focused btn)
     m.cShadow = TC("primary-700", "#04478b")         ' shadow-primary-700
-    m.cInactive = TC("background", "#1f1f22")        ' bg-ui-background (inactive tab) — dark default from dark.theme.ts
+    m.cInactive = TailwindNeutral950Color()       ' bg-neutral-950 (unselected tab)
     m.cTabText = TC("neutral-50", "#ffffff")         ' text-neutral-50
     m.cBtnEnabledBg = TC("primary-500", "#0b75e0")   ' bg-primary-500 (enabled, unfocused)
     m.cBtnFocusBg = m.cActive                        ' bg-primary-600 (enabled, focused)
@@ -173,21 +173,20 @@ sub ApplyThemeColors()
     m.title.color = TC("neutral-50", "#ffffff")
     m.logoLabel.color = TC("primary-500", "#0b75e0")
 
-    cardBg = TC("background", "#1f1f22")
+    cardBg = TailwindNeutral950Color()
     cardBorder = TC("neutral-500", "#e279ce")
     m.phoneCard.blendColor = cardBg
     m.phoneCardBorder.blendColor = cardBorder
     m.remoteCard.blendColor = cardBg
     m.remoteCardBorder.blendColor = cardBorder
 
-    ' Badge bg uses neutral-50 (theme), but the number uses text-neutral-950 which
-    ' is NOT mapped in the web Tailwind config — it falls back to Tailwind's default
-    ' #0a0a0a (dark). So hardcode dark to match React/LG (not the white theme token).
+    ' Badge bg: bg-neutral-50 (API token). Number: text-neutral-950 (Tailwind built-in).
     badgeBg = TC("neutral-50", "#ffffff")
     m.step1Badge.blendColor = badgeBg
     m.step2Badge.blendColor = badgeBg
-    m.step1Num.color = "0x0a0a0aff"
-    m.step2Num.color = "0x0a0a0aff"
+    badgeNumColor = TailwindNeutral950Color()
+    m.step1Num.color = badgeNumColor
+    m.step2Num.color = badgeNumColor
 
     bodyText = TC("neutral-500", "#e279ce")
     m.step1Text.color = bodyText

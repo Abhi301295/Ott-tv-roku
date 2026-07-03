@@ -103,6 +103,11 @@ function VideoIsReel(detail as object) as boolean
     return detail.isReel = true
 end function
 
+function VideoIsLive(detail as object) as boolean
+    if detail = invalid then return false
+    return detail.isLive = true
+end function
+
 ' Subtitle tracks for the ContentNode
 ' detail.subtitles[].{lang|value|language, path|url}). Returns [] when none.
 function VideoSubtitleTracks(detail as object) as object

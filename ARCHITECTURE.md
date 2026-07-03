@@ -1,9 +1,11 @@
 # OTT Accelerator — Roku Architecture
 
 Production Roku channel (BrightScript + SceneGraph) porting the LG/Samsung CTV React app
-(`lg-samsung-tv-player-lg-dev`). Both clients talk to the same `media/v1/*` backend.
+(`/home/admin3329/Desktop/lg-samsung-tv-player`). Both clients talk to the same `media/v1/*` backend.
 
-**Related docs:** [`../docs/port-plan/port-plan.md`](../docs/port-plan/port-plan.md) (milestones),
+**Related docs:** [`docs/REACT_REFERENCE.md`](docs/REACT_REFERENCE.md) (React source path),
+[`docs/REACT_PARITY_AUDIT.md`](docs/REACT_PARITY_AUDIT.md) (screen-by-screen gap analysis),
+[`../docs/port-plan/port-plan.md`](../docs/port-plan/port-plan.md) (milestones),
 [`../docs/roku-channel/roku-channel.md`](../docs/roku-channel/roku-channel.md) (tooling & install).
 
 ---
@@ -12,7 +14,8 @@ Production Roku channel (BrightScript + SceneGraph) porting the LG/Samsung CTV R
 
 ### 1. React is the reference
 
-Behavior, API contracts, and visuals come from the React app first. When porting a screen,
+Behavior, API contracts, and visuals come from the React app at
+`/home/admin3329/Desktop/lg-samsung-tv-player` first. When porting a screen,
 start in `src/features/…` / `src/components/…`, then mirror routing, data shape, and UI
 decisions in Roku.
 

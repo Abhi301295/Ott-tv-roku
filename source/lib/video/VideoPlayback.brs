@@ -3,6 +3,12 @@
 
 function VP_PlaybackKey(state as object) as string
     if state = invalid then return ""
+    if state.type <> invalid and state.type = "LIVE" then
+        id = ""
+        if state.contentId <> invalid and state.contentId <> "" then id = state.contentId
+        if id = "" and state.detail <> invalid and state.detail._id <> invalid then id = state.detail._id
+        return "live:" + id
+    end if
     id = ""
     if state.contentId <> invalid and state.contentId <> "" then id = state.contentId
     if id = "" and state.detail <> invalid and state.detail._id <> invalid then id = state.detail._id
@@ -89,9 +95,10 @@ function VP_BingeShouldAdvance(remaining as float) as boolean
     return remaining <= 0
 end function
 
-function VP_ShouldPostProgress(isTrailer as boolean, isReel as boolean, position as float, videoId as string) as boolean
+function VP_ShouldPostProgress(isTrailer as boolean, isReel as boolean, isLive as boolean, position as float, videoId as string) as boolean
     if isTrailer then return false
     if isReel then return false
+    if isLive then return false
     if videoId = "" then return false
     if position <= 0 then return false
     return true

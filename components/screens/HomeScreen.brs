@@ -576,18 +576,10 @@ sub SetupHeader()
         return
     end if
 
-    reels = false
-    resolved = invalid
-    if m.global <> invalid then resolved = m.global.businessResolved
-    if resolved <> invalid then reels = IsFeatureEnabled(resolved, "reelsEnabled")
-    if not reels then
-        tm = m.top.getScene().findNode("themeManager")
-        if tm <> invalid and tm.reelsEnabled = true then reels = true
-    end if
-
-    m.menuItems = HeaderMenuItems(reels)
+    flags = HeaderMenuFeatureFlags(m.top)
+    m.menuItems = HeaderMenuItems(flags.reels, flags.epg)
     if ThemeIsSidebarHeader() then
-        m.header.menuItems = SidebarMenuItems(reels)
+        m.header.menuItems = SidebarMenuItems(flags.reels, flags.epg)
     else
         texts = []
         for each it in m.menuItems

@@ -12,5 +12,6 @@ function RouteSearch() as string: return "search": end function
 function RouteSeries() as string: return "series": end function
 function RouteMyListDetail() as string: return "mylist_detail": end function
 function RouteReels() as string: return "reels": end function
+function RouteLiveTv() as string: return "live_tv": end function
 function RouteNewRelease() as string: return "new_release": end function
 function RouteMyList() as string: return "mylist": end function

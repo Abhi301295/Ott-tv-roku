@@ -1,7 +1,7 @@
 # OTT Accelerator - Roku
 
 Production Roku channel (BrightScript + SceneGraph) replicating the LG/Samsung web CTV app
-(`lg-samsung-tv-player-lg-dev`), targeting the same `media/v1/*` backend.
+(`lg-samsung-tv-player` at `/home/admin3329/Desktop/lg-samsung-tv-player`), targeting the same `media/v1/*` backend.
 
 **Project documentation:** [`../docs/README.md`](../docs/README.md)
 

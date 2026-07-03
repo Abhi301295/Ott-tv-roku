@@ -11,7 +11,8 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-REACT_IMAGE_TS = ROOT.parent / "lg-samsung-tv-player-lg-dev" / "src" / "utils" / "images" / "image.ts"
+REACT_REPO = ROOT.parent.parent / "lg-samsung-tv-player"
+REACT_IMAGE_TS = REACT_REPO / "src" / "utils" / "images" / "image.ts"
 UI = ROOT / "images" / "ui"
 OUT_PNG = UI / "reels_thumb_placeholder.png"
 W, H = 608, 1080

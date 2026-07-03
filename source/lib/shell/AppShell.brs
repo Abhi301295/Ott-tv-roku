@@ -183,24 +183,30 @@ sub SetupAppHeader(vm as object, route as string, state as object)
     end if
 
     reels = false
+    epg = false
     resolved = invalid
     scene = header.getScene()
     if scene <> invalid and scene.global <> invalid then resolved = scene.global.businessResolved
-    if resolved <> invalid then reels = IsFeatureEnabled(resolved, "reelsEnabled")
+    if resolved <> invalid then
+        reels = IsFeatureEnabled(resolved, "reelsEnabled")
+        epg = IsFeatureEnabled(resolved, "epgManagement")
+    end if
     tm = invalid
     if scene <> invalid then tm = scene.findNode("themeManager")
     if tm <> invalid and tm.reelsEnabled = true then reels = true
+    if tm <> invalid and tm.epgEnabled = true then epg = true
 
-    ' shellMenuBuilt / shellMenuReels live on ViewManager's m (not interface fields).
+    ' shellMenuBuilt / shellMenuReels / shellMenuEpg live on ViewManager's m (not interface fields).
     menuBuilt = false
     if m.shellMenuBuilt = true then menuBuilt = true
     if m.shellMenuReels <> reels then menuBuilt = false
+    if m.shellMenuEpg <> epg then menuBuilt = false
 
     if not menuBuilt then
-        menuItems = HeaderMenuItems(reels)
+        menuItems = HeaderMenuItems(reels, epg)
         vm.menuItems = menuItems
         if ThemeIsSidebarHeader() then
-            header.menuItems = SidebarMenuItems(reels)
+            header.menuItems = SidebarMenuItems(reels, epg)
         else
             texts = []
             for each it in menuItems
@@ -209,6 +215,7 @@ sub SetupAppHeader(vm as object, route as string, state as object)
             header.menuTexts = texts
         end if
         m.shellMenuReels = reels
+        m.shellMenuEpg = epg
         m.shellMenuBuilt = true
         LoadAppHeaderTheme(header)
         ApplyAppHeaderBranding(header)

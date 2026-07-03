@@ -1,5 +1,5 @@
 ' HeaderMenu.brs — top-bar menu entries (parity with HeaderList.ts MENU_LIST,
-' filtered by the reels feature flag like ottHeader.tsx menuList).
+' filtered by reelsEnabled and epgManagement like ottHeader.tsx menuList).
 
 function HM_TypeSingleVideo() as string
     return "SINGLE_VIDEO"
@@ -9,18 +9,42 @@ function HM_TypeSeries() as string
     return "SERIES_AND_EPISODES"
 end function
 
-function HeaderMenuItems(reelsEnabled as boolean) as object
+' Read feature flags from business config + ThemeManager (post-resolve overrides).
+function HeaderMenuFeatureFlags(fromNode as object) as object
+    reels = false
+    epg = false
+    scene = invalid
+    if fromNode <> invalid then scene = fromNode.getScene()
+    if scene <> invalid and scene.global <> invalid then
+        resolved = scene.global.businessResolved
+        if resolved <> invalid then
+            reels = IsFeatureEnabled(resolved, "reelsEnabled")
+            epg = IsFeatureEnabled(resolved, "epgManagement")
+        end if
+    end if
+    tm = invalid
+    if scene <> invalid then tm = scene.findNode("themeManager")
+    if tm <> invalid and tm.reelsEnabled = true then reels = true
+    if tm <> invalid and tm.epgEnabled = true then epg = true
+    return { reels: reels, epg: epg }
+end function
+
+' Order matches HeaderList.ts: Profile before Reels; Live TV after Reels.
+function HeaderMenuItems(reelsEnabled as boolean, epgEnabled as boolean) as object
     items = [
         { text: "Home", route: RouteHome(), type: "" }
         { text: "Search", route: RouteSearch(), type: "" }
         { text: "Movies", route: RouteGenere(), type: HM_TypeSingleVideo() }
         { text: "Series", route: RouteGenere(), type: HM_TypeSeries() }
         { text: "My Watchlist", route: RouteMyListDetail(), type: "" }
+        { text: "Profile", route: RouteLoginProfile(), type: "" }
     ]
     if reelsEnabled then
         items.Push({ text: "Reels", route: RouteReels(), type: "" })
     end if
-    items.Push({ text: "Profile", route: RouteLoginProfile(), type: "" })
+    if epgEnabled then
+        items.Push({ text: "Live TV", route: RouteLiveTv(), type: "" })
+    end if
     return items
 end function
 
