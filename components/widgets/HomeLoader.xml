@@ -5,6 +5,7 @@
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
     <field id="neutral50" type="string" value="" onChange="OnColorsChanged" />
     <field id="primary600" type="string" value="" onChange="OnColorsChanged" />
+    <function name="NudgeSpin" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/components/widgets/HomeLoader.brs" />
@@ -23,10 +24,5 @@
         <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
       </Label>
     </Group>
-
-    <Animation id="loaderAnim" duration="0.9" repeat="true" easeFunction="linear">
-      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
-        fieldToInterp="loaderSpin.rotation" />
-    </Animation>
   </children>
 </component>

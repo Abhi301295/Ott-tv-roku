@@ -270,7 +270,7 @@ sub HardResetTrailerVideo()
     video.translation = trans
     video.visible = false
     video.opacity = 0.0
-    video.mute = true
+    video.mute = false
     video.enableUI = false
     if parent <> invalid then
         if idx >= 0 and idx <= parent.getChildCount() then
@@ -1260,7 +1260,7 @@ sub LoadTrailerWithFormat(url as string, formatOverride as string, isFormatRetry
     content = CreateObject("roSGNode", "ContentNode")
     content.url = url
     content.streamFormat = fmt
-    m.trailerVideo.mute = true
+    m.trailerVideo.mute = false
     HideTrailerVideo()
     m.trailerVideo.seek = 0
     m.trailerVideo.content = content

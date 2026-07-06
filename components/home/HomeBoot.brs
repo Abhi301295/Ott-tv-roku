@@ -5,6 +5,7 @@
 sub OnNavStateReady()
     if m.homeNavReady = true then return
     m.homeNavReady = true
+    HomeLoaderLog("navState ready", "pendingSelectId=" + m.pendingSelectId)
     SyncHeaderFromShell()
     ClaimHomeHeaderFocus()
     TryStartHomeBoot()
@@ -73,19 +74,6 @@ sub TryStartHomeBoot()
     if m.bootDeferPending then return
     if m.bootStarted then return
     ConsumeHomeNavState()
-    if ProfileTransitionActive() then
-        ArmTransitionSafetyTimer()
-        if m.bootDeferTimer = invalid then
-            m.bootDeferTimer = CreateObject("roSGNode", "Timer")
-            m.bootDeferTimer.duration = 0.045
-            m.bootDeferTimer.repeat = false
-            m.top.appendChild(m.bootDeferTimer)
-            m.bootDeferTimer.observeField("fire", "OnBootDeferTimer")
-        end if
-        m.bootDeferPending = true
-        m.bootDeferTimer.control = "start"
-        return
-    end if
     BeginHomeBootWork()
 end sub
 
@@ -100,6 +88,7 @@ end sub
 sub BeginHomeBootWork()
     if m.bootStarted then return
     m.bootStarted = true
+    HomeLoaderLogBoot(m.bootSpan, "boot work start", HomeLoaderGateSnapshot())
 
     ' A pending select (from the profile screen) sets the profile id itself once it
     ' succeeds, so don't bounce back to the picker just because it isn't persisted yet.
@@ -113,6 +102,7 @@ sub BeginHomeBootWork()
 
     ' Page loader follows layout; React Spinner covers the home canvas until data lands.
     ApplyHomeLoaderColors()
+    HomeLoaderLogBoot(m.bootSpan, "loader SHOW", "boot sequence | " + HomeLoaderGateSnapshot())
     ShowHomeLoader(true)
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "start"
     m.cwShimmerSpan = CreateObject("roTimespan")
@@ -136,22 +126,14 @@ end sub
 
 
 sub OnTransitionSafetyTimer()
-    if not ProfileTransitionActive() then return
-    print "[WELCOME_DBG] safety_timeout boot_started="; m.bootStarted; " content_boot="; m.contentBootStarted; " rowsBuilt="; m.rowsBuilt
+    if m.transitionSafetyTimer <> invalid then m.transitionSafetyTimer.control = "stop"
     if not m.contentBootStarted then BootHomeContent()
     row0 = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
     if row0 <> invalid then
         row0.callFunc("ForceReveal", invalid)
-        if not m.rowsRevealed then PrepareFirstRowReveal()
+        if not m.rowsRevealed then TryPrepareHomeReveal()
     end if
-    HideProfileWelcomeTransition()
-end sub
-
-
-sub HideProfileWelcomeTransition()
-    if ProfileTransitionActive() then ProfileTransitionHide(m.vm)
-    if m.transitionSafetyTimer <> invalid then m.transitionSafetyTimer.control = "stop"
 end sub
 
 
@@ -264,6 +246,7 @@ end sub
 
 sub BootHomeContent()
     if m.contentBootStarted then return
+    HomeLoaderLogBoot(m.bootSpan, "content boot start", HomeLoaderGateSnapshot())
     ' Prefetch may finish after BeginHomeBootWork when select-profile ran in parallel.
     if not m.categoriesPrefetched then ConsumeHomeBootCacheIfReady()
     m.contentBootStarted = true
@@ -299,6 +282,7 @@ end sub
 
 sub OnContinueBootTimeout()
     if m.continueLoading <> true then return
+    HomeLoaderLogBoot(m.bootSpan, "CW boot TIMEOUT", HomeLoaderGateSnapshot())
     HomeBootLog(m.bootSpan, "CW boot timeout", "proceed without continue-watching")
     m.continueLoading = false
     MaybeBuildRows()
@@ -376,6 +360,7 @@ sub OnHomeSelectResponse(event as object)
         m.selectInFlight = false
         ProfileSelectLogNode("HOME_SELECT_OK", "profileId persisted -> boot content", m.top)
         HomeBootLog(m.bootSpan, "select-profile ok", "boot content")
+        HomeLoaderLogBoot(m.bootSpan, "select-profile OK", HomeLoaderGateSnapshot())
         print "[HOME] select-profile ok -> boot home content"
         BootHomeContent()
         return
@@ -526,6 +511,7 @@ end sub
 
 sub FetchContinueWatching()
     path = Endpoints().HOME.CONTINUE_WATCHING
+    HomeLoaderLogBoot(m.bootSpan, "fetch CW", path)
     m.continueTask = ApiGet(path)
     m.continueTask.observeField("apiResult", "OnContinueWatchingResponse")
     StartHttpTask(m.continueTask)
@@ -556,6 +542,7 @@ sub OnContinueWatchingResponse()
 
     if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "stop"
     m.continueLoading = false
+    HomeLoaderLogBoot(m.bootSpan, "CW response", "ok=" + CwPerfBool(api.ok) + " rows=" + Str(cwCount) + " | " + HomeLoaderGateSnapshot())
     HomeBootLog(m.bootSpan, "CW response", "ok=" + CwPerfBool(api.ok) + " rows=" + Str(cwCount) + " rowsBuilt=" + CwPerfBool(m.rowsBuilt))
     MaybeBuildRows()
 end sub
@@ -568,6 +555,7 @@ sub FetchHomeCategories(pageNum as integer)
     ' curated home payload when page/limit ARE present, which made our rows/items diverge
     ' from LG. Send the identical param-less request so the content mapping matches exactly.
     path = Endpoints().HOME.CATEGORY_LIST
+    HomeLoaderLogBoot(m.bootSpan, "fetch categories", path)
     m.categoryTask = ApiGet(path)
     m.categoryTask.observeField("apiResult", "OnHomeCategoriesResponse")
     StartHttpTask(m.categoryTask)
@@ -596,6 +584,7 @@ sub OnHomeCategoriesResponse()
 
     m.hasMore = false
     m.initialLoading = false
+    HomeLoaderLogBoot(m.bootSpan, "categories response", "listing=" + Str(catCount) + " totalCats=" + Str(m.categories.Count()) + " | " + HomeLoaderGateSnapshot())
     HomeBootLog(m.bootSpan, "categories response", "listing=" + Str(catCount) + " totalCats=" + Str(m.categories.Count()))
     MaybeBuildHero()
     MaybeBuildRows()
@@ -634,7 +623,6 @@ end function
 ' Row build gate — OTT may build before CW on revisit; profile handoff and Netflix wait
 ' for both APIs so row 0 is Continue Watching before the welcome overlay dismisses.
 function RowsBootLoading() as boolean
-    if ProfileTransitionActive() then return AnyBootLoading()
     if ThemeIsOttHome() then return m.initialLoading
     return AnyBootLoading()
 end function
@@ -650,6 +638,7 @@ sub MaybeBuildHero()
     if m.heroBuilt then return
     m.heroBuilt = true
     items = ExtractBannerItems(m.categories)
+    HomeLoaderLogBoot(m.bootSpan, "build hero", "bannerItems=" + Str(items.Count()))
     print "[HOME] MaybeBuildHero bannerItems="; items.Count()
     if items.Count() = 0 then
         UpdateHeroBanner()
@@ -667,11 +656,13 @@ end sub
 sub MaybeBuildRows()
     if m.rowsBuilt then return
     if RowsBootLoading() then
+        HomeLoaderLogBoot(m.bootSpan, "MaybeBuildRows waiting", "initial=" + CwPerfBool(m.initialLoading) + " continue=" + CwPerfBool(m.continueLoading))
         HomeBootLog(m.bootSpan, "rows waiting", "initial=" + CwPerfBool(m.initialLoading) + " continue=" + CwPerfBool(m.continueLoading) + " ott=" + CwPerfBool(ThemeIsOttHome()))
         print "[HOME] MaybeBuildRows waiting (initialLoading="; m.initialLoading; " continueLoading="; m.continueLoading; ")"
         return
     end if
     m.rowsDataReady = true
+    HomeLoaderLogBoot(m.bootSpan, "rows data ready", "cats=" + Str(FilterContentRows(m.categories).Count()) + " | " + HomeLoaderGateSnapshot())
     HomeBootLog(m.bootSpan, "rows data ready", "cats=" + Str(FilterContentRows(m.categories).Count()))
     print "[HOME] MaybeBuildRows -> data ready, waiting for hero trailer / gate"
     MaybeStartRowBuild()
@@ -692,8 +683,6 @@ sub MaybeStartRowBuild()
     end if
 
     if ThemeIsOttHome() then m.rowGateElapsed = true
-    ' Profile handoff: user already waited on welcome overlay — build rows immediately.
-    if ProfileTransitionActive() then m.rowGateElapsed = true
     ' No CW row for this profile — do not hold row build for a hero trailer preview gate.
     if not HomeHasContinueWatchingRow() then m.rowGateElapsed = true
     if not HeroMultiSlide() then m.rowGateElapsed = true
@@ -701,6 +690,7 @@ sub MaybeStartRowBuild()
     heroLive = (m.hero <> invalid and m.hero.trailerPlaying = true)
     if heroLive or m.rowGateElapsed then
         m.rowsBuilt = true
+        HomeLoaderLogBoot(m.bootSpan, "row gate OPEN", "trailer=" + CwPerfBool(heroLive) + " elapsed=" + CwPerfBool(m.rowGateElapsed) + " | " + HomeLoaderGateSnapshot())
         if heroLive then
             HomeBootLog(m.bootSpan, "row gate open", "trailer live")
             print "[HOME] row gate open (trailer live) -> build rows"
@@ -715,6 +705,7 @@ sub MaybeStartRowBuild()
     if not m.rowGateStarted then
         m.rowGateStarted = true
         m.rowBuildGate.control = "start"
+        HomeLoaderLogBoot(m.bootSpan, "row gate ARMED", "sec=" + Str(HC_RowBuildGateSecForLayout(m.homeLayout)))
         HomeBootLog(m.bootSpan, "row gate armed", "sec=" + Str(HC_RowBuildGateSecForLayout(m.homeLayout)))
         print "[HOME] row build held for hero preview (gate armed)"
     end if
@@ -725,18 +716,49 @@ end sub
 ' Safety gate elapsed — build the rows even if no trailer ever went live.
 sub OnRowBuildGate()
     m.rowGateElapsed = true
+    HomeLoaderLogBoot(m.bootSpan, "row gate TIMEOUT", HomeLoaderGateSnapshot())
     MaybeStartRowBuild()
 end sub
 
-' Hero poster has painted — stop the loader safety timer (page loader hides when rows land).
+' Hero poster has painted — retry dropping the loader when row 0 is also ready.
 sub OnHeroPosterReady()
     if m.hero = invalid or m.hero.posterReady <> true then return
+    HomeLoaderLogBoot(m.bootSpan, "hero posterReady", HomeLoaderGateSnapshot())
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
+    TryPrepareHomeReveal()
 end sub
 
-' Safety net: hide the page loader if content never signals ready.
+' Safety net: never drop the page loader while first paint is still in flight.
 sub OnHomeLoaderTimeout()
+    HomeLoaderLogBoot(m.bootSpan, "loader safety timeout", "bootActive=" + CwPerfBool(HomeLoaderBootActive()) + " | " + HomeLoaderGateSnapshot())
+    if not m.rowsRevealed and m.rowsBuilt and WelcomeDismissReadyForRow0() then
+        TryPrepareHomeReveal()
+        if m.rowsRevealed then return
+    end if
+    if HomeLoaderBootActive() then
+        HomeBootLog(m.bootSpan, "loader safety re-arm", "boot in flight")
+        BrowseEnsureLoaderRunning(m)
+        ArmHomeLoaderSafetyTimeout()
+        return
+    end if
+    HomeBootLog(m.bootSpan, "loader safety hide", "stuck after reveal")
     ShowHomeLoader(false)
+end sub
+
+function HomeLoaderBootActive() as boolean
+    if not m.bootStarted then return false
+    if m.selectInFlight then return true
+    if not m.rowsRevealed then return true
+    if AnyBootLoading() then return true
+    if not m.rowsBuilt then return true
+    if m.rowBuildTimer <> invalid and m.rowBuildTimer.control = "start" then return true
+    return false
+end function
+
+sub ArmHomeLoaderSafetyTimeout()
+    if m.skeletonTimeout = invalid then return
+    m.skeletonTimeout.control = "stop"
+    m.skeletonTimeout.control = "start"
 end sub
 
 sub ApplyHomeLoaderColors()
@@ -747,15 +769,18 @@ end sub
 sub ShowHomeLoader(show as boolean)
     if m.homeLoader = invalid then return
     if show then
+        HomeLoaderLogBoot(m.bootSpan, "ShowHomeLoader ON", HomeLoaderGateSnapshot())
         if m.cwShimmerSpan = invalid then m.cwShimmerSpan = CreateObject("roTimespan")
         CwPerfMark(m.cwShimmerSpan, "loader ON")
         BrowseShowPageLoader(m, m.pageBgRest)
+        ArmHomeLoaderSafetyTimeout()
     else
         loaderMs = CwPerfMs(m.cwShimmerSpan)
         bootMs = -1
         if m.bootSpan <> invalid then bootMs = m.bootSpan.TotalMilliseconds()
         detail = "loaderVisible=" + Str(loaderMs) + "ms"
         if bootMs >= 0 then detail = detail + " boot=" + Str(bootMs) + "ms"
+        HomeLoaderLogBoot(m.bootSpan, "ShowHomeLoader OFF", detail + " | " + HomeLoaderGateSnapshot())
         CwPerfMark(m.cwShimmerSpan, "loader OFF", detail)
         m.cwShimmerSpan = invalid
         if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"

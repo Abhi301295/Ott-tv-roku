@@ -26,13 +26,14 @@ end sub
 sub ApplyTheme()
     m.cardBorder = m.top.findNode("cardBorder")
     m.cardFill = m.top.findNode("cardFill")
+    m.title = m.top.findNode("title")
     m.prompt = m.top.findNode("prompt")
     m.cardBorder.blendColor = m.top.cCardBorder
     m.cardFill.blendColor = m.top.cCardBg
-    ' Prompt copy follows the themed neutral-300 (parity with text-neutral-300).
+    if m.title <> invalid then m.title.color = m.top.cNeutral50
     if m.prompt <> invalid then m.prompt.color = m.top.cNeutral300
-    ' Subtle dark drop shadow on the focused button (parity with shadow-lg),
-    ' not a colored glow. Kept black; size/opacity set in XML.
+    if m.cancelLabel <> invalid then m.cancelLabel.color = m.top.cNeutral50
+    if m.logoutLabel <> invalid then m.logoutLabel.color = m.top.cNeutral50
     m.cancelShadow.blendColor = "0x000000ff"
     m.logoutShadow.blendColor = "0x000000ff"
 end sub
@@ -54,23 +55,23 @@ sub UpdateButtons()
     cancelFocused = (m.focus = "cancel")
     logoutFocused = (m.focus = "logout")
 
-    ' Cancel: focused → primary-600 fill; else neutral card bg with neutral border.
+    ' Cancel: focused → primary-600 + primary-500 border; else bg-black + neutral-600.
     if cancelFocused and not loggingOut then
         m.cancelBorder.blendColor = m.top.cPrimary500
         m.cancelFill.blendColor = m.top.cPrimary600
     else
-        m.cancelBorder.blendColor = m.top.cNeutral500
+        m.cancelBorder.blendColor = m.top.cNeutral600
         m.cancelFill.blendColor = m.top.cCardBg
     end if
     m.cancelShadow.visible = (cancelFocused and not loggingOut)
 
-    ' Log Out: focused → primary-500 fill; else neutral.
+    ' Log Out: focused → primary-600 + neutral-950 border; else neutral-950 + neutral-600.
     if logoutFocused and not loggingOut then
-        m.logoutBorder.blendColor = m.top.cPrimary500
-        m.logoutFill.blendColor = m.top.cPrimary500
+        m.logoutBorder.blendColor = m.top.cNeutral950
+        m.logoutFill.blendColor = m.top.cPrimary600
     else
-        m.logoutBorder.blendColor = m.top.cNeutral500
-        m.logoutFill.blendColor = m.top.cCardBg
+        m.logoutBorder.blendColor = m.top.cNeutral600
+        m.logoutFill.blendColor = m.top.cNeutral950
     end if
     m.logoutShadow.visible = (logoutFocused and not loggingOut)
 

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- React onboardingSkeleton.tsx SkeletonBox — blue box-shadow halo + shimmer fill.
+     layoutScale=1.0 for profile list loading; 1.25 for focused profile select shimmer. -->
+<component name="ProfileSkeletonBox" extends="Group">
+  <interface>
+    <field id="boxWidth" type="float" value="150" onChange="OnLayoutChanged" />
+    <field id="boxHeight" type="float" value="150" onChange="OnLayoutChanged" />
+    <field id="layoutScale" type="float" value="1.0" onChange="OnLayoutChanged" />
+    <!-- avatar | pill | avatarSquare -->
+    <field id="glowKind" type="string" value="avatar" onChange="OnLayoutChanged" />
+    <field id="shapeUri" type="string" value="" onChange="OnLayoutChanged" />
+    <field id="baseColor" type="string" value="0x04478bff" onChange="OnColorsChanged" />
+    <field id="highlightColor" type="string" value="0x0b75e0ff" onChange="OnColorsChanged" />
+    <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
+    <field id="glowVisible" type="boolean" value="true" onChange="OnRunningChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/components/widgets/ProfileSkeletonBox.brs" />
+
+  <children>
+    <Poster id="glow" loadDisplayMode="scaleToFill" visible="false" />
+    <Skeleton id="sk" running="false" />
+  </children>
+</component>

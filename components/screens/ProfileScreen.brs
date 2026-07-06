@@ -9,7 +9,8 @@ sub init()
     m.listContentPadY = ProfileListTopY()
     m.listScrollY = 0
     m.listScrollTarget = 0
-    m.LIST_SCROLL_ANIM_STEPS = 18
+    m.prevProfileIndex = -1
+    m.LIST_SCROLL_ANIM_STEPS = 4
     m.listScrollAnimTimer = CreateObject("roSGNode", "Timer")
     m.listScrollAnimTimer.duration = 0.016
     m.listScrollAnimTimer.repeat = true
@@ -35,16 +36,6 @@ sub init()
     m.selectedProfile = invalid
     m.popup = ""               ' "" | "confirm" | "otp"
     m.selecting = false
-    m.prefetching = false
-    m.prefetchCwTask = invalid
-    m.prefetchCatTask = invalid
-    m.prefetchClock = invalid
-    m.prefetchStartMs = -1
-    m.prefetchCatalogHandled = false
-    m.prefetchCwRetriesLeft = 0
-    m.prefetchCatRetriesLeft = 0
-    m.prefetchCwRetryTimer = invalid
-    m.prefetchCatRetryTimer = invalid
     m.loggingOut = false
     m.AUTO_TOTAL_MS = 15000      ' progress ring reaches 100% at 15s (parity with React)
     m.AUTO_SELECT_MS = 15500     ' auto-select fires after 15s + a 500ms buffer
@@ -125,21 +116,14 @@ sub OnDispose()
     KillProfileTask(m.verifyTask)
     KillProfileTask(m.refreshTask)
     KillProfileTask(m.selectTask)
-    KillProfileTask(m.prefetchCwTask)
-    KillProfileTask(m.prefetchCatTask)
-    if m.prefetchGateTimer <> invalid then m.prefetchGateTimer.control = "stop"
-    if m.prefetchCwRetryTimer <> invalid then m.prefetchCwRetryTimer.control = "stop"
-    if m.prefetchCatRetryTimer <> invalid then m.prefetchCatRetryTimer.control = "stop"
-    m.prefetchCatalogHandled = false
-    if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
     if m.listScrollAnimTimer <> invalid then m.listScrollAnimTimer.control = "stop"
+    if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
     m.profilesTask = invalid
     m.selectTask = invalid
     m.logoutTask = invalid
     m.verifyTask = invalid
     m.refreshTask = invalid
     m.selecting = false
-    m.prefetching = false
     m.loggingOut = false
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")
@@ -170,8 +154,7 @@ end function
 ' Cumulative row layout — each row gets the height of its scaled card + name (+ hint).
 sub LayoutProfileRows()
     ReflowProfileRows()
-    UpdateProfileListScrollTarget()
-    AnimateProfileListScroll()
+    FollowProfileListScroll()
 end sub
 
 
@@ -218,14 +201,9 @@ sub OnAvatarLayoutChanged(event as object)
     if m.top.dispose = true then return
     if m.useSquareAvatars <> true then return
     ReflowProfileRows()
-    UpdateProfileListScrollTarget()
-    SmoothProfileListScrollStep()
+    FollowProfileListScroll()
 end sub
 
-' Gentle scroll follow while a row grows/shrinks during focus scale animation.
-
-' The resolved business config (theme tokens + branding) arrived/updated — re-apply
-' so the dialog colors, logo and login background reflect the live theme.
 sub OnBusinessResolved()
     LoadProfileTokens()
     m.uiSpec = ProfileUiSpec()
@@ -268,47 +246,22 @@ sub ShowLoading(show as boolean)
     ApplyProfileSkeletonLayout()
     m.skeletonGroup.visible = show
     for each id in ["sk0a", "sk0b", "sk1a", "sk1b", "sk2a", "sk2b"]
-        sk = m.top.findNode(id)
-        if sk <> invalid then sk.running = show
+        skBox = m.top.findNode(id)
+        if skBox <> invalid then skBox.running = show
     end for
+    if ProfileUsesSquareAvatars() then
+        for each id in ["sk0b", "sk1b", "sk2b"]
+            skBox = m.top.findNode(id)
+            if skBox <> invalid then
+                skBox.running = false
+                skBox.visible = false
+            end if
+        end for
+    end if
     host = m.profilesScrollHost
     if host = invalid then host = m.profilesContainer
     if host <> invalid then host.visible = not show
     ApplyProfileFocusBackground()
-end sub
-
-
-sub BindSelectingOverlayProfile()
-    if m.selectedProfile = invalid or m.vm = invalid then return
-    p = m.selectedProfile
-    nm = ""
-    if p.name <> invalid then nm = p.name
-    uri = ""
-    if p.avatar <> invalid then uri = p.avatar
-    ProfileTransitionShow(m.vm, nm, uri, ProfileInitials(nm), m.cPortalPrimary, m.cPortalSecondary, m.cPortalTertiary, m.cNeutral50, m.cAvatarBg)
-end sub
-
-
-sub ShowSelectingOverlay(show as boolean)
-    if show then
-        BindSelectingOverlayProfile()
-    else
-        ProfileTransitionHide(m.vm)
-    end if
-    ' Local overlay unused — shell overlay on ViewManager survives navigate to Home.
-    if m.selectingOverlay <> invalid then
-        m.selectingOverlay.running = false
-        m.selectingOverlay.visible = false
-    end if
-    if m.profilesScrollHost <> invalid then m.profilesScrollHost.visible = not show
-    if m.profileHeaderChrome <> invalid then m.profileHeaderChrome.visible = not show
-    if m.logoutBtn <> invalid then
-        if show then
-            m.logoutBtn.visible = false
-        else
-            m.logoutBtn.visible = (GetRefreshToken() <> "")
-        end if
-    end if
 end sub
 
 
@@ -372,6 +325,7 @@ sub OnProfilesResponse(event as object)
     ProfileSelectLogNode("PROFILE_FETCH", "ok count=" + ProfileSelectFmt(m.profiles.Count()), m.top)
     SaveProfilesMeta(m.profiles)
     BuildAvatars()
+    ApplyProfileColors()
 
     m.logoutBtn.visible = (GetRefreshToken() <> "")
 

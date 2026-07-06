@@ -27,16 +27,16 @@
         shapeUri="pkg:/images/ui/sk_detail_line_500.png" running="false" />
     </Group>
 
-    <!-- First row card shimmer — radius-10 parity VerticalCard (220×300). -->
+    <!-- First row card shimmer — radius-10 parity VerticalCard (240×300). -->
     <Group id="rowsPulse" visible="false">
-      <Skeleton id="skCard0" translation="[32, 649]" boxWidth="220" boxHeight="300"
-        shapeUri="pkg:/images/ui/sk_vertical_card_220x300.png" running="false" />
-      <Skeleton id="skCard1" translation="[262, 649]" boxWidth="220" boxHeight="300"
-        shapeUri="pkg:/images/ui/sk_vertical_card_220x300.png" running="false" />
-      <Skeleton id="skCard2" translation="[492, 649]" boxWidth="220" boxHeight="300"
-        shapeUri="pkg:/images/ui/sk_vertical_card_220x300.png" running="false" />
-      <Skeleton id="skCard3" translation="[722, 649]" boxWidth="220" boxHeight="300"
-        shapeUri="pkg:/images/ui/sk_vertical_card_220x300.png" running="false" />
+      <Skeleton id="skCard0" translation="[32, 649]" boxWidth="240" boxHeight="300"
+        shapeUri="pkg:/images/ui/sk_vertical_card_240x300.png" running="false" />
+      <Skeleton id="skCard1" translation="[282, 649]" boxWidth="240" boxHeight="300"
+        shapeUri="pkg:/images/ui/sk_vertical_card_240x300.png" running="false" />
+      <Skeleton id="skCard2" translation="[532, 649]" boxWidth="240" boxHeight="300"
+        shapeUri="pkg:/images/ui/sk_vertical_card_240x300.png" running="false" />
+      <Skeleton id="skCard3" translation="[782, 649]" boxWidth="240" boxHeight="300"
+        shapeUri="pkg:/images/ui/sk_vertical_card_240x300.png" running="false" />
     </Group>
   </children>
 </component>

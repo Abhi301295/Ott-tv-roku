@@ -718,7 +718,15 @@ end sub
 sub ApplyMoreLikeSkeletonColors()
     if m.moreLikeSkeletonHost = invalid then return
     running = m.moreLikeSkeletonHost.visible = true
-    CardApplyHomeCardSkeletonTree(m.moreLikeSkeletonHost, running)
+    colors = CardMoreLikeDrawerSkeletonColors()
+    for each sk in m.moreLikeSkeletonHost.getChildren(-1, 0)
+        if sk = invalid then continue for
+        if sk.subtype() <> "Skeleton" then continue for
+        sk.shapeUri = ""
+        CardApplySkeleton(sk, colors.base, colors.highlight)
+        if sk.hasField("animate") then sk.animate = true
+        if running and sk.hasField("running") then sk.running = true
+    end for
 end sub
 
 sub OnMoreLikeResponse()

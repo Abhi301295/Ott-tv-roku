@@ -75,7 +75,7 @@
 
       <Group id="actionsHost" translation="[60, 620]">
         <DetailActionButton id="watchNowBtn" label="Watch Now" translation="[0, 0]"
-          alwaysBg="true" iconUri="pkg:/images/ui/ic_play.png" iconW="18" iconH="21" />
+          alwaysBg="false" iconUri="pkg:/images/ui/ic_play.png" iconW="18" iconH="21" />
         <DetailActionButton id="moreEpisodesBtn" label="More Episodes" translation="[0, 92]"
           iconUri="pkg:/images/ui/ic_startover.png" iconW="21" iconH="21" visible="false" />
         <DetailActionButton id="watchlistBtn" label="Add to Watchlist" translation="[0, 184]"

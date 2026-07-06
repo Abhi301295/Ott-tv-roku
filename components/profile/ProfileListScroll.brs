@@ -90,19 +90,8 @@ sub ApplyProfileListScrollSnap()
 end sub
 
 
-' Gentle scroll follow while a row grows/shrinks during focus scale animation.
-sub SmoothProfileListScrollStep()
-    if m.profilesContainer = invalid then return
-    if m.listScrollTarget = invalid then m.listScrollTarget = 0
-    if m.listScrollY = invalid then m.listScrollY = 0
-    delta = m.listScrollTarget - m.listScrollY
-    if delta > -0.5 and delta < 0.5 then
-        m.listScrollY = m.listScrollTarget
-    else
-        m.listScrollY = m.listScrollY + (delta * 0.28)
-    end if
-    m.profilesContainer.translation = [0, -m.listScrollY]
+' Brief scroll glide on focus move; retargets each keypress for snappy navigation.
+sub FollowProfileListScroll()
+    UpdateProfileListScrollTarget()
+    AnimateProfileListScroll()
 end sub
-
-' The resolved business config (theme tokens + branding) arrived/updated — re-apply
-' so the dialog colors, logo and login background reflect the live theme.

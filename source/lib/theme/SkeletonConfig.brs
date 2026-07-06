@@ -24,6 +24,84 @@ function SK_HighlightFallbackHex() as string
     return "#0b75e0"
 end function
 
+function SkeletonBoxGlowPad() as integer
+    ' gen_skeleton_masks.py: GLOW_BLUR(5) + 14 — matches CSS blur-radius 10px halo
+    return 19
+end function
+
+function SkeletonProfileNameGlowPadX() as integer
+    ' gen_skeleton_masks.py: PILL_GLOW_BLUR(12) + 28 — full left/right halo on 190px pill
+    return 40
+end function
+
+function SkeletonProfileNameGlowPadY() as integer
+    return 28
+end function
+
+function SkeletonGlowLayoutPads(glowUri as string) as object
+    padX = SkeletonBoxGlowPad()
+    padY = padX
+    if glowUri = SkeletonProfileNameGlowUri() then
+        padX = SkeletonProfileNameGlowPadX()
+        padY = SkeletonProfileNameGlowPadY()
+    end if
+    return { padX: padX, padY: padY }
+end function
+
+sub LayoutSkeletonGlowPoster(glow as object, sk as object, glowUri as string, glowW as integer, glowH as integer)
+    if glow = invalid or sk = invalid then return
+    pads = SkeletonGlowLayoutPads(glowUri)
+    tr = sk.translation
+    glow.uri = glowUri
+    glow.translation = [tr[0] - pads.padX, tr[1] - pads.padY]
+    glow.width = glowW
+    glow.height = glowH
+    ApplySkeletonGlowPoster(glow)
+end sub
+
+function SkeletonBoxGlowColor() as string
+    ' onboardingSkeleton.tsx hardcoded rgba(0, 146, 255, *) — not a theme token
+    return "0x0092ffff"
+end function
+
+function SkeletonBoxGlowOpacity() as float
+    return 0.4
+end function
+
+sub ApplySkeletonGlowPoster(glow as object)
+    if glow = invalid then return
+    glow.blendColor = SkeletonBoxGlowColor()
+    glow.opacity = SkeletonBoxGlowOpacity()
+    glow.loadDisplayMode = "scaleToFill"
+end sub
+
+function SkeletonBoxGlowOffsetY() as integer
+    return 4
+end function
+
+function SkeletonProfileAvatarGlowUri(squareAvatars as boolean) as string
+    if squareAvatars then return "pkg:/images/ui/sk_glow_rounded_150_r12.png"
+    return "pkg:/images/ui/sk_glow_avatar_150.png"
+end function
+
+function SkeletonProfileNameGlowUri() as string
+    return "pkg:/images/ui/sk_glow_pill_190x22.png"
+end function
+
+function SkeletonProfileAvatarGlowSize() as object
+    pad = SkeletonBoxGlowPad()
+    offY = SkeletonBoxGlowOffsetY()
+    av = 150
+    return [av + pad * 2, av + pad * 2 + offY]
+end function
+
+function SkeletonProfileNameGlowSize() as object
+    padX = SkeletonProfileNameGlowPadX()
+    padY = SkeletonProfileNameGlowPadY()
+    offY = SkeletonBoxGlowOffsetY()
+    return [190 + padX * 2, 22 + padY * 2 + offY]
+end function
+
 function SK_DefaultPageBg() as string
     return SK_LoadingPageBg()
 end function
@@ -56,7 +134,8 @@ end function
 ' Rounded skeleton mask for vertical catalogue cards (parity verticalCard.tsx radius-10).
 function CardVerticalSkeletonShapeUri(w as integer, h as integer) as string
     if w = 272 and h = 340 then return "pkg:/images/ui/sk_vertical_card_272x340.png"
-    return "pkg:/images/ui/sk_vertical_card_220x300.png"
+    if w = 240 and h = 300 then return "pkg:/images/ui/sk_vertical_card_240x300.png"
+    return "pkg:/images/ui/sk_vertical_card_240x300.png"
 end function
 
 ' profile.tsx SkeletonBox borderRadius={9999} — circle avatar + pill name bar.

@@ -45,14 +45,15 @@ sub ApplyStyle()
         m.shadow.opacity = 0.55
         m.shadow.visible = true
     else if m.top.alwaysBg = true then
-        ' Watch Now (unfocused): solid neutral-700 background.
+        ' Legacy: solid neutral-700 when alwaysBg is set (unused — React uses transparent unfocused).
         m.bg.uri = "pkg:/images/ui/btn_detail_flat.png"
         m.bg.blendColor = m.top.cNeutral700
         m.bg.opacity = 1.0
         m.shadow.visible = false
         m.shadow.opacity = 0.0
     else
-        ' Other actions (unfocused): icon + text only, no background.
+        ' Unfocused: icon + text only (React: text-white, no fill).
+        m.bg.uri = "pkg:/images/ui/btn_detail_flat.png"
         m.bg.opacity = 0.0
         m.shadow.visible = false
         m.shadow.opacity = 0.0

@@ -25,7 +25,7 @@ end sub
 
 function ThumbW() as integer
     if m.top.listType = true then return 272
-    return 220
+    return 240
 end function
 
 function ThumbH() as integer

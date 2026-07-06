@@ -53,8 +53,16 @@ end sub
 
 sub BrowseStartLoaderAnim(loader as object)
     if loader = invalid then return
-    if loader.running = true then return
+    if loader.running = true then
+        BrowseNudgeLoaderSpin(loader)
+        return
+    end if
     loader.running = true
+end sub
+
+sub BrowseNudgeLoaderSpin(loader as object)
+    if loader = invalid then return
+    loader.callFunc("NudgeSpin", invalid)
 end sub
 
 sub BrowseRestartLoaderAnim(loader as object)
@@ -63,8 +71,18 @@ sub BrowseRestartLoaderAnim(loader as object)
         loader.running = true
         return
     end if
-    loader.running = false
-    loader.running = true
+    BrowseNudgeLoaderSpin(loader)
+end sub
+
+sub BrowseEnsureLoaderRunning(host as object)
+    if host = invalid or host.pageLoader = invalid then return
+    if host.pageLoader.running <> true then
+        BrowseShowPageLoader(host, host.pageBgRest)
+        return
+    end if
+    BrowseRaiseLoaderHost(host)
+    BrowseApplyLoaderVeil(host, true, host.pageBgRest)
+    BrowseNudgeLoaderSpin(host.pageLoader)
 end sub
 
 sub BrowseEnsureLoaderTimeout(host as object)

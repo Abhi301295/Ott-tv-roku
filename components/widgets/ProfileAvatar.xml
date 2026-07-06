@@ -9,7 +9,12 @@
     <field id="initials" type="string" value="" onChange="OnDataChanged" />
     <field id="profileName" type="string" value="" onChange="OnDataChanged" />
     <field id="parentalLock" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="showEditBadge" type="boolean" value="true" onChange="OnFocusChanged" />
     <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="snapRest" type="boolean" value="false" />
+    <field id="selectingState" type="boolean" value="false" onChange="OnSelectingChanged" />
+    <field id="skBaseColor" type="string" value="0x04478bff" onChange="OnSkColorsChanged" />
+    <field id="skHighlightColor" type="string" value="0x0b75e0ff" onChange="OnSkColorsChanged" />
     <field id="progress" type="float" value="0.0" onChange="OnFocusChanged" />
     <field id="hintText" type="string" value="" onChange="OnHintChanged" />
     <field id="bgColor" type="string" value="0x171717ff" onChange="OnColorsChanged" />
@@ -18,9 +23,11 @@
     <field id="portalPrimary" type="string" value="0x0b75e0ff" onChange="OnPortalColorsChanged" />
     <field id="portalSecondary" type="string" value="0xd355cbff" onChange="OnPortalColorsChanged" />
     <field id="portalTertiary" type="string" value="0xff6b00ff" onChange="OnPortalColorsChanged" />
+    <function name="RefreshFocusChrome" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/ProfileAvatar.brs" />
 
   <children>
@@ -52,13 +59,19 @@
       uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" visible="false" />
     <!-- React NetComponent parity: focused profile shows a left floating badge.
          Unlocked = edit mark; locked = lock icon. Hidden while progress is running. -->
-    <Group id="editBadge" translation="[-48, 59]" visible="false">
+    <Group id="editBadge" translation="[-4, 122]" visible="false">
       <Poster id="editBadgeBg" width="48" height="48"
         uri="pkg:/images/ui/avatar_circle.png" blendColor="0xf8f1f7ff" />
       <Poster id="editIcon" translation="[12, 12]" width="24" height="24"
-        uri="pkg:/images/ui/profile_edit_icon.png" />
+        uri="pkg:/images/ui/profile_edit_icon.png" blendColor="0x000000ff" visible="false" />
       <Poster id="leftLockIcon" translation="[12, 12]" width="24" height="24"
         uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" visible="false" />
+    </Group>
+
+    <!-- userProfile.tsx loading — SkeletonBox inside the scaled wrapper (scale-125). -->
+    <Group id="selectingGroup" visible="false">
+      <ProfileSkeletonBox id="skA" glowKind="avatar" boxWidth="150" boxHeight="150" />
+      <ProfileSkeletonBox id="skB" glowKind="pill" boxWidth="190" boxHeight="22" />
     </Group>
     </Group>
 
