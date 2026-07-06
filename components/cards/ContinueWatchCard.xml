@@ -21,13 +21,12 @@
 
   <children>
     <Group id="body" translation="[3, 3]">
-      <!-- React: radius-10 container has bg-neutral-700 behind the image (shows while the
-           thumbnail loads / on transparent art). -->
-      <Rectangle id="cardBg" width="540" height="286" color="0x404040ff" />
+      <!-- React continueWatchCard.tsx: bg-white/10 behind thumb while loading. -->
+      <Rectangle id="cardBg" width="540" height="286" color="0xffffff1a" />
       <Skeleton id="skeleton" boxWidth="540" boxHeight="286" />
       <Poster id="thumbFallbackLogo" width="226" height="120" loadDisplayMode="scaleToFit" opacity="0.35" visible="false" translation="[157, 83]" />
       <Poster id="thumb" width="540" height="286" loadWidth="540" loadHeight="286" loadDisplayMode="scaleToFill" visible="false" />
-      <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0x0a0a0aff" />
+      <Rectangle id="progressTrack" translation="[0, 278]" width="540" height="8" color="0xffffff1a" />
       <!-- Smooth fill gradient (parity with React from-primary-500 via-600 to-700): built in
            code as N thin slices interpolating primary-500 -> primary-700, so the tone blends
            continuously and stays fully theme-token driven (no baked colors). -->

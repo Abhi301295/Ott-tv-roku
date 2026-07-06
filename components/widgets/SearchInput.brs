@@ -49,7 +49,7 @@ end sub
 
 sub ApplyStyle()
     bgc = m.top.bgColor
-    if bgc = invalid or bgc = "" then bgc = "0x181818ff"
+    if bgc = invalid or bgc = "" then bgc = "0x000000ff"
     m.bg.blendColor = bgc
     if m.top.focusedState then
         m.border.blendColor = m.top.borderColor

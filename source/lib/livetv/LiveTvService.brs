@@ -2,11 +2,8 @@
 
 function LT_FormatTime(ms as longinteger) as string
     if ms <= 0 then return ""
-    dt = CreateObject("roDateTime")
-    dt.FromSeconds(Int(ms / 1000&))
-    dt.ToLocalTime()
-    hours = dt.GetHours()
-    minutes = dt.GetMinutes()
+    hours = LT_LocalHours(ms)
+    minutes = LT_LocalMinutes(ms)
     ampm = "AM"
     if hours >= 12 then ampm = "PM"
     h12 = hours Mod 12
@@ -18,11 +15,8 @@ end function
 
 function LT_FormatTimelineTime(ms as longinteger) as string
     if ms <= 0 then return ""
-    dt = CreateObject("roDateTime")
-    dt.FromSeconds(Int(ms / 1000&))
-    dt.ToLocalTime()
-    hours = dt.GetHours()
-    minutes = dt.GetMinutes()
+    hours = LT_LocalHours(ms)
+    minutes = LT_LocalMinutes(ms)
     hStr = Str(hours).Trim()
     if hours < 10 then hStr = "0" + hStr
     mStr = Str(minutes).Trim()
@@ -82,6 +76,169 @@ function LT_FindProgramIndexAtTime(channel as object, nowMs as longinteger) as i
         if p <> invalid and nowMs >= p.startTime and nowMs < p.endTime then return i
     end for
     return 0
+end function
+
+sub LT_AppendRectBorder(parent as object, x as integer, y as integer, w as integer, h as integer, color as string, thick as integer)
+    if parent = invalid then return
+    top = CreateObject("roSGNode", "Rectangle")
+    top.translation = [x, y]
+    top.width = w
+    top.height = thick
+    top.color = color
+    parent.appendChild(top)
+    bot = CreateObject("roSGNode", "Rectangle")
+    bot.translation = [x, y + h - thick]
+    bot.width = w
+    bot.height = thick
+    bot.color = color
+    parent.appendChild(bot)
+    lft = CreateObject("roSGNode", "Rectangle")
+    lft.translation = [x, y]
+    lft.width = thick
+    lft.height = h
+    lft.color = color
+    parent.appendChild(lft)
+    rgt = CreateObject("roSGNode", "Rectangle")
+    rgt.translation = [x + w - thick, y]
+    rgt.width = thick
+    rgt.height = h
+    rgt.color = color
+    parent.appendChild(rgt)
+end sub
+
+' renderChannelLogo() — per-channel logo inside h-12 w-[70px] bg-white/5 box.
+sub LT_AppendChannelLogo(parent as object, x as integer, y as integer, channelName as string)
+    if parent = invalid then return
+    boxW = LT_LogoBoxW()
+    boxH = LT_LogoBoxH()
+    nm = LCase(channelName)
+
+    if Instr(1, nm, "hbo") > 0 then
+        lbl = LT_MakeLabel("HBO", "pkg:/fonts/Inter-Bold.ttf", 24, LT_ColorWhite(), boxW, boxH, "center", false, "center")
+        lbl.translation = [x, y]
+        parent.appendChild(lbl)
+        return
+    end if
+
+    if Instr(1, nm, "espn") > 0 then
+        ' ⚠ Parity Note: React uses font-black italic; Roku uses Inter-Bold at red-500.
+        lbl = LT_MakeLabel("ESPN", "pkg:/fonts/Inter-Bold.ttf", 24, LT_ColorRed500(), boxW, boxH, "center", false, "center")
+        lbl.translation = [x, y]
+        parent.appendChild(lbl)
+        return
+    end if
+
+    if Instr(1, nm, "discover") > 0 then
+        dotSz = 10
+        gap = 4
+        textFs = 14
+        textW = 50
+        contentW = dotSz + gap + textW
+        startX = x + Int((boxW - contentW) / 2)
+        dotY = y + Int((boxH - dotSz) / 2)
+        dot = CreateObject("roSGNode", "Rectangle")
+        dot.translation = [startX, dotY]
+        dot.width = dotSz
+        dot.height = dotSz
+        dot.color = LT_ColorBlue400()
+        parent.appendChild(dot)
+        lbl = LT_MakeLabel("Discovery", "pkg:/fonts/Inter-Bold.ttf", textFs, LT_ColorWhite(), textW, boxH, "left", false, "center")
+        lbl.translation = [startX + dotSz + gap, y]
+        parent.appendChild(lbl)
+        return
+    end if
+
+    if Instr(1, nm, "nature") > 0 or Instr(1, nm, "geo") > 0 or Instr(1, nm, "national") > 0 then
+        frameW = 10
+        frameH = 20
+        gap = 6
+        textFs = 10
+        textW = 38
+        contentW = frameW + gap + textW
+        startX = x + Int((boxW - contentW) / 2)
+        frameY = y + Int((boxH - frameH) / 2)
+        LT_AppendRectBorder(parent, startX, frameY, frameW, frameH, LT_ColorYellow400(), 2)
+        lbl = LT_MakeLabel("Nat Geo", "pkg:/fonts/Inter-Bold.ttf", textFs, LT_ColorWhite(), textW, boxH, "left", false, "center")
+        lbl.translation = [startX + frameW + gap, y]
+        parent.appendChild(lbl)
+        return
+    end if
+
+    abbr = UCase(Left(channelName, 3))
+    lbl = LT_MakeLabel(abbr, "pkg:/fonts/Inter-Bold.ttf", 14, LT_ColorGray300(), boxW, boxH, "center", false, "center")
+    lbl.translation = [x, y]
+    parent.appendChild(lbl)
+end sub
+
+function LT_MakeLabel(text as string, fontUri as string, fontSize as integer, color as string, width as integer, height as integer, hAlign as string, wrap as boolean, vAlign = "top" as string) as object
+    lbl = CreateObject("roSGNode", "Label")
+    lbl.text = text
+    lbl.width = width
+    lbl.height = height
+    lbl.color = color
+    lbl.horizAlign = hAlign
+    lbl.vertAlign = vAlign
+    lbl.wrap = wrap
+    lbl.lineSpacing = 0
+    f = CreateObject("roSGNode", "Font")
+    f.uri = fontUri
+    f.size = fontSize
+    lbl.font = f
+    return lbl
+end function
+
+function LT_VisiblePrograms(channel as object, timelineStart as longinteger, timelineEnd as longinteger) as object
+    out = []
+    if channel = invalid or channel.programs = invalid then return out
+    for each prog in channel.programs
+        if prog = invalid then continue for
+        if prog.startTime < timelineEnd and prog.endTime > timelineStart then
+            out.Push(prog)
+        end if
+    end for
+    return out
+end function
+
+function LT_IsFirstVisibleProgram(channel as object, prog as object, timelineStart as longinteger, timelineEnd as longinteger) as boolean
+    if channel = invalid or prog = invalid then return false
+    visible = LT_VisiblePrograms(channel, timelineStart, timelineEnd)
+    if visible.Count() = 0 then return false
+    first = visible[0]
+    if first = invalid then return false
+    if first.id <> invalid and prog.id <> invalid then return first.id = prog.id
+    return first.startTime = prog.startTime and first.endTime = prog.endTime
+end function
+
+function LT_FindProgramLeftNeighbor(channel as object, current as object) as integer
+    if channel = invalid or channel.programs = invalid or current = invalid then return -1
+    progs = channel.programs
+    best = -1
+    bestEnd = 0&
+    for i = 0 to progs.Count() - 1
+        p = progs[i]
+        if p = invalid then continue for
+        if p.endTime <= current.startTime and p.endTime > bestEnd then
+            bestEnd = p.endTime
+            best = i
+        end if
+    end for
+    return best
+end function
+
+function LT_FindProgramRightNeighbor(channel as object, current as object) as integer
+    if channel = invalid or channel.programs = invalid or current = invalid then return -1
+    progs = channel.programs
+    best = -1
+    bestStart = 9223372036854775807&
+    for i = 0 to progs.Count() - 1
+        p = progs[i]
+        if p = invalid then continue for
+        if p.startTime >= current.endTime and p.startTime < bestStart then
+            bestStart = p.startTime
+            best = i
+        end if
+    end for
+    return best
 end function
 
 function LT_FindProgramOverlapping(channel as object, startMs as longinteger, endMs as longinteger) as integer

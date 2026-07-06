@@ -38,7 +38,7 @@
   <script type="text/brightscript" uri="pkg:/components/screens/MyListDetailScreen.brs" />
 
   <children>
-    <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
+    <Rectangle id="bg" width="1920" height="1080" color="0x000000ff" />
 
     <Group id="contentHost">
       <Group id="rowsHost" translation="[56, 162]" clippingRect="[0, 0, 1814, 900]" />
@@ -50,7 +50,7 @@
         </Label>
       </Group>
 
-      <!-- list-detail/index.tsx inside PageContainer bg-neutral-700 + Spinner -->
+      <!-- list-detail/index.tsx inside PageContainer bg-black + Spinner -->
       <Group id="loaderHost" translation="[0, 0]" visible="false">
         <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
         <Group id="loaderCenter" translation="[904, 476]">

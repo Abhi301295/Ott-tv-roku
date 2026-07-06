@@ -51,6 +51,13 @@ function ProfileUiSpec() as object
         progressStroke: 4
         progressPerimeter: 580
         progressBlue: "0x3b82f6ff"
+
+        ' profile.tsx loading skeleton (SkeletonBox + ml-20 name pill)
+        skAvatarSize: 150
+        skNameWidth: 190
+        skNameHeight: 22
+        skNameMarginLeft: 80          ' ml-20
+        skRowHeight: 166              ' min-h-[166px]
     }
 end function
 

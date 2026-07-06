@@ -32,7 +32,7 @@ sub init()
     m.cardIndex = 0
     m.layoutAnchorY = GL_RowAnchorY()
     m.firstRowWatch = invalid
-    m.pageBgRest = m.cNeutral950
+    m.pageBgRest = SK_LoadingPageBg()
     m.prefetchWarmupIdx = 1
     m.interacting = false
     m.pendingHeroUpdate = false
@@ -228,8 +228,8 @@ function TokenColor(tokens as object, name as string, fallbackHex as string) as 
 end function
 
 sub ApplyStaticColors()
-    if m.bg <> invalid then m.bg.color = m.cNeutral950
-    m.pageBgRest = m.cNeutral950
+    if m.bg <> invalid then m.bg.color = SK_LoadingPageBg()
+    m.pageBgRest = SK_LoadingPageBg()
     if m.emptyLabel <> invalid then
         m.emptyLabel.color = m.cNeutral50
         ApplyEmptyLabelFont()
@@ -939,7 +939,8 @@ sub OnKey()
     if key = "up" then
         if m.rowIndex = 0 then
             if NavUpOpensHeaderFromContent() then
-                ShellEnterHeader(m.vm, invalid)
+                print "[GENRE_DBG] up_row0_to_header cardIdx=" + Str(m.cardIndex)
+                EnterGenreHeader()
                 ClearGenreRowCardFocus()
             end if
             return

@@ -31,12 +31,13 @@ def lerp_rgb(c0, c1, t: float) -> tuple[int, int, int]:
 
 
 def gradient_rgb(t: float, primary, secondary, tertiary) -> tuple[int, int, int]:
-    if t <= 0.1:
+    # React netComponent: stop 70% primary, 90% secondary, 100% tertiary.
+    if t <= 0.7:
         return primary
-    if t <= 0.2:
-        f = (t - 0.1) / 0.1
+    if t <= 0.9:
+        f = (t - 0.7) / 0.2
         return lerp_rgb(primary, secondary, f)
-    f = min(1.0, (t - 0.2) / 0.8)
+    f = min(1.0, (t - 0.9) / 0.1)
     return lerp_rgb(secondary, tertiary, f)
 
 

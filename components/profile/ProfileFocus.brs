@@ -94,6 +94,7 @@ sub ApplyProfileFocus()
     end if
     m.logoutBtn.showShadow = false
     LayoutProfileRows()
+    ApplyProfileFocusBackground()
 end sub
 
 ' Locked profiles show a PIN hint; square avatars also show auto-select countdown text.

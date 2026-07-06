@@ -15,6 +15,6 @@
 
   <children>
     <Poster id="progressArc" width="166" height="166" uri="pkg:/images/ui/profile_arc_000.png"
-      loadDisplayMode="scaleToFill" />
+      loadDisplayMode="scaleToFill" opacity="0.65" />
   </children>
 </component>

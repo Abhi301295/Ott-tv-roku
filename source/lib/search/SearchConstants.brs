@@ -234,7 +234,7 @@ function SR_PinPageBg() as string
 end function
 
 function SR_PinInputBg() as string
-    return "0x181818ff"
+    return "0x000000ff"
 end function
 
 function SR_PinInputBorderFocus() as string
@@ -242,11 +242,11 @@ function SR_PinInputBorderFocus() as string
 end function
 
 function SR_PinKeyBg() as string
-    return "0x0a0a0aff"
+    return "0x000000ff"
 end function
 
 function SR_PinKeyBorder() as string
-    return "0x181818ff"
+    return "0x404040ff"
 end function
 
 function SR_PinText() as string
@@ -269,9 +269,9 @@ function SR_CardColPitch() as integer
     return SR_CardW() + SR_CardMarginRight() + SR_GridGapX()
 end function
 
-' React bg-neutral-950 is hardcoded #0a0a0a in Tailwind build (not var(--neutral-950)).
+' React searchbar.tsx bg-black; customkeyboard.tsx unfocused bg-black.
 function SR_KeyFillColor() as string
-    return "0x0a0a0aff"
+    return "0x000000ff"
 end function
 
 function SR_PlaceholderColor() as string

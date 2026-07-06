@@ -32,14 +32,14 @@
   <script type="text/brightscript" uri="pkg:/components/screens/SeriesEpisodesScreen.brs" />
 
   <children>
-    <Rectangle id="bg" width="1920" height="1080" color="0x121212ff" />
+    <Rectangle id="bg" width="1920" height="1080" color="0x000000ff" />
 
     <!-- Left pane (~1/3): season tab list (built in code; scrolls via translation). Rendered
          first so the mask + header below paint on top of any scrolled-up tabs. -->
     <Group id="seasonsHost" translation="[40, 330]" />
     <!-- Mask covering season overflow above the list so scrolled tabs don't bleed over the
          brand logo / title / meta header. -->
-    <Rectangle id="leftMask" translation="[0, 0]" width="680" height="330" color="0x121212ff" />
+    <Rectangle id="leftMask" translation="[0, 0]" width="680" height="330" color="0x000000ff" />
 
     <!-- Left header (logo → title → meta), parity with the w-1/3 column header block. -->
     <Poster id="brandLogo" translation="[60, 64]" width="280" height="92"
@@ -60,7 +60,7 @@
     <!-- Right pane (~2/3): vertical episode list (rendered first, under the mask + heading). -->
     <Group id="episodesHost" translation="[700, 250]" />
     <!-- Mask covering episode overflow above the list so scrolled cards don't bleed over the heading. -->
-    <Rectangle id="rightMask" translation="[660, 0]" width="1260" height="250" color="0x121212ff" />
+    <Rectangle id="rightMask" translation="[660, 0]" width="1260" height="250" color="0x000000ff" />
     <Label id="sectionHeading" translation="[700, 120]" width="1160" height="56" wrap="false"
       color="0xf5f5f5ff">
       <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
@@ -70,7 +70,21 @@
       <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
     </Label>
 
-    <!-- bg-neutral-700 veil + Spinner while series detail loads. -->
+    <!-- seriesEpisode.tsx loading branch — white/10 pulse placeholders on bg-black. -->
+    <Group id="seriesSkeletonHost" visible="false">
+      <Skeleton id="seSkLogo" translation="[70, 84]" boxWidth="40" boxHeight="40" />
+      <Skeleton id="seSkTitle" translation="[60, 172]" boxWidth="450" boxHeight="40" />
+      <Skeleton id="seSkMeta" translation="[60, 222]" boxWidth="300" boxHeight="24" />
+      <Skeleton id="seSkTab0" translation="[52, 350]" boxWidth="420" boxHeight="32" />
+      <Skeleton id="seSkTab1" translation="[52, 430]" boxWidth="420" boxHeight="32" />
+      <Skeleton id="seSkTab2" translation="[52, 510]" boxWidth="420" boxHeight="32" />
+      <Skeleton id="seSkTab3" translation="[52, 590]" boxWidth="420" boxHeight="32" />
+      <Skeleton id="seSkTab4" translation="[52, 670]" boxWidth="420" boxHeight="32" />
+      <Skeleton id="seSkHeading" translation="[720, 120]" boxWidth="200" boxHeight="24" />
+      <Skeleton id="seSkSubtitle" translation="[720, 184]" boxWidth="240" boxHeight="24" />
+    </Group>
+
+    <!-- bg-black veil while series detail loads (skeleton blocks, no spinner). -->
     <Group id="loaderHost" translation="[0, 0]" visible="false">
       <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
       <Group id="loaderCenter" translation="[960, 518]">

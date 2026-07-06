@@ -262,7 +262,6 @@ sub LoadAndPlayLive()
         ShowAlert(m.top, 2, CopyVideoLoadFailed())
         return
     end if
-    print "[LIVETV_DBG] player_live url=" + Left(url, 80)
     MediaLogPlayUrl("video.player.live", url)
 
     m.isTrailer = false

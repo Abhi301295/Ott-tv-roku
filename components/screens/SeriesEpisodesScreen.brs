@@ -29,6 +29,7 @@ sub init()
     m.sectionSubtitle = m.top.findNode("sectionSubtitle")
     m.leftMask = m.top.findNode("leftMask")
     m.rightMask = m.top.findNode("rightMask")
+    m.seriesSkeletonHost = m.top.findNode("seriesSkeletonHost")
     m.loaderHost = m.top.findNode("loaderHost")
     m.loaderPageBg = m.top.findNode("loaderPageBg")
     m.pageLoader = m.top.findNode("pageLoader")
@@ -134,10 +135,10 @@ function TCse(name as string, fallbackHex as string) as string
 end function
 
 sub ApplyStaticColors()
-    if m.bg <> invalid then m.bg.color = m.cNeutral800
-    m.pageBgRest = m.cNeutral800
-    if m.leftMask <> invalid then m.leftMask.color = m.cNeutral800
-    if m.rightMask <> invalid then m.rightMask.color = m.cNeutral800
+    m.pageBgRest = SK_LoadingPageBg()
+    if m.bg <> invalid then m.bg.color = m.pageBgRest
+    if m.leftMask <> invalid then m.leftMask.color = m.pageBgRest
+    if m.rightMask <> invalid then m.rightMask.color = m.pageBgRest
     if m.seriesTitle <> invalid then m.seriesTitle.color = m.cNeutral50
     if m.seriesMeta <> invalid then m.seriesMeta.color = m.cNeutral300
     if m.sectionHeading <> invalid then m.sectionHeading.color = m.cNeutral50
@@ -189,14 +190,22 @@ sub SetContentVisible(show as boolean)
     end if
 end sub
 
+sub ShowSeriesSkeleton(show as boolean)
+    if m.seriesSkeletonHost = invalid then return
+    m.seriesSkeletonHost.visible = show
+    CardApplyHomeCardSkeletonTree(m.seriesSkeletonHost, show)
+end sub
+
 sub ShowLoading(show as boolean)
     m.loading = show
     if show then
         m.episodesRevealed = false
-        BrowseShowPageLoader(m, m.pageBgRest)
+        BrowseHidePageLoader(m, m.pageBgRest)
+        ShowSeriesSkeleton(true)
         SetContentVisible(false)
     else
         BrowseDetachHostPaintWatch(m)
+        ShowSeriesSkeleton(false)
         BrowseHidePageLoader(m, m.pageBgRest)
     end if
 end sub

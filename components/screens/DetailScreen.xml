@@ -32,7 +32,7 @@
   <script type="text/brightscript" uri="pkg:/components/screens/DetailScreen.brs" />
 
   <children>
-    <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
+    <Rectangle id="bg" width="1920" height="1080" color="0x000000ff" />
 
     <!-- Backdrop banner + cinematic scrims (parity with contentdetail/index.tsx).
          Banner uses scaleToZoom (= CSS bg-cover) so the art stays sharp; gradients only
@@ -92,16 +92,24 @@
       <Rectangle id="moreLikeScrim" width="1920" height="1080" color="0x000000ff" opacity="0" />
       <Group id="moreLikeDrawer" translation="[0, 1080]">
         <Group id="moreLikeCardsHost" translation="[40, 612]" />
-        <!-- 8 shimmer placeholders — parity with React w-272 h-340 bg-neutral-700 animate-pulse. -->
+        <!-- 8 shimmer placeholders — parity with React w-272 h-340 bg-white/10 animate-pulse. -->
         <Group id="moreLikeSkeletonHost" translation="[40, 612]" visible="false">
-          <Skeleton id="mlSk0" translation="[0, 0]" boxWidth="272" boxHeight="340" />
-          <Skeleton id="mlSk1" translation="[282, 0]" boxWidth="272" boxHeight="340" />
-          <Skeleton id="mlSk2" translation="[564, 0]" boxWidth="272" boxHeight="340" />
-          <Skeleton id="mlSk3" translation="[846, 0]" boxWidth="272" boxHeight="340" />
-          <Skeleton id="mlSk4" translation="[1128, 0]" boxWidth="272" boxHeight="340" />
-          <Skeleton id="mlSk5" translation="[1410, 0]" boxWidth="272" boxHeight="340" />
-          <Skeleton id="mlSk6" translation="[1692, 0]" boxWidth="272" boxHeight="340" />
-          <Skeleton id="mlSk7" translation="[1974, 0]" boxWidth="272" boxHeight="340" />
+          <Skeleton id="mlSk0" translation="[0, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
+          <Skeleton id="mlSk1" translation="[282, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
+          <Skeleton id="mlSk2" translation="[564, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
+          <Skeleton id="mlSk3" translation="[846, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
+          <Skeleton id="mlSk4" translation="[1128, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
+          <Skeleton id="mlSk5" translation="[1410, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
+          <Skeleton id="mlSk6" translation="[1692, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
+          <Skeleton id="mlSk7" translation="[1974, 0]" boxWidth="272" boxHeight="340"
+            shapeUri="pkg:/images/ui/sk_vertical_card_272x340.png" />
         </Group>
         <Group id="moreLikeCloseHost" translation="[1824, 516]">
           <Label id="moreLikeClose" text="✕" width="64" height="64"
@@ -120,7 +128,33 @@
       </Animation>
     </Group>
 
-    <!-- PageContainer bg-neutral-700 + Spinner while detail content loads. -->
+    <!-- contentdetail/index.tsx loading branch — bg-white/10 pulse blocks on black (no spinner). -->
+    <Group id="detailSkeletonHost" visible="false">
+      <Skeleton id="detSkTitle" translation="[50, 336]" boxWidth="400" boxHeight="80"
+        shapeUri="pkg:/images/ui/sk_detail_title.png" />
+      <Skeleton id="detSkRating" translation="[50, 430]" boxWidth="40" boxHeight="40"
+        shapeUri="pkg:/images/ui/sk_detail_rate.png" />
+      <Skeleton id="detSkStar0" translation="[102, 438]" boxWidth="24" boxHeight="24"
+        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
+      <Skeleton id="detSkStar1" translation="[130, 438]" boxWidth="24" boxHeight="24"
+        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
+      <Skeleton id="detSkStar2" translation="[158, 438]" boxWidth="24" boxHeight="24"
+        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
+      <Skeleton id="detSkStar3" translation="[186, 438]" boxWidth="24" boxHeight="24"
+        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
+      <Skeleton id="detSkStar4" translation="[214, 438]" boxWidth="24" boxHeight="24"
+        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
+      <Skeleton id="detSkDesc0" translation="[50, 498]" boxWidth="1116" boxHeight="20"
+        shapeUri="pkg:/images/ui/sk_detail_line_1116.png" />
+      <Skeleton id="detSkDesc1" translation="[50, 524]" boxWidth="1060" boxHeight="20"
+        shapeUri="pkg:/images/ui/sk_detail_line_1060.png" />
+      <Skeleton id="detSkDesc2" translation="[50, 550]" boxWidth="948" boxHeight="20"
+        shapeUri="pkg:/images/ui/sk_detail_line_948.png" />
+      <Skeleton id="detSkBtn0" translation="[60, 620]" boxWidth="500" boxHeight="60" />
+      <Skeleton id="detSkBtn1" translation="[60, 700]" boxWidth="500" boxHeight="60" />
+    </Group>
+
+    <!-- PageContainer bg-black while detail content loads. -->
     <Group id="loaderHost" translation="[0, 0]" visible="false">
       <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
       <Group id="loaderCenter" translation="[960, 518]">

@@ -51,8 +51,7 @@ sub UpdateDisplay()
         m.text.color = m.top.textColor
     else
         m.text.text = m.placeholder
-        ' Focused empty input: placeholder reverts to the muted default gray
-        ' (web focused class drops placeholder:text-neutral-50); unfocused stays light.
+        ' Unfocused: placeholder:text-neutral-950. Focused: no placeholder: class → preflight #9ca3af.
         if m.top.focusedState then
             m.text.color = m.top.placeholderColorFocused
         else

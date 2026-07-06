@@ -84,7 +84,7 @@ sub ApplyAll()
     end if
     bg = m.top.cPageBg
     if bg = invalid or bg = "" then bg = SkeletonDefaultPageBg()
-    skColors = SkeletonResolveColors(CardSkeletonThemeTokens(m.top))
+    skColors = CardHomeCardSkeletonColors()
     if m.skeleton <> invalid and m.skeleton.visible = true then
         CardApplySkeleton(m.skeleton, skColors.base, skColors.highlight)
     end if
@@ -92,10 +92,10 @@ sub ApplyAll()
         if m.thumbFallbackLogo <> invalid and m.thumbFallbackLogo.visible = true then
             m.cardBg.color = CardThumbFallbackFillColor(m.top)
         else
-            m.cardBg.color = CardThumbPlaceholderBg()
+            m.cardBg.color = CardWhite10Color()
         end if
     end if
-    m.progressTrack.color = CardProgressTrackColor()
+    m.progressTrack.color = CardCwProgressTrackColor()
     ApplyProgressFill()
 
     ApplyFocusVisual()

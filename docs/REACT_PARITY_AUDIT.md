@@ -30,6 +30,61 @@ This document compares each routed screen in the **new** React platform against 
 
 ---
 
+## Two-week React delta audit (2026-06-19 → 2026-07-03)
+
+React repo: `lg-samsung-tv-player`. Only **three** meaningful commits landed in this window:
+
+| Commit | Title | Scope |
+|--------|-------|-------|
+| `0fa24a8` | Lg dev bg | Global `bg-black` PageContainer, loaders on black, skeleton tiles `bg-white/10`, search input/keyboard, profile ring, CW/cards |
+| `613bb2c` | Lg dev epg | Live TV feature, header menu + routes, genre-list UP→header, search card `onFocus`, profile scroll, reels API tweak |
+| `f1e14e6` | domain-name header | Axios `domain-name` header fix (net layer — already mirrored in Roku `ApiClient`) |
+
+### `0fa24a8` — file-by-file Roku status
+
+| React file | Change | Roku status |
+|------------|--------|-------------|
+| `pagecontainer/index.tsx` | `bg-black` | ✅ `SK_LoadingPageBg()` + browse loaders |
+| `features/home/*`, `heroBannerCinematic` | black page + card loaders | ✅ `HomeConstants`, `HeroBannerCinematic`, CW/horizontal cards |
+| `features/profile/*` | black bg, ring 4px/70–100% stops, skeleton 150px | ✅ `ProfileScreen`, `ProfileArcTheme`, `ProfileAvatar` |
+| `features/login/*` | `neutral-950` card, black page | ⚠️ Re-verify `LoginScreen` tab/card tokens |
+| `features/search/*` | input `bg-black`, keyboard borders | ✅ `SearchTheme`, `SearchInput`, `SearchKeyboard` |
+| `features/list-detail/listDetailCard` | `bg-dark_black` shimmer + badge `bg-white/10` | ✅ **this pass:** `MyListDetailScreen` black bg, `ListDetailCard` white/10 skeleton |
+| `features/contentdetail/index` | loading `bg-black`, blocks `bg-white/10` | ✅ **this pass:** `DetailScreen` black bg, more-like drawer white/10 |
+| `features/genre-list/Content` | PageContainer black | ✅ `GenreListScreen` |
+| `features/reels/index` | black loader | ✅ `ReelsScreen` |
+| `components/cards/verticalCard` | `bg-white/10` loader | ✅ `VerticalCard`, `NumberedVerticalCard` |
+| `components/cards/horizontalCard` | `bg-white/10` loader | ✅ `HorizontalCard`, `ContinueWatchCard` |
+| `components/cards/banner` | `bg-white/10` loader | ✅ `BannerCard` |
+| `components/cards/seeAll` | `bg-white/10` fill | ✅ `SeeAllCard` |
+| `components/cards/seriesCard` | `bg-white/10` loader | ✅ via `VerticalCard` on series grid |
+| `components/cards/continueWatchCard` | progress + loader | ✅ `ContinueWatchCard` |
+| `components/header/*` | menu styling | ⚠️ Spot-check focus underline (prior branch work) |
+| `App.tsx`, routes | loader backdrop | ✅ global black veil |
+
+### `613bb2c` — file-by-file Roku status
+
+| React file | Change | Roku status |
+|------------|--------|-------------|
+| `features/livetv/*`, `pages/livetv` | mock EPG screen | ✅ `LiveTvScreen` |
+| `routes/route*`, `HeaderList` | Live TV route + menu | ✅ `Routes.brs`, `HeaderMenu.brs` |
+| `BusinessConfigContext` | `epgManagement` flag | ✅ `BusinessConfig.brs` |
+| `features/genre-list/Content` | UP from row 0 → header | ⚠️ Verify `GenreListScreen` key handler |
+| `features/search/search-horizontalcard` | `onFocus` callback | ⚠️ Low priority — scroll-into-view only |
+| `features/profile/profile.tsx` | horizontal scroll | ⚠️ Verify `ProfileScreen` if profiles overflow |
+| `features/reels/services/action` | API path tweak | ⚠️ Diff against `ReelsService.brs` |
+
+### Remaining gaps (post this pass)
+
+_All items below were closed in the follow-up parity pass (2026-07-03)._
+
+1. ~~**Login**~~ — `neutral-950` cards/tabs, inline centered logo (`max-w-480` / `max-h-100`), body copy `neutral-50`.
+2. ~~**Series episodes**~~ — `bg-black` page + masks; loading uses white/10 skeleton blocks (no spinner).
+3. ~~**Genre list UP→header**~~ — row 0 UP calls `EnterGenreHeader()` + `[GENRE_DBG]` trace.
+4. ~~**Detail inline skeleton**~~ — `detailSkeletonHost` white/10 blocks on black (spinner removed for initial load).
+
+---
+
 ## Route map
 
 | React route | Roku route id | Roku screen | Audit status |

@@ -274,6 +274,7 @@ sub ShowLoading(show as boolean)
     host = m.profilesScrollHost
     if host = invalid then host = m.profilesContainer
     if host <> invalid then host.visible = not show
+    ApplyProfileFocusBackground()
 end sub
 
 

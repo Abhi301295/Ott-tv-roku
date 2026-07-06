@@ -136,19 +136,19 @@ function ProfileArcLerpInt(a as integer, b as integer, t as float) as integer
     return Int(a + ((b - a) * t) + 0.5)
 end function
 
+' React netComponent linearGradient stops: 70% primary, 90% secondary, 100% tertiary.
 function ProfileArcGradientRgbChannels(t as float, primary as object, secondary as object, tertiary as object) as object
-    if t <= 0.1 then return primary
-    if t <= 0.2 then
-        f = (t - 0.1) / 0.1
+    if t <= 0.7 then return primary
+    if t <= 0.9 then
+        f = (t - 0.7) / 0.2
         return {
             r: ProfileArcLerpInt(primary.r, secondary.r, f)
             g: ProfileArcLerpInt(primary.g, secondary.g, f)
             b: ProfileArcLerpInt(primary.b, secondary.b, f)
         }
     end if
-    f = t - 0.2
+    f = (t - 0.9) / 0.1
     if f > 1.0 then f = 1.0
-    f = f / 0.8
     return {
         r: ProfileArcLerpInt(secondary.r, tertiary.r, f)
         g: ProfileArcLerpInt(secondary.g, tertiary.g, f)

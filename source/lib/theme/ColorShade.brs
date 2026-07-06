@@ -291,6 +291,12 @@ function TailwindNeutral950Color() as string
     return HexToRokuColor("#0a0a0a", "ff")
 end function
 
+' When an input has no placeholder:text-* class, Tailwind preflight sets
+' ::placeholder to theme(colors.gray.400) → #9ca3af (see preflight.css).
+function TailwindPreflightPlaceholderColor() as string
+    return HexToRokuColor("#9ca3af", "ff")
+end function
+
 ' Read a token from a tokens map and return it as a Roku "0xRRGGBBaa" color.
 function ThemeTokenColor(tokens as object, name as string, fallbackHex as string) as string
     hex = fallbackHex

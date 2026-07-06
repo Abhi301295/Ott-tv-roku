@@ -40,7 +40,7 @@
   <script type="text/brightscript" uri="pkg:/components/screens/SeriesScreen.brs" />
 
   <children>
-    <Rectangle id="bg" width="1920" height="1080" color="0x121212ff" />
+    <Rectangle id="bg" width="1920" height="1080" color="0x000000ff" />
 
     <Group id="contentHost">
       <Label id="titleLabel" translation="[56, 72]" width="1700" height="56" wrap="false"
@@ -60,7 +60,7 @@
       </Animation>
     </Group>
 
-    <!-- series/index.tsx inside PageContainer bg-neutral-700 + Spinner -->
+    <!-- series/index.tsx inside PageContainer bg-black + Spinner -->
     <Group id="loaderHost" translation="[0, 0]" visible="false">
       <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
       <Group id="loaderCenter" translation="[960, 518]">

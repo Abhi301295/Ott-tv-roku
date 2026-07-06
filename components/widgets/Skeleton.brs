@@ -1,8 +1,10 @@
 sub init()
-    m.base = m.top.findNode("base")
-    m.shine = m.top.findNode("shine")
+    m.baseRect = m.top.findNode("baseRect")
+    m.shineRect = m.top.findNode("shineRect")
+    m.basePoster = m.top.findNode("basePoster")
+    m.shinePoster = m.top.findNode("shinePoster")
     m.anim = m.top.findNode("anim")
-    m.interp = m.top.findNode("interp")
+    ApplyShapeMode()
     ApplySize()
     ApplyColors()
 end sub
@@ -12,31 +14,55 @@ sub OnSizeChanged()
 end sub
 
 sub OnShapeChanged()
-    if m.base = invalid then return
-    if m.top.shapeUri <> invalid and m.top.shapeUri <> "" then
-        m.base.uri = m.top.shapeUri
-        m.shine.uri = m.top.shapeUri
-    end if
+    ApplyShapeMode()
+    ApplySize()
+    ApplyColors()
 end sub
 
 sub OnColorsChanged()
     ApplyColors()
 end sub
 
+sub ApplyShapeMode()
+    usePoster = m.top.shapeUri <> invalid and m.top.shapeUri <> ""
+    if m.baseRect <> invalid then m.baseRect.visible = not usePoster
+    if m.shineRect <> invalid then m.shineRect.visible = not usePoster
+    if m.basePoster <> invalid then
+        m.basePoster.visible = usePoster
+        if usePoster then m.basePoster.uri = m.top.shapeUri
+    end if
+    if m.shinePoster <> invalid then
+        m.shinePoster.visible = usePoster
+        if usePoster then m.shinePoster.uri = m.top.shapeUri
+    end if
+end sub
+
 sub ApplySize()
-    if m.base = invalid then return
     w = m.top.boxWidth
     h = m.top.boxHeight
-    m.base.width = w
-    m.base.height = h
-    m.shine.width = w
-    m.shine.height = h
+    if m.baseRect <> invalid then
+        m.baseRect.width = w
+        m.baseRect.height = h
+    end if
+    if m.shineRect <> invalid then
+        m.shineRect.width = w
+        m.shineRect.height = h
+    end if
+    if m.basePoster <> invalid then
+        m.basePoster.width = w
+        m.basePoster.height = h
+    end if
+    if m.shinePoster <> invalid then
+        m.shinePoster.width = w
+        m.shinePoster.height = h
+    end if
 end sub
 
 sub ApplyColors()
-    if m.base = invalid then return
-    m.base.blendColor = m.top.baseColor
-    m.shine.blendColor = m.top.highlightColor
+    if m.baseRect <> invalid then m.baseRect.color = m.top.baseColor
+    if m.shineRect <> invalid then m.shineRect.color = m.top.highlightColor
+    if m.basePoster <> invalid then m.basePoster.blendColor = m.top.baseColor
+    if m.shinePoster <> invalid then m.shinePoster.blendColor = m.top.highlightColor
 end sub
 
 ' Static placeholders (cards) keep the shimmer animation off: running ~20 of them
@@ -44,11 +70,13 @@ end sub
 ' base color reads as a plain neutral block. Screens that want the sweep set animate.
 sub OnRunningChanged()
     if m.anim = invalid then return
-    if m.base <> invalid then m.base.opacity = 1.0
+    if m.baseRect <> invalid then m.baseRect.opacity = 1.0
+    if m.basePoster <> invalid then m.basePoster.opacity = 1.0
     if m.top.running and m.top.animate then
         m.anim.control = "start"
     else
         m.anim.control = "stop"
-        if m.shine <> invalid then m.shine.opacity = 0.0
+        if m.shineRect <> invalid then m.shineRect.opacity = 0.0
+        if m.shinePoster <> invalid then m.shinePoster.opacity = 0.0
     end if
 end sub

@@ -23,6 +23,7 @@ sub init()
     m.moreLikeDrawer = m.top.findNode("moreLikeDrawer")
     m.moreLikeCardsHost = m.top.findNode("moreLikeCardsHost")
     m.moreLikeSkeletonHost = m.top.findNode("moreLikeSkeletonHost")
+    m.detailSkeletonHost = m.top.findNode("detailSkeletonHost")
     m.moreLikeCloseHost = m.top.findNode("moreLikeCloseHost")
     m.moreLikeClose = m.top.findNode("moreLikeClose")
     m.moreLikeScrimIn = m.top.findNode("moreLikeScrimIn")
@@ -53,7 +54,7 @@ sub init()
 
     m.vm = FindViewManager(m.top)
     LoadDetailTokens()
-    m.pageBgRest = m.cNeutral950
+    m.pageBgRest = SK_LoadingPageBg()
     ApplyPageLoaderLayout(1920)
     SetupActionButtons()
     ApplyContentColors()
@@ -109,6 +110,7 @@ sub OnDispose()
     m.top.unobserveField("keyEvent")
     if m.banner <> invalid then m.banner.unobserveField("loadStatus")
     BrowseHidePageLoader(m, m.pageBgRest)
+    ShowDetailSkeleton(false)
     StopMoreLikeSkeleton()
 end sub
 
@@ -119,12 +121,12 @@ end sub
 
 sub StopMoreLikeSkeleton()
     if m.moreLikeSkeletonHost = invalid then return
-    SkeletonApplyTree(m.moreLikeSkeletonHost, m.tokens, false)
+    CardApplyHomeCardSkeletonTree(m.moreLikeSkeletonHost, false)
 end sub
 
 sub OnBusinessResolved()
     LoadDetailTokens()
-    m.pageBgRest = m.cNeutral950
+    m.pageBgRest = SK_LoadingPageBg()
     ApplyButtonThemes()
     ApplyContentColors()
     BrowseApplyPageLoaderColors(m)
@@ -191,16 +193,24 @@ sub ApplyPageLoaderLayout(viewportW as integer)
     if m.loaderCenter <> invalid then m.loaderCenter.translation = [Int(viewportW / 2), 518]
 end sub
 
+sub ShowDetailSkeleton(show as boolean)
+    if m.detailSkeletonHost = invalid then return
+    m.detailSkeletonHost.visible = show
+    CardApplyHomeCardSkeletonTree(m.detailSkeletonHost, show)
+end sub
+
 sub ShowLoading(show as boolean)
     m.loading = show
     if show then
         m.detailRevealed = false
-        BrowseShowPageLoader(m, m.pageBgRest)
+        BrowseHidePageLoader(m, m.pageBgRest)
+        ShowDetailSkeleton(true)
         m.contentHost.visible = false
         m.banner.visible = false
         m.gradLeft.visible = false
         m.gradBottom.visible = false
     else
+        ShowDetailSkeleton(false)
         BrowseHidePageLoader(m, m.pageBgRest)
     end if
 end sub
@@ -215,6 +225,7 @@ end function
 sub PrepareDetailReveal()
     if m.detailRevealed then return
     m.detailRevealed = true
+    ShowDetailSkeleton(false)
     m.contentHost.visible = true
     m.banner.visible = true
     m.gradLeft.visible = true
@@ -224,21 +235,22 @@ end sub
 
 sub OnBannerPaintReady()
     if not m.detailRevealed then return
-    if not BrowsePageLoaderRunning(m) then return
+    if not m.loading then return
     if DetailPaintGateOpen() then CompleteDetailReveal()
 end sub
 
 sub CompleteDetailReveal()
-    if not BrowsePageLoaderRunning(m) then return
+    if not m.loading then return
     BrowseHidePageLoader(m, m.pageBgRest)
+    ShowDetailSkeleton(false)
     m.loading = false
     ApplyActionFocus()
 end sub
 
 sub OnBrowseLoaderTimeout()
-    if not BrowsePageLoaderRunning(m) then return
+    if not m.loading then return
     if not m.detailRevealed then PrepareDetailReveal()
-    if BrowsePageLoaderRunning(m) then CompleteDetailReveal()
+    CompleteDetailReveal()
 end sub
 
 sub FetchDetail(silent as boolean)
@@ -268,6 +280,7 @@ sub OnDetailResponse()
         end if
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         BrowseHidePageLoader(m, m.pageBgRest)
+        ShowDetailSkeleton(false)
         m.loading = false
         return
     end if
@@ -278,6 +291,7 @@ sub OnDetailResponse()
         if silent then return
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         BrowseHidePageLoader(m, m.pageBgRest)
+        ShowDetailSkeleton(false)
         m.loading = false
         return
     end if
@@ -704,7 +718,7 @@ end sub
 sub ApplyMoreLikeSkeletonColors()
     if m.moreLikeSkeletonHost = invalid then return
     running = m.moreLikeSkeletonHost.visible = true
-    SkeletonApplyTree(m.moreLikeSkeletonHost, m.tokens, running)
+    CardApplyHomeCardSkeletonTree(m.moreLikeSkeletonHost, running)
 end sub
 
 sub OnMoreLikeResponse()

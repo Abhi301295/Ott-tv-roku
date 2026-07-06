@@ -323,8 +323,7 @@ sub LoadThemeTokens()
     ApplyHomePageBackground()
 end sub
 
-' Netflix home uses bg-black once NetflixContent mounts; OTT uses bg-neutral-100.
-' While the page loader runs, match PageContainer bg-neutral-700 (pagecontainer/index.tsx).
+' React home/content.tsx + netflixContent.tsx + PageContainer: bg-black.
 sub ApplyHomePageBackground()
     if m.bg = invalid then return
     layout = m.homeLayout

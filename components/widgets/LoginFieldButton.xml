@@ -10,9 +10,9 @@
     <field id="secure" type="boolean" value="false" />
     <field id="bgColor" type="string" value="0xffffffff" onChange="ApplyStyle" />
     <field id="bgColorFocused" type="string" value="0xffffffff" onChange="ApplyStyle" />
-    <field id="textColor" type="string" value="0xf8f1f7ff" onChange="ApplyStyle" />
-    <field id="placeholderColor" type="string" value="0xf8f1f7ff" onChange="ApplyStyle" />
-    <field id="placeholderColorFocused" type="string" value="0x9ea4b0ff" onChange="ApplyStyle" />
+    <field id="textColor" type="string" value="0x0a0a0aff" onChange="ApplyStyle" />
+    <field id="placeholderColor" type="string" value="0x0a0a0aff" onChange="ApplyStyle" />
+    <field id="placeholderColorFocused" type="string" value="0x9ca3afff" onChange="ApplyStyle" />
     <field id="borderColor" type="string" value="0xefdcebff" onChange="ApplyStyle" />
     <field id="focusedState" type="boolean" value="false" onChange="ApplyStyle" />
   </interface>

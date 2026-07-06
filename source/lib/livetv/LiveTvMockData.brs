@@ -14,7 +14,7 @@ function LT_SpecialTemplates() as object
         { title: "Fish And Shark", durationMins: 30, desc: "A documentary exploring marine life and predator patterns in deep oceans.", category: "Documentary" }
         { title: "The Mission", durationMins: 30, desc: "A team of explorers travel to remote regions to execute search and rescue.", category: "Movies" }
         { title: "The Citadel", durationMins: 30, desc: "A thrilling spy drama about a global syndicate and their operations.", category: "Series" }
-        { title: "Jumanji Movies", durationMins: 180, desc: "The 1995 classic film, starring Robin Williams, follows young Alan Parrish who discovers a mysterious board game.", category: "Movies" }
+        { title: "Jumanji Movies", durationMins: 180, desc: "The 1995 classic film, starring Robin Williams, follows young Alan Parrish who, in 1969, discovers a mysterious board game and is magically sucked into its jungle world. Twenty-six years later, two unsuspecting children move into his abandoned home, find the game, and roll the dice,", category: "Movies" }
     ]
 end function
 
@@ -82,18 +82,6 @@ function LT_ChannelNameBase(category as string, slot as integer) as string
     return bank[slot Mod bank.Count()]
 end function
 
-function LT_MidnightTodayMs() as longinteger
-    dt = CreateObject("roDateTime")
-    dt.Mark()
-    dt.ToLocalTime()
-    sec = dt.AsSeconds()
-    hour = dt.GetHours()
-    min = dt.GetMinutes()
-    s = dt.GetSeconds()
-    midnightSec = sec - (hour * 3600 + min * 60 + s)
-    return midnightSec * 1000&
-end function
-
 function LT_Pad2(n as integer) as string
     s = Str(n).Trim()
     if Len(s) < 2 then return "0" + s
@@ -111,7 +99,7 @@ function LT_GenerateEPGData() as object
     count = LT_MockChannelCount()
     categories = LT_Categories()
     specials = LT_SpecialTemplates()
-    midnightToday = LT_MidnightTodayMs()
+    midnightToday = LT_LocalMidnightMs()
     startOfTimeline = midnightToday - (6& * 60& * 60& * 1000&)
     endOfTimeline = midnightToday + (48& * 60& * 60& * 1000&)
 
@@ -196,7 +184,6 @@ function LT_GenerateEPGData() as object
         })
     end for
 
-    print "[LIVETV_DBG] mock_epg channels=" + Str(channels.Count()).Trim()
     return {
         channels: channels
         timelineStart: startOfTimeline

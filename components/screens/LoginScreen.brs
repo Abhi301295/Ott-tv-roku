@@ -118,11 +118,10 @@ sub LoadThemeTokens()
     m.cBtnDisabledText = TC("neutral-400", "#ce4fb6")' text-neutral-400 (disabled)
     m.cFieldBg = TC("neutral-700", "#ffffff")        ' bg-neutral-700 (input bg, unfocused)
     m.cFieldBgFocus = TC("neutral-900", "#ffffff")   ' bg-neutral-900 (input bg, focused)
-    m.cFieldText = TC("neutral-50", "#ffffff")       ' text-neutral-50 (typed text + unfocused placeholder)
+    m.cFieldText = TailwindNeutral950Color()         ' text-neutral-950 (typed text)
+    m.cFieldPlaceholder = TailwindNeutral950Color()  ' placeholder:text-neutral-950 (unfocused)
+    m.cFieldPlaceholderFocus = TailwindPreflightPlaceholderColor() ' no placeholder: class when focused
     m.cFieldBorder = TC("neutral-100", "#efdceb")    ' border-neutral-100 (focused input)
-    ' Focused placeholder = browser-default muted gray (web drops the neutral-50
-    ' override when focused). Not a theme token, so hardcode like the badge number.
-    m.cFieldPlaceholderFocus = "0x9ea4b0ff"
 end sub
 
 function LoginSpinnerPx() as integer
@@ -188,7 +187,7 @@ sub ApplyThemeColors()
     m.step1Num.color = badgeNumColor
     m.step2Num.color = badgeNumColor
 
-    bodyText = TC("neutral-500", "#e279ce")
+    bodyText = TC("neutral-50", "#ffffff")
     m.step1Text.color = bodyText
     m.step2Text.color = bodyText
     m.orLabel.color = bodyText
@@ -209,13 +208,13 @@ sub ApplyThemeColors()
     m.emailField.bgColor = m.cFieldBg
     m.emailField.bgColorFocused = m.cFieldBgFocus
     m.emailField.textColor = m.cFieldText
-    m.emailField.placeholderColor = m.cFieldText
+    m.emailField.placeholderColor = m.cFieldPlaceholder
     m.emailField.placeholderColorFocused = m.cFieldPlaceholderFocus
     m.emailField.borderColor = m.cFieldBorder
     m.passwordField.bgColor = m.cFieldBg
     m.passwordField.bgColorFocused = m.cFieldBgFocus
     m.passwordField.textColor = m.cFieldText
-    m.passwordField.placeholderColor = m.cFieldText
+    m.passwordField.placeholderColor = m.cFieldPlaceholder
     m.passwordField.placeholderColorFocused = m.cFieldPlaceholderFocus
     m.passwordField.borderColor = m.cFieldBorder
     if m.loginSpinnerArc <> invalid then m.loginSpinnerArc.blendColor = m.cTabText
@@ -330,13 +329,23 @@ sub ApplyLoginBranding()
     end if
 
     logoUrl = resolved.brandingLogo
+    logoW = 480
+    logoH = 100
+    logoX = Int((1920 - logoW) / 2)
+    logoY = 94
     if logoUrl <> invalid and logoUrl <> "" then
         m.logoPoster.uri = logoUrl
+        m.logoPoster.translation = [logoX, logoY]
+        m.logoPoster.width = logoW
+        m.logoPoster.height = logoH
         m.logoPoster.visible = true
         m.logoLabel.visible = false
     else if resolved.appName <> invalid and resolved.appName <> "" then
         m.logoLabel.text = resolved.appName
+        m.logoLabel.translation = [logoX, logoY + 20]
+        m.logoLabel.width = logoW
         m.logoLabel.visible = true
+        m.logoPoster.visible = false
     end if
 end sub
 

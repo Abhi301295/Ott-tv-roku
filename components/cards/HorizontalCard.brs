@@ -32,7 +32,8 @@ sub ApplyAll()
         m.thumb.visible = true
         m.skeleton.visible = true
         m.skeleton.running = true
-        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
+        skColors = CardHomeCardSkeletonColors()
+        CardApplySkeleton(m.skeleton, skColors.base, skColors.highlight)
     else
         CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 540, 312)
     end if

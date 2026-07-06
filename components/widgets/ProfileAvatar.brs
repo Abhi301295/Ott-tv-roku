@@ -185,8 +185,8 @@ end function
 
 sub ApplyAvatarSize(scale as float)
     ringSize = 166 * scale
-    avatarSize = 144 * scale
-    inset = 11 * scale
+    avatarSize = 150 * scale
+    inset = 8 * scale
 
     if m.avatarMask <> invalid then
         m.avatarMask.maskSize = [avatarSize, avatarSize]

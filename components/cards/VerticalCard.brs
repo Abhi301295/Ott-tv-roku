@@ -84,7 +84,7 @@ sub ShowThumbLoading()
     if m.skeleton <> invalid then
         m.skeleton.visible = true
         m.skeleton.running = true
-        CardApplySkeletonFromConfig(m.skeleton, CardSkeletonThemeTokens(m.top), true)
+        CardApplyHomeCardSkeleton(m.skeleton, true)
     end if
 end sub
 

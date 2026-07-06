@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Live TV + mock EPG — parity with src/features/livetv/index.tsx -->
+<!-- Live TV + mock EPG — pixel parity src/features/livetv/index.tsx -->
 <component name="LiveTvScreen" extends="Group">
   <interface>
     <field id="navState" type="assocarray" onChange="OnNavStateReady" />
@@ -25,6 +25,9 @@
   <script type="text/brightscript" uri="pkg:/source/lib/net/MediaUrl.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/video/VideoPlayback.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvLayout.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvDevTz.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvTime.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvMockData.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvService.brs" />
@@ -34,51 +37,104 @@
     <Rectangle id="bg" width="1920" height="1080" color="0x0C111Aff" />
 
     <Group id="contentHost" translation="[0, 0]">
-      <!-- Hero (~45% height) -->
-      <Group id="heroHost" translation="[0, 0]">
-        <Poster id="heroBackdrop" width="1920" height="486" loadDisplayMode="scaleToZoom" opacity="0.7" />
-        <Rectangle id="heroGradL" width="1152" height="486" color="0x0C111Aff" opacity="0.85" />
-        <Rectangle id="heroGradT" translation="[0, 340]" width="1920" height="146" color="0x0C111Aff" opacity="0.6" />
+      <!-- Layer 1: hero backdrop only (clipped to 45vh). -->
+      <Group id="heroBackdropHost" translation="[0, 0]">
+        <Poster id="heroBackdropA" width="1920" height="486" loadDisplayMode="scaleToZoom" opacity="0.7" />
+        <Poster id="heroBackdropB" width="1920" height="486" loadDisplayMode="scaleToZoom" opacity="0.0" />
+        <Poster id="heroGradL" uri="pkg:/images/ui/grad_left.png" width="1152" height="486"
+          loadDisplayMode="scaleToFill" />
+      </Group>
 
-        <Group id="heroMeta" translation="[40, 300]">
-          <Label id="spotlightLbl" width="900" height="28" wrap="false" color="0xec4899ff">
-            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="18" />
-          </Label>
-          <Label id="titleLbl" width="900" height="56" wrap="true" maxLines="2" color="0xffffffff">
-            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="40" />
-          </Label>
-          <Label id="timeLbl" width="900" height="28" wrap="false" color="0xd1d5dbff">
-            <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="18" />
-          </Label>
-          <Label id="descLbl" width="760" height="72" wrap="true" maxLines="3" color="0x9ca3afff">
-            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
-          </Label>
-          <Group id="playNowBtn" translation="[0, 88]">
-            <Rectangle id="playNowBg" width="200" height="52" color="0xE5007Aff" />
-            <Label id="playNowLbl" text="Play Now" width="200" height="52" horizAlign="center" vertAlign="center" color="0xffffffff">
-              <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="20" />
-            </Label>
+      <!-- Layer 2: EPG — scrollable grid under sticky timeline (React sticky top-0 z-30). -->
+      <Group id="epgHost" translation="[0, 486]">
+        <Rectangle id="epgBg" width="1920" height="594" color="0x0C111Aff" />
+        <Rectangle id="epgTopBorder" width="1920" height="1" color="0xffffff0d" />
+
+        <Group id="gridClip" translation="[0, 56]" clippingRect="[0, 0, 1920, 538]">
+          <Rectangle id="gridScrollBg" width="1920" height="538" color="0x0C111Aff" />
+          <Group id="programGridHost" translation="[200, 0]" clippingRect="[0, 0, 1720, 538]">
+            <Group id="programScrollHost" clippingRect="[0, 0, 1720, 538]" />
+            <Rectangle id="liveLine" width="2" height="538" color="0xE5007Aff" visible="false" />
           </Group>
-          <Group id="playBeginningBtn" translation="[220, 88]">
-            <Rectangle id="playBeginningBg" width="260" height="52" color="0x00000000" />
-            <Rectangle id="playBeginningBorder" width="260" height="52" color="0xffffff66" />
-            <Label id="playBeginningLbl" text="Play From Beginning" width="260" height="52" horizAlign="center" vertAlign="center" color="0xd1d5dbff">
-              <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="20" />
-            </Label>
+          <Group id="channelColHost" clippingRect="[0, 0, 200, 538]">
+            <Rectangle id="channelColBg" width="200" height="538" color="0x0C111Aff" />
+            <Rectangle id="channelColBorder" translation="[199, 0]" width="1" height="538" color="0xffffff0d" />
+            <Group id="channelRowsHost" clippingRect="[0, 0, 200, 538]" />
           </Group>
+        </Group>
+
+        <!-- Timeline paints above grid so virtualized rows never bleed into time markers. -->
+        <Rectangle id="timelineRowBg" width="1920" height="56" color="0x0C111Aff" />
+        <Rectangle id="timelineCornerBg" width="200" height="56" color="0x0C111Aff" />
+        <Rectangle id="timelineCornerBorder" translation="[199, 0]" width="1" height="56" color="0xffffff0d" />
+        <Label id="timelineTodayLbl" translation="[0, 16]" width="200" height="24" text="Today"
+          horizAlign="center" vertAlign="center" color="0xd1d5dbff">
+          <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="14" />
+        </Label>
+        <Group id="timelineHost" translation="[200, 0]" />
+        <Rectangle id="timelineBottomBorder" translation="[0, 55]" width="1920" height="1" color="0xffffff0d" />
+
+        <Group id="liveDotHost" translation="[200, 46]" visible="false">
+          <Poster id="liveDotRing" width="18" height="18" translation="[-4, -4]"
+            uri="pkg:/images/ui/avatar_circle.png" blendColor="0xE5007A4d" />
+          <Poster id="liveDot" width="10" height="10" uri="pkg:/images/ui/avatar_circle.png" blendColor="0xE5007Aff" />
         </Group>
       </Group>
 
-      <!-- EPG grid -->
-      <Group id="epgHost" translation="[0, 486]">
-        <Group id="timelineHost" translation="[200, 0]" />
-        <Group id="gridClip" translation="[0, 48]" clippingRect="[0, 0, 1920, 546]">
-          <Group id="rowsHost" translation="[0, 0]" />
-          <Rectangle id="liveLine" width="2" height="546" color="0xE5007Aff" visible="false" />
+      <!-- Layer 3: hero copy + buttons fixed above EPG (React absolute bottom-6 left-10). -->
+      <Group id="heroControlsHost" translation="[0, 0]">
+        <Group id="heroMeta" translation="[40, 180]">
+          <Label id="spotlightLbl" width="960" height="18" wrap="false" vertAlign="top" color="0xec4899ff">
+            <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="14" />
+          </Label>
+          <Label id="titleLbl" translation="[0, 22]" width="960" height="45" wrap="true" maxLines="2" vertAlign="top" color="0xffffffff">
+            <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="36" />
+          </Label>
+          <Label id="timeLbl" translation="[0, 75]" width="960" height="20" wrap="false" vertAlign="top" color="0xd1d5dbff">
+            <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="14" />
+          </Label>
+          <Label id="descLbl" translation="[0, 148]" text="" width="960" height="0" wrap="true"
+            color="0x9ca3afff" horizAlign="left" vertAlign="top" lineSpacing="9" numLines="3"
+            ellipsizeOnBoundary="true">
+            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="14" />
+          </Label>
+          <Group id="heroBtnRow" translation="[0, 248]">
+            <Group id="playNowBtn">
+              <Poster id="playNowRing" uri="pkg:/images/ui/livetv_play_ring.png" width="160" height="52"
+                translation="[-4, -4]" loadDisplayMode="scaleToFit" visible="false" />
+              <Poster id="playNowBg" uri="pkg:/images/ui/livetv_play_fill.png" width="152" height="44"
+                loadDisplayMode="scaleToFit" blendColor="0xE5007Aff" />
+              <Poster id="playNowIcon" uri="pkg:/images/ui/livetv_ic_play_fill.png" width="18" height="18"
+                translation="[24, 13]" loadDisplayMode="scaleToFit" />
+              <Label id="playNowLbl" text="Play Now" translation="[50, 0]" width="78" height="44"
+                horizAlign="left" vertAlign="center" color="0xffffffff">
+                <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="14" />
+              </Label>
+            </Group>
+            <Group id="playBeginningBtn" translation="[168, 0]">
+              <Poster id="playBeginningRing" uri="pkg:/images/ui/livetv_pill_ring.png" width="256" height="52"
+                translation="[-4, -4]" loadDisplayMode="scaleToFit" visible="false" />
+              <Poster id="playBeginningFill" uri="pkg:/images/ui/livetv_pill_fill.png" width="246" height="42"
+                translation="[1, 1]" loadDisplayMode="scaleToFit" blendColor="0x00000000" visible="false" />
+              <Poster id="playBeginningBorder" uri="pkg:/images/ui/livetv_pill_outline.png" width="248" height="44"
+                loadDisplayMode="scaleToFit" />
+              <Poster id="playBeginningIcon" uri="pkg:/images/ui/livetv_ic_play_stroke.png" width="18" height="18"
+                translation="[24, 13]" loadDisplayMode="scaleToFit" />
+              <Label id="playBeginningLbl" text="Play From Beginning" translation="[50, 0]" width="174" height="44"
+                horizAlign="left" vertAlign="center" color="0xd1d5dbff">
+                <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="14" />
+              </Label>
+            </Group>
+          </Group>
         </Group>
       </Group>
     </Group>
 
     <Timer id="nowTimer" duration="15" repeat="true" />
+    <Timer id="initialFocusTimer" duration="0.1" repeat="false" />
+    <Timer id="backdropSwapTimer" duration="0.15" repeat="false" />
+    <Animation id="backdropFadeAnim" duration="0.3" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="backdropFadeInterp" key="[0.0, 1.0]" fieldToInterp="heroBackdropA.opacity" />
+    </Animation>
   </children>
 </component>

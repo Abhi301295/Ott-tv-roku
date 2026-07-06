@@ -120,8 +120,8 @@ sub LoadBrowseTokens()
 end sub
 
 sub ApplyStaticColors()
-    if m.bg <> invalid then m.bg.color = m.cNeutral800
-    m.pageBgRest = m.cNeutral800
+    m.pageBgRest = SK_LoadingPageBg()
+    if m.bg <> invalid then m.bg.color = m.pageBgRest
     if m.titleLabel <> invalid then m.titleLabel.color = m.cNeutral50
     if m.emptyLabel <> invalid then m.emptyLabel.color = m.cNeutral50
     ApplyPageLoaderColors()
