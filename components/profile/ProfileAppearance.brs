@@ -191,6 +191,7 @@ sub ApplyProfileColors()
     ' confirmpopup.tsx — scrim bg-black/30; card bg-black; borders neutral-600.
     m.confirmPopup.cPrimary500 = m.cPrimary500
     m.confirmPopup.cPrimary600 = m.cPrimary600
+    m.confirmPopup.cNeutral50 = m.cNeutral50
     m.confirmPopup.cNeutral300 = m.cNeutral300
     m.confirmPopup.cNeutral600 = m.cNeutral600
     m.confirmPopup.cNeutral950 = TailwindNeutral950Color()
