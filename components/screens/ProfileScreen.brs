@@ -9,7 +9,8 @@ sub init()
     m.listContentPadY = ProfileListTopY()
     m.listScrollY = 0
     m.listScrollTarget = 0
-    m.LIST_SCROLL_ANIM_STEPS = 18
+    m.prevProfileIndex = -1
+    m.LIST_SCROLL_ANIM_STEPS = 4
     m.listScrollAnimTimer = CreateObject("roSGNode", "Timer")
     m.listScrollAnimTimer.duration = 0.016
     m.listScrollAnimTimer.repeat = true
@@ -170,8 +171,7 @@ end function
 ' Cumulative row layout — each row gets the height of its scaled card + name (+ hint).
 sub LayoutProfileRows()
     ReflowProfileRows()
-    UpdateProfileListScrollTarget()
-    AnimateProfileListScroll()
+    FollowProfileListScroll()
 end sub
 
 
@@ -218,14 +218,9 @@ sub OnAvatarLayoutChanged(event as object)
     if m.top.dispose = true then return
     if m.useSquareAvatars <> true then return
     ReflowProfileRows()
-    UpdateProfileListScrollTarget()
-    SmoothProfileListScrollStep()
+    FollowProfileListScroll()
 end sub
 
-' Gentle scroll follow while a row grows/shrinks during focus scale animation.
-
-' The resolved business config (theme tokens + branding) arrived/updated — re-apply
-' so the dialog colors, logo and login background reflect the live theme.
 sub OnBusinessResolved()
     LoadProfileTokens()
     m.uiSpec = ProfileUiSpec()
@@ -271,6 +266,16 @@ sub ShowLoading(show as boolean)
         sk = m.top.findNode(id)
         if sk <> invalid then sk.running = show
     end for
+    for each id in ["sk0aGlow", "sk0bGlow", "sk1aGlow", "sk1bGlow", "sk2aGlow", "sk2bGlow"]
+        glow = m.top.findNode(id)
+        if glow <> invalid then glow.visible = show
+    end for
+    if ProfileUsesSquareAvatars() then
+        for each id in ["sk0bGlow", "sk1bGlow", "sk2bGlow"]
+            glow = m.top.findNode(id)
+            if glow <> invalid then glow.visible = false
+        end for
+    end if
     host = m.profilesScrollHost
     if host = invalid then host = m.profilesContainer
     if host <> invalid then host.visible = not show

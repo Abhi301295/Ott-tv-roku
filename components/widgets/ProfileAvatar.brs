@@ -26,7 +26,11 @@ sub init()
     ' unfocused profiles return to x=0 so the default column stays aligned.
     m.FOCUS_OFFSET_X = 34.0
     m.REST_OFFSET_X = 0.0
-    m.SIZE_ANIM_STEPS = 12
+    m.SIZE_ANIM_STEPS = 10
+    m.DEFOCUS_ANIM_STEPS = 4
+    m.animStepCount = m.SIZE_ANIM_STEPS
+    m.visualScale = m.REST_SCALE
+    m.visualOffsetX = m.REST_OFFSET_X
 
     m.top.focusable = true
     m.top.drawFocusFeedback = false
@@ -118,8 +122,8 @@ sub OnFocusChanged()
     AnimateScale(focused)
 end sub
 
-' Smoothly pop the avatar in (1.0 → 1.25 + right offset) on focus and out on blur.
-' The first call (init) just snaps to the resting scale without animating.
+' Focus in: ~300ms ease-out (React duration-300). Focus out: shorter ease on the row
+' just left; skipped rows snap so rapid up/down does not snake.
 sub AnimateScale(focused as boolean)
     target = m.REST_SCALE
     targetX = m.REST_OFFSET_X
@@ -128,28 +132,63 @@ sub AnimateScale(focused as boolean)
         targetX = m.FOCUS_OFFSET_X
     end if
 
+    if m.visualScale = invalid then m.visualScale = m.REST_SCALE
+    if m.visualOffsetX = invalid then m.visualOffsetX = m.REST_OFFSET_X
+
     if m.lastScale = invalid then
         ApplyAvatarSize(target)
         m.scaler.scale = [1.0, 1.0]
         m.scaler.translation = [targetX, SizeOffsetY(target)]
+        m.visualScale = target
+        m.visualOffsetX = targetX
         m.lastScale = target
         m.lastOffsetX = targetX
         return
     end if
 
-    if m.lastScale = target and m.lastOffsetX = targetX then return
+    if not focused then
+        if m.top.snapRest = true then
+            m.top.snapRest = false
+            SnapAvatarToRest()
+            return
+        end if
+        fromScale = m.visualScale
+        fromX = m.visualOffsetX
+        if fromScale = target and fromX = targetX then return
+        StartSizeAnimation(fromScale, target, fromX, targetX, m.DEFOCUS_ANIM_STEPS)
+        m.lastScale = target
+        m.lastOffsetX = targetX
+        return
+    end if
 
-    StartSizeAnimation(m.lastScale, target, m.lastOffsetX, targetX)
+    m.top.snapRest = false
+    fromScale = m.visualScale
+    fromX = m.visualOffsetX
+    if fromScale = target and fromX = targetX then return
+
+    StartSizeAnimation(fromScale, target, fromX, targetX, m.SIZE_ANIM_STEPS)
     m.lastScale = target
     m.lastOffsetX = targetX
 end sub
 
-sub StartSizeAnimation(fromScale as float, toScale as float, fromX as float, toX as float)
+sub SnapAvatarToRest()
+    if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.control = "stop"
+    ApplyAvatarSize(m.REST_SCALE)
+    m.scaler.scale = [1.0, 1.0]
+    m.scaler.translation = [m.REST_OFFSET_X, SizeOffsetY(m.REST_SCALE)]
+    m.visualScale = m.REST_SCALE
+    m.visualOffsetX = m.REST_OFFSET_X
+    m.lastScale = m.REST_SCALE
+    m.lastOffsetX = m.REST_OFFSET_X
+end sub
+
+sub StartSizeAnimation(fromScale as float, toScale as float, fromX as float, toX as float, steps as integer)
     m.animFromScale = fromScale
     m.animToScale = toScale
     m.animFromX = fromX
     m.animToX = toX
     m.animStep = 0
+    m.animStepCount = steps
     if m.sizeAnimTimer <> invalid then
         m.sizeAnimTimer.control = "stop"
         m.sizeAnimTimer.control = "start"
@@ -161,7 +200,9 @@ end sub
 
 sub OnSizeAnimTick()
     m.animStep = m.animStep + 1
-    t = m.animStep / m.SIZE_ANIM_STEPS
+    steps = m.SIZE_ANIM_STEPS
+    if m.animStepCount <> invalid and m.animStepCount > 0 then steps = m.animStepCount
+    t = m.animStep / steps
     if t > 1.0 then t = 1.0
 
     ' Ease out cubic for the same "pop" feel as the React transition.
@@ -170,6 +211,8 @@ sub OnSizeAnimTick()
     scale = m.animFromScale + ((m.animToScale - m.animFromScale) * eased)
     x = m.animFromX + ((m.animToX - m.animFromX) * eased)
 
+    m.visualScale = scale
+    m.visualOffsetX = x
     ApplyAvatarSize(scale)
     m.scaler.scale = [1.0, 1.0]
     m.scaler.translation = [x, SizeOffsetY(scale)]

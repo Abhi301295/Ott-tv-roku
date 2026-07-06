@@ -27,8 +27,11 @@ sub init()
     m.REST_SCALE = 1.0
     m.FOCUS_OFFSET_X = m.spec.focusOffsetX
     m.REST_OFFSET_X = 0.0
-    m.SIZE_ANIM_STEPS = 24
+    m.SIZE_ANIM_STEPS = 10
+    m.DEFOCUS_ANIM_STEPS = 4
+    m.animStepCount = m.SIZE_ANIM_STEPS
     m.visualScale = m.REST_SCALE
+    m.visualOffsetX = m.REST_OFFSET_X
 
     m.top.focusable = true
     m.top.drawFocusFeedback = false
@@ -79,7 +82,7 @@ sub UpdateLayoutHeight(showHint as boolean)
     focused = (m.top.focusedState = true)
     h = ProfileSquareRowContentHeight(focused, showHint)
     if h < 1 then h = ProfileSquareRowContentHeight(false, false)
-    m.top.layoutHeight = h
+    if m.top.layoutHeight <> h then m.top.layoutHeight = h
 end sub
 
 sub OnColorsChanged()
@@ -205,6 +208,9 @@ sub AnimateScale(focused as boolean)
         targetX = m.FOCUS_OFFSET_X
     end if
 
+    if m.visualScale = invalid then m.visualScale = m.REST_SCALE
+    if m.visualOffsetX = invalid then m.visualOffsetX = m.REST_OFFSET_X
+
     if m.lastScale = invalid then
         ApplyScales(target, targetX)
         m.lastScale = target
@@ -213,27 +219,61 @@ sub AnimateScale(focused as boolean)
         return
     end if
 
-    if m.lastScale = target and m.lastOffsetX = targetX then return
-
-    m.animFromScale = m.lastScale
-    m.animToScale = target
-    m.animFromX = m.lastOffsetX
-    m.animToX = targetX
-    m.animStep = 0
-    if m.sizeAnimTimer <> invalid then
-        m.sizeAnimTimer.control = "stop"
-        m.sizeAnimTimer.control = "start"
-    else
-        ApplyScales(target, targetX)
+    if not focused then
+        if m.top.snapRest = true then
+            m.top.snapRest = false
+            SnapSquareAvatarToRest()
+            ProfileUiLogDerived(m.top.rowIndex, focused, m.REST_SCALE, 1.0)
+            return
+        end if
+        fromScale = m.visualScale
+        fromX = m.visualOffsetX
+        if fromScale = target and fromX = targetX then return
+        StartSquareSizeAnimation(fromScale, target, fromX, targetX, m.DEFOCUS_ANIM_STEPS)
+        m.lastScale = target
+        m.lastOffsetX = targetX
+        ProfileUiLogDerived(m.top.rowIndex, focused, target, 1.0)
+        return
     end if
+
+    m.top.snapRest = false
+    fromScale = m.visualScale
+    fromX = m.visualOffsetX
+    if fromScale = target and fromX = targetX then return
+
+    StartSquareSizeAnimation(fromScale, target, fromX, targetX, m.SIZE_ANIM_STEPS)
     m.lastScale = target
     m.lastOffsetX = targetX
     ProfileUiLogDerived(m.top.rowIndex, focused, target, 1.0)
 end sub
 
+sub SnapSquareAvatarToRest()
+    if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.control = "stop"
+    ApplyScales(m.REST_SCALE, m.REST_OFFSET_X)
+    m.lastScale = m.REST_SCALE
+    m.lastOffsetX = m.REST_OFFSET_X
+end sub
+
+sub StartSquareSizeAnimation(fromScale as float, toScale as float, fromX as float, toX as float, steps as integer)
+    m.animFromScale = fromScale
+    m.animToScale = toScale
+    m.animFromX = fromX
+    m.animToX = toX
+    m.animStep = 0
+    m.animStepCount = steps
+    if m.sizeAnimTimer <> invalid then
+        m.sizeAnimTimer.control = "stop"
+        m.sizeAnimTimer.control = "start"
+    else
+        ApplyScales(toScale, toX)
+    end if
+end sub
+
 sub OnSizeAnimTick()
     m.animStep = m.animStep + 1
-    t = m.animStep / m.SIZE_ANIM_STEPS
+    steps = m.SIZE_ANIM_STEPS
+    if m.animStepCount <> invalid and m.animStepCount > 0 then steps = m.animStepCount
+    t = m.animStep / steps
     if t > 1.0 then t = 1.0
 
     inv = 1.0 - t
@@ -245,12 +285,11 @@ sub OnSizeAnimTick()
     if t >= 1.0 and m.sizeAnimTimer <> invalid then
         m.sizeAnimTimer.control = "stop"
     end if
-    showHint = (m.hintLabel <> invalid and m.hintLabel.visible)
-    UpdateLayoutHeight(showHint)
 end sub
 
 sub ApplyScales(scale as float, offsetX as float)
     m.visualScale = scale
+    m.visualOffsetX = offsetX
     ApplyCardSize(scale)
     ApplyCardChrome(m.top.focusedState)
 

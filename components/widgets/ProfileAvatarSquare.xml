@@ -6,6 +6,7 @@
     <field id="profileName" type="string" value="" onChange="OnDataChanged" />
     <field id="parentalLock" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="focusedState" type="boolean" value="false" alwaysNotify="true" onChange="OnFocusChanged" />
+    <field id="snapRest" type="boolean" value="false" />
     <field id="progress" type="float" value="0.0" alwaysNotify="true" onChange="OnFocusChanged" />
     <field id="hintText" type="string" value="" onChange="OnHintChanged" />
     <field id="cardTopColor" type="string" value="0x3d3d3dff" onChange="OnColorsChanged" />

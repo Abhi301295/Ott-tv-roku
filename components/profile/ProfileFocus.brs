@@ -59,13 +59,15 @@ end sub
 
 ' ── Focus ────────────────────────────────────────────────────────────────────
 
-
-' ── Focus ────────────────────────────────────────────────────────────────────
-
 sub ApplyProfileFocus()
+    prevIdx = -1
+    if m.prevProfileIndex <> invalid then prevIdx = m.prevProfileIndex
     for i = 0 to m.avatars.Count() - 1
         av = m.avatars[i]
         focused = (m.focusArea = "profiles" and i = m.profileIndex)
+        if av.hasField("snapRest") then
+            av.snapRest = (not focused and i <> prevIdx)
+        end if
         if focused then
             av.hintText = FocusHint(i)
             if ProfileNeedsPin(m.profiles[i]) then
@@ -84,20 +86,17 @@ sub ApplyProfileFocus()
         av.focusedState = focused
     end for
 
-    ' Logout button focus (bg-primary-600 when focused). Selection is shown by the
-    ' fill change only — no drop shadow (kept as-is per the current correct look;
-    ' the shared LoginTabButton's shadow is reserved for the login tabs).
+    ' Logout button focus (bg-primary-600 when focused).
     if m.focusArea = "logout" then
         m.logoutBtn.bgColor = m.cPrimary600
     else
         m.logoutBtn.bgColor = m.cPrimary500
     end if
     m.logoutBtn.showShadow = false
+    m.prevProfileIndex = m.profileIndex
     LayoutProfileRows()
     ApplyProfileFocusBackground()
 end sub
-
-' Locked profiles show a PIN hint; square avatars also show auto-select countdown text.
 
 ' Locked profiles show a PIN hint; square avatars also show auto-select countdown text.
 function FocusHint(index as integer) as string
@@ -113,9 +112,6 @@ function FocusHint(index as integer) as string
     end if
     return ""
 end function
-
-' ── Key handling ─────────────────────────────────────────────────────────────
-
 
 ' ── Key handling ─────────────────────────────────────────────────────────────
 
@@ -184,8 +180,3 @@ sub HandleLogoutKey(key as string)
         OpenConfirm()
     end if
 end sub
-
-' ── Auto-select (15s on focus, non-locked) ───────────────────────────────────
-
-' Re-arm the countdown for the currently focused profile, starting a fresh 15.5s
-' window. Called on every navigation, so any focus change restarts timing from zero.
