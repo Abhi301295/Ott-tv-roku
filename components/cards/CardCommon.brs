@@ -27,6 +27,14 @@ sub CardApplyHomeCardSkeleton(skeleton as object, running as boolean)
     if running and skeleton.hasField("running") then skeleton.running = true
 end sub
 
+function CardMoreLikeDrawerSkeletonColors() as object
+    ' Opaque blocks over the drawer — React bg-white/10 on black reads as ~#1a1a1a.
+    return {
+        base: "0x1a1a1aff"
+        highlight: "0x2e2e2eff"
+    }
+end function
+
 sub CardApplyHomeCardSkeletonTree(node as object, running as boolean)
     if node = invalid then return
     colors = CardHomeCardSkeletonColors()
@@ -65,7 +73,7 @@ function CardResolveThumbSize(poster as object, posterW as integer, posterH as i
     h = posterH
     if w <= 0 and poster <> invalid then w = poster.width
     if h <= 0 and poster <> invalid then h = poster.height
-    if w <= 0 then w = 220
+    if w <= 0 then w = 240
     if h <= 0 then h = 300
     return [w, h]
 end function

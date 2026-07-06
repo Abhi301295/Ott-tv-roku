@@ -74,6 +74,7 @@ sub init()
     end if
 
     ShowLoading(true)
+    BrowseEnsureLoaderTimeout(m)
 end sub
 
 sub OnNavStateReady()
@@ -203,6 +204,7 @@ sub ShowLoading(show as boolean)
         BrowseHidePageLoader(m, m.pageBgRest)
         ShowSeriesSkeleton(true)
         SetContentVisible(false)
+        BrowseArmLoaderTimeout(m)
     else
         BrowseDetachHostPaintWatch(m)
         ShowSeriesSkeleton(false)
@@ -241,30 +243,36 @@ sub OnEpisodesFirstPainted()
 end sub
 
 sub TryCompleteEpisodesReveal()
-    if not BrowsePageLoaderRunning(m) then return
-    if EpisodesPaintGateOpen() then CompleteEpisodesReveal()
+    if not m.loading then return
+    if EpisodesPaintGateOpen() or m.epCards.Count() = 0 then CompleteEpisodesReveal()
 end sub
 
 sub PrepareEpisodesReveal()
     if m.episodesRevealed then return
     m.episodesRevealed = true
     SetContentVisible(true)
+    if m.epCards.Count() = 0 then
+        CompleteEpisodesReveal()
+        return
+    end if
     AttachEpisodesPaintWatch()
     TryCompleteEpisodesReveal()
 end sub
 
 sub CompleteEpisodesReveal()
-    if not BrowsePageLoaderRunning(m) then return
-    BrowseHidePageLoader(m, m.pageBgRest)
+    if not m.loading then return
+    DetachEpisodesPaintWatch()
+    BrowseDisarmLoaderTimeout(m)
+    ShowSeriesSkeleton(false)
     m.loading = false
     ApplySeasonFocus()
     ApplyEpisodeFocus()
 end sub
 
 sub OnBrowseLoaderTimeout()
-    if not BrowsePageLoaderRunning(m) then return
+    if not m.loading then return
     if not m.episodesRevealed then PrepareEpisodesReveal()
-    if BrowsePageLoaderRunning(m) then CompleteEpisodesReveal()
+    CompleteEpisodesReveal()
 end sub
 
 ' ── Fetch ────────────────────────────────────────────────────────────────────

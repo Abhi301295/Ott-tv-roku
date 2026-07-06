@@ -72,7 +72,7 @@
          the simulator letterboxes the Video so a y=0 node puts a black bar in the
          header zone, making the preview look like it starts below the nav.) -->
     <Video id="trailerVideo" width="1920" height="1080" translation="[0, -160]"
-      visible="false" opacity="0.0" mute="true" enableUI="false" />
+      visible="false" opacity="0.0" mute="false" enableUI="false" />
 
     <!-- Left vignette (65% width); height from ApplyViewportLayout(). -->
     <Poster id="leftVignette" uri="pkg:/images/ui/grad_left.png" width="1248" height="1118"
