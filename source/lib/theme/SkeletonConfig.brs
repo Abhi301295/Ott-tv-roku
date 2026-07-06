@@ -24,6 +24,37 @@ function SK_HighlightFallbackHex() as string
     return "#0b75e0"
 end function
 
+function SkeletonBoxGlowPad() as integer
+    ' gen_skeleton_masks.py: GLOW_BLUR(10) + 12
+    return 22
+end function
+
+function SkeletonBoxGlowOffsetY() as integer
+    return 4
+end function
+
+function SkeletonProfileAvatarGlowUri(squareAvatars as boolean) as string
+    if squareAvatars then return "pkg:/images/ui/sk_glow_rounded_150_r12.png"
+    return "pkg:/images/ui/sk_glow_avatar_150.png"
+end function
+
+function SkeletonProfileNameGlowUri() as string
+    return "pkg:/images/ui/sk_glow_pill_190x22.png"
+end function
+
+function SkeletonProfileAvatarGlowSize() as object
+    pad = SkeletonBoxGlowPad()
+    offY = SkeletonBoxGlowOffsetY()
+    av = 150
+    return [av + pad * 2, av + pad * 2 + offY]
+end function
+
+function SkeletonProfileNameGlowSize() as object
+    pad = SkeletonBoxGlowPad()
+    offY = SkeletonBoxGlowOffsetY()
+    return [190 + pad * 2, 22 + pad * 2 + offY]
+end function
+
 function SK_DefaultPageBg() as string
     return SK_LoadingPageBg()
 end function

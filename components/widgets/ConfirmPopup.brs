@@ -54,23 +54,23 @@ sub UpdateButtons()
     cancelFocused = (m.focus = "cancel")
     logoutFocused = (m.focus = "logout")
 
-    ' Cancel: focused → primary-600 fill; else neutral card bg with neutral border.
+    ' Cancel: focused → primary-600 + primary-500 border; else bg-black + neutral-600.
     if cancelFocused and not loggingOut then
         m.cancelBorder.blendColor = m.top.cPrimary500
         m.cancelFill.blendColor = m.top.cPrimary600
     else
-        m.cancelBorder.blendColor = m.top.cNeutral500
+        m.cancelBorder.blendColor = m.top.cNeutral600
         m.cancelFill.blendColor = m.top.cCardBg
     end if
     m.cancelShadow.visible = (cancelFocused and not loggingOut)
 
-    ' Log Out: focused → primary-500 fill; else neutral.
+    ' Log Out: focused → primary-600 + neutral-950 border; else neutral-950 + neutral-600.
     if logoutFocused and not loggingOut then
-        m.logoutBorder.blendColor = m.top.cPrimary500
-        m.logoutFill.blendColor = m.top.cPrimary500
+        m.logoutBorder.blendColor = m.top.cNeutral950
+        m.logoutFill.blendColor = m.top.cPrimary600
     else
-        m.logoutBorder.blendColor = m.top.cNeutral500
-        m.logoutFill.blendColor = m.top.cCardBg
+        m.logoutBorder.blendColor = m.top.cNeutral600
+        m.logoutFill.blendColor = m.top.cNeutral950
     end if
     m.logoutShadow.visible = (logoutFocused and not loggingOut)
 

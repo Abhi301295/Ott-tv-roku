@@ -97,20 +97,39 @@ sub ApplyProfileHeaderBackdrop()
 end sub
 
 
+sub LayoutProfileSkeletonGlow(glow as object, sk as object, glowUri as string, glowSize as object)
+    if glow = invalid or sk = invalid then return
+    pad = SkeletonBoxGlowPad()
+    tr = sk.translation
+    glow.uri = glowUri
+    glow.translation = [tr[0] - pad, tr[1] - pad]
+    glow.width = glowSize[0]
+    glow.height = glowSize[1]
+    glow.loadDisplayMode = "scaleToFill"
+    glow.opacity = 1.0
+end sub
+
+
 sub ApplyProfileSkeletonLayout()
     pitch = ProfileRowPitch()
     square = ProfileUsesSquareAvatars()
     s = ProfileUiSpec()
     nameX = s.skAvatarSize + s.skNameMarginLeft
     nameY = Int((s.skRowHeight - s.skNameHeight) / 2.0 + 0.5)
+    avatarGlowUri = SkeletonProfileAvatarGlowUri(square)
+    avatarGlowSize = SkeletonProfileAvatarGlowSize()
+    nameGlowUri = SkeletonProfileNameGlowUri()
+    nameGlowSize = SkeletonProfileNameGlowSize()
     slots = [
-        { a: "sk0a", b: "sk0b", y: 0 }
-        { a: "sk1a", b: "sk1b", y: pitch }
-        { a: "sk2a", b: "sk2b", y: pitch * 2 }
+        { a: "sk0a", aGlow: "sk0aGlow", b: "sk0b", bGlow: "sk0bGlow", y: 0 }
+        { a: "sk1a", aGlow: "sk1aGlow", b: "sk1b", bGlow: "sk1bGlow", y: pitch }
+        { a: "sk2a", aGlow: "sk2aGlow", b: "sk2b", bGlow: "sk2bGlow", y: pitch * 2 }
     ]
     for each slot in slots
         skA = m.top.findNode(slot.a)
         skB = m.top.findNode(slot.b)
+        glowA = m.top.findNode(slot.aGlow)
+        glowB = m.top.findNode(slot.bGlow)
         if skA <> invalid then
             skA.translation = [0, slot.y]
             if square then
@@ -120,17 +139,20 @@ sub ApplyProfileSkeletonLayout()
             end if
             if skA.hasField("boxWidth") then skA.boxWidth = s.skAvatarSize
             if skA.hasField("boxHeight") then skA.boxHeight = s.skAvatarSize
+            LayoutProfileSkeletonGlow(glowA, skA, avatarGlowUri, avatarGlowSize)
         end if
         if skB <> invalid then
             if square then
                 skB.visible = false
                 skB.running = false
+                if glowB <> invalid then glowB.visible = false
             else
                 skB.visible = true
                 skB.translation = [nameX, slot.y + nameY]
                 if skB.hasField("boxWidth") then skB.boxWidth = s.skNameWidth
                 if skB.hasField("boxHeight") then skB.boxHeight = s.skNameHeight
                 if skB.hasField("shapeUri") then skB.shapeUri = SkeletonProfileNameShapeUri()
+                LayoutProfileSkeletonGlow(glowB, skB, nameGlowUri, nameGlowSize)
             end if
         end if
     end for
@@ -150,7 +172,8 @@ sub ApplyProfileColors()
     m.errorLabel.color = m.cPrimary500
     m.logoLabel.color = m.cPrimary500
 
-    ' Profile shimmer — same palette as SkeletonConfig.brs (React SkeletonBox).
+    ' Shimmer fill: theme primary-700/500 (React SkeletonBox defaults).
+    ' Wrapper glow: baked sk_glow_*.png — React boxShadow rgba(0, 146, 255, 0.4).
     skColors = SkeletonResolveColors(m.tokens)
     for each id in ["sk0a", "sk0b", "sk1a", "sk1b", "sk2a", "sk2b"]
         sk = m.top.findNode(id)
@@ -165,13 +188,13 @@ sub ApplyProfileColors()
     m.logoutBtn.textColor = m.cNeutral50
     m.logoutBtn.shadowColor = m.cPrimary500
 
-    ' Inject colors into the overlays. Dialog surfaces follow the BE theme:
-    ' card/button fills = neutral-900 (bg-neutral-900), borders = neutral-600/500.
+    ' confirmpopup.tsx — scrim bg-black/30; card bg-black; borders neutral-600.
     m.confirmPopup.cPrimary500 = m.cPrimary500
     m.confirmPopup.cPrimary600 = m.cPrimary600
     m.confirmPopup.cNeutral300 = m.cNeutral300
-    m.confirmPopup.cNeutral500 = m.cNeutral500
-    m.confirmPopup.cCardBg = m.cNeutral900
+    m.confirmPopup.cNeutral600 = m.cNeutral600
+    m.confirmPopup.cNeutral950 = TailwindNeutral950Color()
+    m.confirmPopup.cCardBg = "0x000000ff"
     m.confirmPopup.cCardBorder = m.cNeutral600
 
     m.otpPopup.cPrimary500 = m.cPrimary500
@@ -262,12 +285,13 @@ sub ApplyProfileBranding()
 end sub
 
 
-' React profile.tsx: bg-black base; loginBackgroundImage only when a profile is focused.
+' React profile.tsx: loginBackgroundImage while a profile is focused; focusedProfile
+' persists when the logout button is focused so the backdrop does not snap to black.
 sub ApplyProfileFocusBackground()
     if m.bgImage = invalid then return
     showImage = false
-    if m.profilesLoaded = true and m.focusArea = "profiles" then
-        if m.avatars <> invalid and m.avatars.Count() > 0 then showImage = true
+    if m.profilesLoaded = true and m.avatars <> invalid and m.avatars.Count() > 0 then
+        if m.focusArea = "profiles" or m.focusArea = "logout" then showImage = true
     end if
     m.bgImage.opacity = 0.0
     if showImage then m.bgImage.opacity = 1.0
