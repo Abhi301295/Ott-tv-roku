@@ -39,3 +39,20 @@ sub HomeBootLog(span as object, tag as string, detail = "" as string)
   if detail <> "" then line = line + " " + detail
   print line
 end sub
+
+' Grep telnet for [HOME_LOADER_DBG] — loader lifecycle + paint gates.
+sub HomeLoaderLog(tag as string, detail = "" as string)
+  if not HomePerfEnabled() then return
+  line = "[HOME_LOADER_DBG] " + tag
+  if detail <> "" then line = line + " | " + detail
+  print line
+end sub
+
+sub HomeLoaderLogBoot(span as object, tag as string, detail = "" as string)
+  if not HomePerfEnabled() then return
+  ms = CwPerfMs(span)
+  line = "[HOME_LOADER_DBG] " + tag
+  if ms >= 0 then line = line + " +" + Str(ms).Trim() + "ms"
+  if detail <> "" then line = line + " | " + detail
+  print line
+end sub

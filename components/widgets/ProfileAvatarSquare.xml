@@ -7,6 +7,9 @@
     <field id="parentalLock" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="focusedState" type="boolean" value="false" alwaysNotify="true" onChange="OnFocusChanged" />
     <field id="snapRest" type="boolean" value="false" />
+    <field id="selectingState" type="boolean" value="false" onChange="OnSelectingChanged" />
+    <field id="skBaseColor" type="string" value="0x04478bff" onChange="OnSkColorsChanged" />
+    <field id="skHighlightColor" type="string" value="0x0b75e0ff" onChange="OnSkColorsChanged" />
     <field id="progress" type="float" value="0.0" alwaysNotify="true" onChange="OnFocusChanged" />
     <field id="hintText" type="string" value="" onChange="OnHintChanged" />
     <field id="cardTopColor" type="string" value="0x3d3d3dff" onChange="OnColorsChanged" />
@@ -20,6 +23,7 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiDebug.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/ProfileAvatarSquare.brs" />
 
@@ -56,6 +60,11 @@
           uri="pkg:/images/ui/profile_sq_track.png" visible="false" />
         <Poster id="progressArc" width="150" height="150"
           uri="pkg:/images/ui/profile_sq_arc_000.png" visible="false" />
+      </Group>
+
+      <!-- userProfile.tsx loading branch — skeleton inside the focused scale wrapper. -->
+      <Group id="selectingGroup" visible="false">
+        <ProfileSkeletonBox id="skA" glowKind="avatarSquare" boxWidth="150" boxHeight="150" />
       </Group>
     </Group>
 

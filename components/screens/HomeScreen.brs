@@ -220,7 +220,8 @@ sub OnDispose()
     if m.transitionSafetyTimer <> invalid then m.transitionSafetyTimer.control = "stop"
     if m.bootDeferTimer <> invalid then m.bootDeferTimer.control = "stop"
     if m.rowBuildDeferTimer <> invalid then m.rowBuildDeferTimer.control = "stop"
-    HideProfileWelcomeTransition()
+    if m.vm = invalid then m.vm = FindViewManager(m.top)
+    ProfileTransitionHide(m.vm)
     if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
 
     ' Kill every in-flight HTTP listener. The shared pool may still finish the request,
@@ -364,7 +365,14 @@ sub OnBusinessResolved()
     InjectRowTheme()
     ApplyThemeToHero()
     ApplyHomeLoaderColors()
+    if BrowsePageLoaderRunning(m) then BrowseEnsureLoaderRunning(m)
     if IsHomeForeground() then SetupHeader()
+end sub
+
+
+' BrowsePageLoader arms loaderTimeout — keep home spinner alive until row 0 reveals.
+sub OnBrowseLoaderTimeout()
+    OnHomeLoaderTimeout()
 end sub
 
 
@@ -629,8 +637,10 @@ end sub
 
 sub OnHeroTrailerPlayingChanged()
     UpdateHeaderScrimForHero()
-    ' Preview is live now — safe to spend the render thread on building the rows.
-    if m.hero <> invalid and m.hero.trailerPlaying = true then MaybeStartRowBuild()
+    if m.hero <> invalid and m.hero.trailerPlaying = true then
+        HomeLoaderLogBoot(m.bootSpan, "hero trailerPlaying", HomeLoaderGateSnapshot())
+        MaybeStartRowBuild()
+    end if
 end sub
 
 

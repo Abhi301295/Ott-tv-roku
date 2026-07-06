@@ -1,5 +1,8 @@
 sub init()
     m.scaler = m.top.findNode("scaler")
+    m.selectingGroup = m.top.findNode("selectingGroup")
+    m.skA = m.top.findNode("skA")
+    m.skB = m.top.findNode("skB")
     m.avatarMask = m.top.findNode("avatarMask")
     m.circleBg = m.top.findNode("circleBg")
     m.avatarImg = m.top.findNode("avatarImg")
@@ -11,6 +14,7 @@ sub init()
     m.lockBadge = m.top.findNode("lockBadge")
     m.editBadge = m.top.findNode("editBadge")
     m.editIcon = m.top.findNode("editIcon")
+    m.editBadgeBg = m.top.findNode("editBadgeBg")
     m.leftLockIcon = m.top.findNode("leftLockIcon")
     m.nameLabel = m.top.findNode("nameLabel")
     m.hintLabel = m.top.findNode("hintLabel")
@@ -37,6 +41,7 @@ sub init()
     ' Manual sizing uses a left-center anchor: grow rightward while vertical growth
     ' stays centered in the profile row, matching React's origin-left transform.
     m.scaler.scaleRotateCenter = [0, 0]
+    if m.selectingGroup <> invalid then m.selectingGroup.scaleRotateCenter = [0, 0]
     if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.observeField("fire", "OnSizeAnimTick")
 
     OnColorsChanged()
@@ -46,10 +51,117 @@ sub init()
     OnFocusChanged()
 end sub
 
+sub OnSelectingChanged()
+    show = (m.top.selectingState = true)
+    if m.selectingGroup <> invalid then
+        m.selectingGroup.visible = show
+        if show then
+            if m.skA <> invalid then m.skA.running = true
+            if m.skB <> invalid then m.skB.running = true
+            SyncSelectingSkeletonScale()
+            OnSkColorsChanged()
+        else
+            m.selectingGroup.scale = [1.0, 1.0]
+        end if
+    end if
+    if m.skA <> invalid then m.skA.running = show
+    if m.skB <> invalid then m.skB.running = show
+    if show then
+        HideAvatarForSelecting()
+    else
+        ShowAvatarAfterSelecting()
+    end if
+end sub
+
+sub HideAvatarForSelecting()
+    for each node in [m.avatarMask, m.ring, m.progressTrack, m.progressArcRing, m.dot, m.editBadge, m.circleBg]
+        if node <> invalid then node.visible = false
+    end for
+end sub
+
+sub ShowAvatarAfterSelecting()
+    if m.avatarMask <> invalid then m.avatarMask.visible = true
+    ApplyFocusChrome()
+end sub
+
+function RefreshFocusChrome() as boolean
+    if m.top.selectingState = true then return true
+    ApplyFocusChrome()
+    return true
+end function
+
+' Sized to match ApplyAvatarSize — bake focus scale into skeleton dims (same as avatar chrome).
+sub SyncSelectingSkeletonScale()
+    if m.selectingGroup = invalid then return
+    scale = SelectingSkeletonScale()
+    m.selectingGroup.scale = [1.0, 1.0]
+    ApplySelectingSkeletonLayout(scale)
+end sub
+
+function SelectingSkeletonScale() as float
+    scale = m.visualScale
+    if scale < m.REST_SCALE then scale = m.REST_SCALE
+    if m.top.selectingState = true and m.top.focusedState = true and scale < m.FOCUS_SCALE then
+        scale = m.FOCUS_SCALE
+    end if
+    return scale
+end function
+
+function ScaleInt(v as float) as integer
+    return Int(v + 0.5)
+end function
+
+sub ApplySelectingSkeletonLayout(scale as float)
+    spec = ProfileUiSpec()
+    inset = 8 * scale
+    skAx = ScaleInt(inset)
+    skAy = ScaleInt(inset)
+    nameW = spec.skNameWidth
+    nameH = spec.skNameHeight
+    marginL = spec.skNameMarginLeft
+    avatarSz = spec.skAvatarSize
+    nameY = ScaleInt((spec.skRowHeight * scale - nameH * scale) / 2.0)
+    nameX = skAx + ScaleInt(avatarSz * scale) + ScaleInt(marginL * scale)
+
+    if m.skA <> invalid then
+        m.skA.layoutScale = scale
+        m.skA.translation = [skAx, skAy]
+        m.skA.boxWidth = avatarSz
+        m.skA.boxHeight = avatarSz
+        m.skA.glowKind = "avatar"
+        m.skA.shapeUri = SkeletonProfileAvatarShapeUri(false)
+        m.skA.glowVisible = false
+    end if
+
+    if m.skB <> invalid then
+        m.skB.visible = true
+        m.skB.layoutScale = scale
+        m.skB.translation = [nameX, nameY]
+        m.skB.boxWidth = nameW
+        m.skB.boxHeight = nameH
+        m.skB.glowKind = "pill"
+        m.skB.shapeUri = SkeletonProfileNameShapeUri()
+        m.skB.glowVisible = false
+    end if
+end sub
+
+sub OnSkColorsChanged()
+    if m.skA <> invalid then
+        m.skA.baseColor = m.top.skBaseColor
+        m.skA.highlightColor = m.top.skHighlightColor
+    end if
+    if m.skB <> invalid then
+        m.skB.baseColor = m.top.skBaseColor
+        m.skB.highlightColor = m.top.skHighlightColor
+    end if
+    if m.top.selectingState = true then SyncSelectingSkeletonScale()
+end sub
+
 sub OnColorsChanged()
     if m.ring = invalid then return
     m.ring.blendColor = m.top.ringColor
     m.nameLabel.color = m.top.nameColor
+    if m.editBadgeBg <> invalid then m.editBadgeBg.blendColor = m.top.nameColor
 end sub
 
 sub OnPortalColorsChanged()
@@ -82,20 +194,20 @@ end sub
 
 sub OnFocusChanged()
     if m.ring = invalid then return
+    ApplyFocusChrome()
+    AnimateScale(m.top.focusedState = true)
+end sub
+
+' Ring, dot, edit badge, and progress arc — focus-only chrome (NetComponent parity).
+sub ApplyFocusChrome()
+    if m.ring = invalid then return
+    if m.top.selectingState = true then return
     focused = (m.top.focusedState = true)
     locked = (m.top.parentalLock = true)
     progress = m.top.progress
-
-    ' Unlocked + focused once auto-select starts → filling multicolor arc + track.
-    ' Otherwise (just focused, or locked) → static white ring + dot.
     showArc = (focused and not locked and progress > 0)
 
-    if focused then
-        m.circleBg.visible = true
-    else
-        m.circleBg.visible = false
-    end if
-
+    if m.circleBg <> invalid then m.circleBg.visible = focused
     m.progressTrack.visible = showArc
     if m.progressArcRing <> invalid then
         m.progressArcRing.visible = showArc
@@ -108,18 +220,15 @@ sub OnFocusChanged()
 
     m.ring.visible = (focused and not showArc)
     m.dot.visible = (focused and not showArc)
-    ' React shows a left badge on focus: edit icon for unlocked, lock icon for locked.
-    showBadge = (focused and (progress = 0 or locked))
+    canShowBadge = true
+    if m.top.hasField("showEditBadge") then canShowBadge = (m.top.showEditBadge = true)
+    showBadge = (focused and canShowBadge and (progress = 0 or locked))
     m.editBadge.visible = showBadge
-    m.editIcon.visible = (showBadge and not locked)
-    m.leftLockIcon.visible = (showBadge and locked)
+    if m.editIcon <> invalid then m.editIcon.visible = (showBadge and not locked)
+    if m.leftLockIcon <> invalid then m.leftLockIcon.visible = (showBadge and locked)
     m.lockBadge.visible = false
-    ' Match current OTTPlay React/LG visual pass: profile rail shows only avatars
-    ' and focus affordances, not side labels.
     m.nameLabel.visible = false
     m.hintLabel.visible = false
-
-    AnimateScale(focused)
 end sub
 
 ' Focus in: ~300ms ease-out (React duration-300). Focus out: shorter ease on the row
@@ -216,6 +325,7 @@ sub OnSizeAnimTick()
     ApplyAvatarSize(scale)
     m.scaler.scale = [1.0, 1.0]
     m.scaler.translation = [x, SizeOffsetY(scale)]
+    if m.top.selectingState = true then SyncSelectingSkeletonScale()
 
     if t >= 1.0 and m.sizeAnimTimer <> invalid then
         m.sizeAnimTimer.control = "stop"
@@ -267,5 +377,31 @@ sub ApplyAvatarSize(scale as float)
         m.lockBadge.width = 28 * scale
         m.lockBadge.height = 28 * scale
     end if
+    ApplyEditBadgeLayout(scale)
+    if m.top.selectingState = true then SyncSelectingSkeletonScale()
+end sub
+
+' netComponent.tsx: absolute -bottom-1 -left-1, w-12 h-12 badge, w-6 h-6 icon.
+sub ApplyEditBadgeLayout(scale as float)
+    if m.editBadge = invalid then return
+    spec = ProfileUiSpec()
+    ringSize = 166 * scale
+    badgeSize = spec.editBadgeSize * scale
+    iconSize = spec.editIconSize * scale
+    inset = spec.editBadgeInset * scale
+
+    m.editBadge.translation = [-inset, ringSize - badgeSize + inset]
+    if m.editBadgeBg <> invalid then
+        m.editBadgeBg.width = badgeSize
+        m.editBadgeBg.height = badgeSize
+    end if
+    iconPad = (badgeSize - iconSize) / 2
+    for each node in [m.editIcon, m.leftLockIcon]
+        if node <> invalid then
+            node.translation = [iconPad, iconPad]
+            node.width = iconSize
+            node.height = iconSize
+        end if
+    end for
 end sub
 
