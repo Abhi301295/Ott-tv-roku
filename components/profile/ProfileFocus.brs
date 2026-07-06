@@ -48,6 +48,7 @@ sub BuildAvatars()
             av.bgColor = m.cAvatarBg
             av.ringColor = m.cNeutral50
             av.nameColor = m.cNeutral50
+            if av.hasField("showEditBadge") then av.showEditBadge = ProfileEditBadgeDefaultVisible()
             if p.avatar <> invalid then av.avatarUri = p.avatar
         end if
         m.avatars.Push(av)
@@ -96,6 +97,16 @@ sub ApplyProfileFocus()
     m.prevProfileIndex = m.profileIndex
     LayoutProfileRows()
     ApplyProfileFocusBackground()
+    SyncAllAvatarFocusChrome()
+end sub
+
+sub SyncAllAvatarFocusChrome()
+    for i = 0 to m.avatars.Count() - 1
+        av = m.avatars[i]
+        if av = invalid then continue for
+        if av.hasField("selectingState") and av.selectingState = true then continue for
+        av.callFunc("RefreshFocusChrome", invalid)
+    end for
 end sub
 
 ' Locked profiles show a PIN hint; square avatars also show auto-select countdown text.

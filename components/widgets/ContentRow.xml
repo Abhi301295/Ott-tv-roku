@@ -20,8 +20,9 @@
     <!-- Fires after RevealNow + a short paint window so Home can drop the rows shimmer only
          once real card pixels are on screen (loadStatus=ready is not enough). -->
     <field id="paintedReady" type="boolean" value="false" alwaysNotify="true" />
-    <!-- Genre / OTT catalogue rows: skip the Netflix paint-poll loop once media loads. -->
-    <field id="ottRowReveal" type="boolean" value="false" />
+    <!-- Home row 0: every boot-window card must paint before paintedReady (not just the first). -->
+    <field id="requireFullRowPaint" type="boolean" value="false" />
+    <field id="bootPaintCardCount" type="integer" value="0" />
     <!-- Home fs-34 → 41px; genre-list fs-38 → 46px (see GL_RowTitleFontSize). -->
     <field id="rowTitleFontSize" type="integer" value="41" onChange="OnRowTitleFontChanged" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />

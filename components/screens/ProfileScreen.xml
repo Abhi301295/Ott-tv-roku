@@ -51,19 +51,12 @@
 
     <!-- Profile list layer (behind header chrome — scroll must never paint over the title). -->
     <Group id="skeletonGroup" translation="[64, 265]" visible="false">
-      <!-- onboardingSkeleton.tsx boxShadow behind each SkeletonBox — sk_glow_*.png -->
-      <Poster id="sk0aGlow" loadDisplayMode="scaleToFill" visible="false" />
-      <Skeleton id="sk0a" translation="[0, 0]" boxWidth="150" boxHeight="150" />
-      <Poster id="sk0bGlow" loadDisplayMode="scaleToFill" visible="false" />
-      <Skeleton id="sk0b" translation="[230, 72]" boxWidth="190" boxHeight="22" />
-      <Poster id="sk1aGlow" loadDisplayMode="scaleToFill" visible="false" />
-      <Skeleton id="sk1a" translation="[0, 210]" boxWidth="150" boxHeight="150" />
-      <Poster id="sk1bGlow" loadDisplayMode="scaleToFill" visible="false" />
-      <Skeleton id="sk1b" translation="[230, 282]" boxWidth="190" boxHeight="22" />
-      <Poster id="sk2aGlow" loadDisplayMode="scaleToFill" visible="false" />
-      <Skeleton id="sk2a" translation="[0, 420]" boxWidth="150" boxHeight="150" />
-      <Poster id="sk2bGlow" loadDisplayMode="scaleToFill" visible="false" />
-      <Skeleton id="sk2b" translation="[230, 492]" boxWidth="190" boxHeight="22" />
+      <ProfileSkeletonBox id="sk0a" translation="[0, 0]" boxWidth="150" boxHeight="150" glowKind="avatar" />
+      <ProfileSkeletonBox id="sk0b" translation="[230, 72]" boxWidth="190" boxHeight="22" glowKind="pill" />
+      <ProfileSkeletonBox id="sk1a" translation="[0, 210]" boxWidth="150" boxHeight="150" glowKind="avatar" />
+      <ProfileSkeletonBox id="sk1b" translation="[230, 282]" boxWidth="190" boxHeight="22" glowKind="pill" />
+      <ProfileSkeletonBox id="sk2a" translation="[0, 420]" boxWidth="150" boxHeight="150" glowKind="avatar" />
+      <ProfileSkeletonBox id="sk2b" translation="[230, 492]" boxWidth="190" boxHeight="22" glowKind="pill" />
     </Group>
 
     <Group id="profilesScrollHost" translation="[64, 0]">

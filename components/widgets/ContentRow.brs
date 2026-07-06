@@ -231,6 +231,9 @@ sub StartCardBuild(cat as object)
     m.paintPollCount = 0
     m.paintStableCount = 0
     CwPerfMark(m.cwPerfSpan, "row StartCardBuild", "cards=" + Str(plan.Count()))
+    if m.top.bootPaintCardCount > 0 then
+        HomeLoaderLog("row StartCardBuild", "plan=" + Str(plan.Count()) + " bootWindow=" + Str(m.top.bootPaintCardCount) + " progressive=1card/tick")
+    end if
 
     m.buildPlan = plan
     m.top.cardCount = m.buildPlan.Count()
@@ -297,8 +300,35 @@ sub OnCardBuildTick()
         return
     end if
 
+    ' Boot row: finish the paint window before building see-all / off-screen cards.
+    if m.top.bootPaintCardCount > 0 and m.top.paintedReady <> true then
+        target = m.top.bootPaintCardCount
+        if m.buildPlan <> invalid and m.buildPlan.Count() < target then target = m.buildPlan.Count()
+        if m.cards.Count() >= target then
+            m.cardTimer.control = "stop"
+            return
+        end if
+    end if
+
     AppendNextCardFromPlan()
+    MaybeBootPaintProgress()
     FinishCardBuildIfDone()
+end sub
+
+sub MaybeBootPaintProgress()
+    if m.top.bootPaintCardCount < 1 then return
+    if m.cards.Count() = 0 then return
+    if m.rowTitle <> invalid and m.rowTitle.opacity < 1.0 then m.rowTitle.opacity = 1.0
+    if m.cardsHost <> invalid and m.cardsHost.opacity < 1.0 then m.cardsHost.opacity = 1.0
+    HomeLoaderLog("row0 card built", "idx=" + Str(m.buildIdx) + "/" + Str(m.buildPlan.Count()) + " " + BootWindowPaintProgress())
+    MaybeStartPaintGate()
+end sub
+
+sub ResumeBootCardBuildIfNeeded()
+    if m.top.bootPaintCardCount < 1 then return
+    if m.buildComplete then return
+    if m.buildIdx >= m.buildPlan.Count() then return
+    if m.cardTimer <> invalid then m.cardTimer.control = "start"
 end sub
 
 sub AppendNextCardFromPlan()
@@ -359,8 +389,18 @@ sub RevealStripNow()
     if m.cardsHost <> invalid then m.cardsHost.opacity = 1.0
 end sub
 
-' Sync-build the first N cards (focused-row navigation) so the strip is visible immediately.
+' Sync-build cards for focus prefetch — boot row 0 uses cardTimer (one card/tick) so the
+' home page loader keeps spinning on the render thread.
 function BuildCardsNow(maxCards as dynamic) as boolean
+    if m.top.bootPaintCardCount > 0 and m.buildActive then
+        if m.cardTimer <> invalid and m.cardTimer.control <> "start" then
+            m.cardTimer.control = "start"
+        end if
+        MaybeBootPaintProgress()
+        HomeLoaderLog("row0 BuildCardsNow defer", "progressive cards=" + Str(m.cards.Count()) + " plan=" + Str(m.buildPlan.Count()))
+        return true
+    end if
+
     limit = 6
     if maxCards <> invalid then
         if Type(maxCards) = "roInt" or Type(maxCards) = "Integer" then limit = maxCards
@@ -379,6 +419,9 @@ function BuildCardsNow(maxCards as dynamic) as boolean
     end while
 
     if m.top.ottRowReveal = true and m.cards.Count() > 0 then RevealStripNow()
+    if m.top.bootPaintCardCount > 0 then
+        HomeLoaderLog("row0 BuildCardsNow done", "cards=" + Str(m.cards.Count()) + " idx=" + Str(m.buildIdx) + "/" + Str(m.buildPlan.Count()))
+    end if
     if m.buildIdx >= m.buildPlan.Count() then
         FinishCardBuildIfDone()
     else
@@ -430,6 +473,18 @@ sub MaybeStartPaintGate()
     StartPaintPoll()
 end sub
 
+function CardSlotPainted(card as object) as boolean
+    if card = invalid then return true
+    thumb = card.findNode("thumb")
+    if thumb = invalid then return true
+    st = thumb.loadStatus
+    if st <> "ready" and st <> "failed" then return false
+    if thumb.visible <> true then return false
+    skel = card.findNode("skeleton")
+    if skel <> invalid and skel.visible = true then return false
+    return true
+end function
+
 function FirstVisibleCardPainted() as boolean
     if m.top.opacity < 1.0 then return false
     if m.cardsHost = invalid or m.cardsHost.opacity < 1.0 then return false
@@ -438,21 +493,65 @@ function FirstVisibleCardPainted() as boolean
         if card = invalid then continue for
         x = card.translation[0]
         if x >= 1920 then continue for
-        thumb = card.findNode("thumb")
-        skel = card.findNode("skeleton")
-        if thumb = invalid then return false
-        st = thumb.loadStatus
-        if st <> "ready" and st <> "failed" then return false
-        if thumb.visible <> true then return false
-        if skel <> invalid and skel.visible = true then return false
-        return true
+        if CardSlotPainted(card) then return true
     end for
     return false
 end function
 
+function AllOnScreenCardsPainted() as boolean
+    if m.top.opacity < 1.0 then return false
+    if m.cardsHost = invalid or m.cardsHost.opacity < 1.0 then return false
+    if m.cards.Count() = 0 then return true
+    anyOnScreen = false
+    for each card in m.cards
+        if card = invalid then continue for
+        x = card.translation[0]
+        if x >= 1920 then continue for
+        anyOnScreen = true
+        if not CardSlotPainted(card) then return false
+    end for
+    return anyOnScreen
+end function
+
+function BootWindowCardsPainted() as boolean
+    target = m.top.bootPaintCardCount
+    if target < 1 then return AllOnScreenCardsPainted()
+    if m.buildPlan <> invalid and m.buildPlan.Count() > 0 and m.buildPlan.Count() < target then
+        target = m.buildPlan.Count()
+    end if
+    if m.cards.Count() < target then return false
+    for i = 0 to target - 1
+        if not CardSlotPainted(m.cards[i]) then return false
+    end for
+    return true
+end function
+
+function BootWindowPaintProgress() as string
+    target = m.top.bootPaintCardCount
+    if target < 1 then return ""
+    if m.buildPlan <> invalid and m.buildPlan.Count() > 0 and m.buildPlan.Count() < target then
+        target = m.buildPlan.Count()
+    end if
+    painted = 0
+    for i = 0 to m.cards.Count() - 1
+        if i >= target then exit for
+        if CardSlotPainted(m.cards[i]) then painted = painted + 1
+    end for
+    return Str(painted) + "/" + Str(target) + " built=" + Str(m.cards.Count())
+end function
+
+function RowPaintPollSatisfied() as boolean
+    if m.top.requireFullRowPaint = true then
+        if m.top.bootPaintCardCount > 0 then return BootWindowCardsPainted()
+        if not m.buildComplete then return false
+        return AllOnScreenCardsPainted()
+    end if
+    return FirstVisibleCardPainted()
+end function
+
 sub OnPaintPoll()
     m.paintPollCount = m.paintPollCount + 1
-    painted = FirstVisibleCardPainted()
+    painted = RowPaintPollSatisfied()
     if painted then
         m.paintStableCount = m.paintStableCount + 1
     else
@@ -462,6 +561,9 @@ sub OnPaintPoll()
         chop = 0.0
         if m.cardsHost <> invalid then chop = m.cardsHost.opacity
         CwPerfMark(m.cwPerfSpan, "row paint poll #" + Str(m.paintPollCount), "painted=" + CwPerfBool(painted) + " stable=" + Str(m.paintStableCount) + " rowOp=" + Str(m.top.opacity) + " hostOp=" + Str(chop))
+        if m.top.bootPaintCardCount > 0 then
+            HomeLoaderLog("row0 paint poll", "#" + Str(m.paintPollCount) + " ok=" + CwPerfBool(painted) + " " + BootWindowPaintProgress())
+        end if
     end if
     ' Two consecutive painted frames — page loader drops only after compositor shows cards.
     needStable = 2
@@ -480,8 +582,11 @@ end sub
 sub MarkPaintedReady(forced as boolean)
     if m.paintTimer <> invalid then m.paintTimer.control = "stop"
     detail = "polls=" + Str(m.paintPollCount) + " forced=" + CwPerfBool(forced)
+    if m.top.bootPaintCardCount > 0 then detail = detail + " " + BootWindowPaintProgress()
     CwPerfMark(m.cwPerfSpan, "row paintedReady TRUE", detail)
+    if m.top.bootPaintCardCount > 0 then HomeLoaderLog("row0 paintedReady", detail)
     if m.top.paintedReady <> true then m.top.paintedReady = true
+    ResumeBootCardBuildIfNeeded()
 end sub
 
 sub OnRevealSafety()

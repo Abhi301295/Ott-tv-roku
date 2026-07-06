@@ -97,62 +97,47 @@ sub ApplyProfileHeaderBackdrop()
 end sub
 
 
-sub LayoutProfileSkeletonGlow(glow as object, sk as object, glowUri as string, glowSize as object)
-    if glow = invalid or sk = invalid then return
-    pad = SkeletonBoxGlowPad()
-    tr = sk.translation
-    glow.uri = glowUri
-    glow.translation = [tr[0] - pad, tr[1] - pad]
-    glow.width = glowSize[0]
-    glow.height = glowSize[1]
-    glow.loadDisplayMode = "scaleToFill"
-    glow.opacity = 1.0
-end sub
-
-
 sub ApplyProfileSkeletonLayout()
     pitch = ProfileRowPitch()
     square = ProfileUsesSquareAvatars()
     s = ProfileUiSpec()
     nameX = s.skAvatarSize + s.skNameMarginLeft
     nameY = Int((s.skRowHeight - s.skNameHeight) / 2.0 + 0.5)
-    avatarGlowUri = SkeletonProfileAvatarGlowUri(square)
-    avatarGlowSize = SkeletonProfileAvatarGlowSize()
-    nameGlowUri = SkeletonProfileNameGlowUri()
-    nameGlowSize = SkeletonProfileNameGlowSize()
+    avatarKind = "avatar"
+    if square then avatarKind = "avatarSquare"
+    avatarShape = SkeletonProfileAvatarShapeUri(square)
+    pillShape = SkeletonProfileNameShapeUri()
     slots = [
-        { a: "sk0a", aGlow: "sk0aGlow", b: "sk0b", bGlow: "sk0bGlow", y: 0 }
-        { a: "sk1a", aGlow: "sk1aGlow", b: "sk1b", bGlow: "sk1bGlow", y: pitch }
-        { a: "sk2a", aGlow: "sk2aGlow", b: "sk2b", bGlow: "sk2bGlow", y: pitch * 2 }
+        { a: "sk0a", b: "sk0b", y: 0 }
+        { a: "sk1a", b: "sk1b", y: pitch }
+        { a: "sk2a", b: "sk2b", y: pitch * 2 }
     ]
     for each slot in slots
-        skA = m.top.findNode(slot.a)
-        skB = m.top.findNode(slot.b)
-        glowA = m.top.findNode(slot.aGlow)
-        glowB = m.top.findNode(slot.bGlow)
-        if skA <> invalid then
-            skA.translation = [0, slot.y]
-            if square then
-                if skA.hasField("shapeUri") then skA.shapeUri = SkeletonProfileAvatarShapeUri(true)
-            else
-                if skA.hasField("shapeUri") then skA.shapeUri = SkeletonProfileAvatarShapeUri(false)
-            end if
-            if skA.hasField("boxWidth") then skA.boxWidth = s.skAvatarSize
-            if skA.hasField("boxHeight") then skA.boxHeight = s.skAvatarSize
-            LayoutProfileSkeletonGlow(glowA, skA, avatarGlowUri, avatarGlowSize)
+        boxA = m.top.findNode(slot.a)
+        boxB = m.top.findNode(slot.b)
+        if boxA <> invalid then
+            boxA.translation = [0, slot.y]
+            boxA.layoutScale = 1.0
+            boxA.glowKind = avatarKind
+            boxA.boxWidth = s.skAvatarSize
+            boxA.boxHeight = s.skAvatarSize
+            boxA.shapeUri = avatarShape
+            boxA.glowVisible = true
         end if
-        if skB <> invalid then
+        if boxB <> invalid then
             if square then
-                skB.visible = false
-                skB.running = false
-                if glowB <> invalid then glowB.visible = false
+                boxB.visible = false
+                boxB.running = false
+                boxB.glowVisible = false
             else
-                skB.visible = true
-                skB.translation = [nameX, slot.y + nameY]
-                if skB.hasField("boxWidth") then skB.boxWidth = s.skNameWidth
-                if skB.hasField("boxHeight") then skB.boxHeight = s.skNameHeight
-                if skB.hasField("shapeUri") then skB.shapeUri = SkeletonProfileNameShapeUri()
-                LayoutProfileSkeletonGlow(glowB, skB, nameGlowUri, nameGlowSize)
+                boxB.visible = true
+                boxB.translation = [nameX, slot.y + nameY]
+                boxB.layoutScale = 1.0
+                boxB.glowKind = "pill"
+                boxB.boxWidth = s.skNameWidth
+                boxB.boxHeight = s.skNameHeight
+                boxB.shapeUri = pillShape
+                boxB.glowVisible = true
             end if
         end if
     end for
@@ -209,6 +194,8 @@ sub ApplyProfileColors()
         if av <> invalid then
             if av.hasField("nameColor") then av.nameColor = m.cNeutral50
             if av.hasField("hintColor") then av.hintColor = m.cNeutral400
+            if av.hasField("skBaseColor") then av.skBaseColor = skColors.base
+            if av.hasField("skHighlightColor") then av.skHighlightColor = skColors.highlight
         end if
     end for
 end sub
@@ -217,6 +204,7 @@ end sub
 
 sub ApplySquareAvatarColors()
     if m.useSquareAvatars <> true then return
+    skColors = SkeletonResolveColors(m.tokens)
     for each av in m.avatars
         av.cardTopColor = m.cNeutral600
         av.cardBottomColor = m.cNeutral800
@@ -224,6 +212,8 @@ sub ApplySquareAvatarColors()
         av.borderColor = m.cPrimary700
         av.nameColor = m.cNeutral50
         av.hintColor = m.cNeutral400
+        if av.hasField("skBaseColor") then av.skBaseColor = skColors.base
+        if av.hasField("skHighlightColor") then av.skHighlightColor = skColors.highlight
     end for
 end sub
 

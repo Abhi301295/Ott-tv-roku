@@ -1,6 +1,8 @@
 sub init()
     m.spec = ProfileUiSpec()
     m.cardScaler = m.top.findNode("cardScaler")
+    m.selectingGroup = m.top.findNode("selectingGroup")
+    m.skA = m.top.findNode("skA")
     m.scaler = m.cardScaler
     m.cardStack = m.top.findNode("cardStack")
     m.cardInner = m.top.findNode("cardInner")
@@ -42,6 +44,64 @@ sub init()
     OnDataChanged()
     OnHintChanged()
     OnFocusChanged()
+    OnSelectingChanged()
+end sub
+
+sub OnSelectingChanged()
+    show = (m.top.selectingState = true)
+    if m.cardStack <> invalid then m.cardStack.visible = not show
+    if m.nameLabel <> invalid then m.nameLabel.visible = not show
+    if m.hintLabel <> invalid then m.hintLabel.visible = false
+    if m.selectingGroup <> invalid then
+        m.selectingGroup.visible = show
+        if show then
+            SyncSelectingSkeletonScale()
+        else
+            m.selectingGroup.scale = [1.0, 1.0]
+        end if
+    end if
+    if m.skA <> invalid then m.skA.running = show
+    if show then
+        m.top.layoutHeight = m.spec.skRowHeight
+    else
+        if m.hintLabel <> invalid then
+            m.hintLabel.visible = (m.top.focusedState = true and m.top.hintText <> "")
+        end if
+        showHint = false
+        if m.hintLabel <> invalid then showHint = m.hintLabel.visible
+        UpdateLayoutHeight(showHint)
+    end if
+end sub
+
+sub SyncSelectingSkeletonScale()
+    if m.selectingGroup = invalid then return
+    scale = m.visualScale
+    if scale < m.REST_SCALE then scale = m.REST_SCALE
+    if m.top.selectingState = true and m.top.focusedState = true and scale < m.FOCUS_SCALE then
+        scale = m.FOCUS_SCALE
+    end if
+    m.selectingGroup.scale = [1.0, 1.0]
+    ApplySelectingSkeletonLayout(scale)
+end sub
+
+sub ApplySelectingSkeletonLayout(scale as float)
+    spec = ProfileUiSpec()
+    if m.skA <> invalid then
+        m.skA.layoutScale = scale
+        m.skA.translation = [0, 0]
+        m.skA.boxWidth = spec.cardSize
+        m.skA.boxHeight = spec.cardSize
+        m.skA.glowKind = "avatarSquare"
+        m.skA.shapeUri = SkeletonProfileAvatarShapeUri(true)
+        m.skA.glowVisible = false
+    end if
+end sub
+
+sub OnSkColorsChanged()
+    if m.skA <> invalid then
+        m.skA.baseColor = m.top.skBaseColor
+        m.skA.highlightColor = m.top.skHighlightColor
+    end if
 end sub
 
 sub ApplyLayoutFromSpec()
@@ -297,6 +357,7 @@ sub ApplyScales(scale as float, offsetX as float)
         m.cardScaler.scale = [1.0, 1.0]
         m.cardScaler.translation = [offsetX, ScaleOffsetY(scale)]
     end if
+    if m.top.selectingState = true then SyncSelectingSkeletonScale()
     ApplyLabelLayout()
 end sub
 

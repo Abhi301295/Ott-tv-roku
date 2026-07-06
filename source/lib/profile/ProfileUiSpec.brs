@@ -58,7 +58,17 @@ function ProfileUiSpec() as object
         skNameHeight: 22
         skNameMarginLeft: 80          ' ml-20
         skRowHeight: 166              ' min-h-[166px]
+
+        ' netComponent.tsx edit/lock badge (-bottom-1 -left-1, w-12 h-12, icon w-6 h-6)
+        editBadgeSize: 48
+        editIconSize: 24
+        editBadgeInset: 4
     }
+end function
+
+' TEMP: default on until BE profile-edit permission is wired per profile.
+function ProfileEditBadgeDefaultVisible() as boolean
+    return true
 end function
 
 function ProfileUiRowPitch() as integer
