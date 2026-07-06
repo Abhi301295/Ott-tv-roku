@@ -13,7 +13,8 @@ OUT = ROOT / "images" / "ui"
 SIZE = 96
 RENDER_SIZE = 512
 IDLE_FILL = "#8F8F8F"
-REACT_IMAGE_TS = ROOT.parent / "lg-samsung-tv-player-lg-dev" / "src" / "utils" / "images" / "image.ts"
+REACT_REPO = ROOT.parent.parent / "lg-samsung-tv-player"
+REACT_IMAGE_TS = REACT_REPO / "src" / "utils" / "images" / "image.ts"
 CHROME = os.environ.get("CHROME_BIN", "google-chrome")
 
 ICON_PAIRS = {
@@ -24,6 +25,7 @@ ICON_PAIRS = {
     "list": ("LIST", "LIST_FOCUSED"),
     "profile": ("PROFILE", "PROFILE_FOCUSED"),
     "reels": ("NEW_RELEASE", "NEW_RELEASE_FOCUSED"),
+    "live_tv": ("LIVE_TV", "LIVE_TV_FOCUSED"),
 }
 
 

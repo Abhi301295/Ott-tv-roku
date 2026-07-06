@@ -10,6 +10,7 @@ function DefaultFeatures() as object
         enableRegistration: true
         enableSocialLogin: false
         reelsEnabled: false
+        epgManagement: false
         geoBlockingEnabled: true
         subscriptionEnabled: true
     }

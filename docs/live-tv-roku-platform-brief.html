@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live TV on Roku — Platform Capability Brief</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap');
+
+    :root {
+      --ink: #0f1419;
+      --muted: #536471;
+      --line: #e8ecef;
+      --bg: #ffffff;
+      --surface: #f7f9fb;
+      --accent: #0b5cab;
+      --accent-soft: #e8f2fc;
+      --yes: #0d7a4e;
+      --yes-bg: #e8f7ef;
+      --warn: #9a6700;
+      --warn-bg: #fff8e6;
+      --no: #b42318;
+      --no-bg: #fdeeed;
+      --alt: #5b21b6;
+      --alt-bg: #f3efff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.55;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    @page {
+      size: A4;
+      margin: 18mm 16mm 20mm 16mm;
+    }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .page-break { page-break-before: always; }
+      .avoid-break { page-break-inside: avoid; }
+    }
+
+    .cover {
+      min-height: 260mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 12mm 0 8mm;
+      border-bottom: 4px solid var(--accent);
+    }
+
+    .cover-tag {
+      display: inline-block;
+      font-size: 9pt;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 24px;
+      width: fit-content;
+    }
+
+    .cover h1 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 34pt;
+      font-weight: 600;
+      line-height: 1.15;
+      color: var(--ink);
+      max-width: 16ch;
+      margin-bottom: 20px;
+    }
+
+    .cover .subtitle {
+      font-size: 13pt;
+      color: var(--muted);
+      max-width: 52ch;
+      margin-bottom: 48px;
+    }
+
+    .cover-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: auto;
+      padding-top: 40px;
+      border-top: 1px solid var(--line);
+      font-size: 9.5pt;
+      color: var(--muted);
+    }
+
+    .cover-meta strong { color: var(--ink); display: block; margin-bottom: 4px; }
+
+    h2 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 18pt;
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0 0 10px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--accent);
+    }
+
+    h3 {
+      font-size: 11.5pt;
+      font-weight: 700;
+      color: var(--ink);
+      margin: 18px 0 8px;
+    }
+
+    h4 {
+      font-size: 10pt;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 14px 0 6px;
+    }
+
+    p { margin-bottom: 10px; color: var(--ink); }
+    .muted { color: var(--muted); }
+    section { padding: 8mm 0 4mm; }
+
+    .exec-box {
+      background: var(--surface);
+      border-left: 4px solid var(--accent);
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+    }
+
+    .exec-box p:last-child { margin-bottom: 0; }
+
+    .badge {
+      display: inline-block;
+      font-size: 8pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    .badge-yes { background: var(--yes-bg); color: var(--yes); }
+    .badge-warn { background: var(--warn-bg); color: var(--warn); }
+    .badge-no { background: var(--no-bg); color: var(--no); }
+    .badge-alt { background: var(--alt-bg); color: var(--alt); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 18px;
+      font-size: 9.5pt;
+    }
+
+    th {
+      text-align: left;
+      background: var(--ink);
+      color: #fff;
+      padding: 10px 12px;
+      font-weight: 600;
+    }
+
+    th:first-child { border-radius: 6px 0 0 0; }
+    th:last-child { border-radius: 0 6px 0 0; }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: var(--surface); }
+
+    .feature-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      background: #fff;
+    }
+
+    .feature-card .head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .feature-card .head h3 { margin: 0; flex: 1; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 10px 0;
+    }
+
+    .mini-panel {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 9.5pt;
+    }
+
+    .mini-panel strong {
+      display: block;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    ul { margin: 8px 0 12px 20px; }
+    li { margin-bottom: 5px; }
+
+    .toc {
+      list-style: none;
+      margin: 16px 0;
+      padding: 0;
+    }
+
+    .toc li {
+      padding: 8px 0;
+      border-bottom: 1px dotted var(--line);
+      display: flex;
+      justify-content: space-between;
+      font-size: 10pt;
+    }
+
+    .toc .num { color: var(--accent); font-weight: 600; margin-right: 10px; }
+
+    .phase-row {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .phase-num {
+      font-family: 'Source Serif 4', serif;
+      font-size: 22pt;
+      font-weight: 600;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    footer.doc-footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      font-size: 8.5pt;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- COVER -->
+  <div class="cover">
+    <span class="cover-tag">Internal · Pre-Client Commitment</span>
+    <h1>Live TV on Roku</h1>
+    <p class="subtitle">A detailed platform capability brief: what you can deliver with confidence, what requires qualification, and practical alternatives for everything else.</p>
+    <div class="exec-box">
+      <p><strong>Purpose.</strong> Use this document before signing statements of work or promising parity with web, mobile, or cable-style live TV products. Roku is a capable live TV platform when scope is aligned with how the device actually works.</p>
+    </div>
+    <div class="cover-meta">
+      <div><strong>Audience</strong> Product, engineering, delivery, sales</div>
+      <div><strong>Platform</strong> Roku OS · SceneGraph · Native Video</div>
+      <div><strong>Focus</strong> Linear live TV, EPG, playback, monetization</div>
+      <div><strong>Classification</strong> Capability reference · Not a fixed estimate</div>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- EXEC SUMMARY -->
+  <section>
+    <h2>Executive Summary</h2>
+    <p>A professional Live TV application on Roku is <strong>absolutely achievable</strong>. The experience clients expect from modern TV apps — a featured live channel, a favorites row, a full electronic program guide (EPG), channel changing, and fullscreen playback — maps well to Roku’s strengths.</p>
+    <p>Where teams get into trouble is promising <strong>web or mobile parity</strong> without understanding platform boundaries. Roku uses a native video stack, not a browser. There is no HTML, no HLS.js, no Google IMA, no Chromecast, and no mobile-style push notifications inside your channel.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Verdict</th>
+          <th>Meaning for proposals</th>
+          <th>Examples</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-yes">Supported</span></td>
+          <td>Safe to commit in a v1 Live TV scope</td>
+          <td>Live HLS play, EPG grid, favorites, hero preview, fullscreen player</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-warn">Qualified</span></td>
+          <td>Deliverable with caveats, backend dependency, or phased timeline</td>
+          <td>DRM, DVR, manual quality, ads, pause-live, EPG refresh</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-alt">Alternative</span></td>
+          <td>Different UX or technology achieves the same user goal</td>
+          <td>Inline preview instead of Picture-in-Picture (PiP); polling instead of WebSockets</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-no">Not on Roku</span></td>
+          <td>Do not list as a Roku deliverable</td>
+          <td>Playback speed, Chromecast, mobile push, Google IMA as-is</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="page-break"></div>
+
+  <!-- WHAT WE CAN DO -->
+  <section>
+    <h2>Part I — What Roku Delivers Well</h2>
+    <p class="muted">These capabilities form the core of a credible Live TV product and should anchor any v1 commitment.</p>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>1. Live channel playback (HLS)</h3>
+        <span class="badge badge-yes">Supported</span>
+      </div>
+      <h4>What it is</h4>
+      <p>Streaming a broadcast or OTT live channel in real time using HTTP Live Streaming (HLS), typically delivered as an <code>.m3u8</code> manifest URL from your CDN or origin.</p>
+      <h4>Why Roku is strong here</h4>
+      <p>Roku’s native <strong>Video</strong> node plays HLS without a third-party player SDK. The device handles segment fetching, buffering, and adaptive bitrate for live manifests when configured correctly. This is the same fundamental technology used by major FAST and live TV apps on Roku.</p>
+      <h4>What you need from the client / backend</h4>
+      <ul>
+        <li>A playable live manifest URL per channel (or a play API that returns one)</li>
+        <li>Token or signed-URL refresh rules if links expire</li>
+        <li>Entitlement checks per subscription tier</li>
+        <li>Geo / blackout policy clarity</li>
+      </ul>
+      <h4>Client-safe commitment</h4>
+      <p><strong>Yes</strong> — live linear playback is a standard Roku deliverable, subject to stream format and DRM discovery.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>2. Electronic Program Guide (EPG)</h3>
+        <span class="badge badge-yes">Supported</span>
+      </div>
+      <h4>What it is</h4>
+      <p>The “TV guide” grid: channels on one axis, time on the other, with program blocks showing title, duration, and what is on now vs later. Users navigate with the remote to browse schedules and select content.</p>
+      <h4>Why Roku is strong here</h4>
+      <p>EPG is a custom UI built in SceneGraph (groups, rectangles, labels, focus). There is no built-in EPG widget — you implement the grid — but Roku’s focus engine is designed for remote-driven 2D navigation. This is well-trodden territory for TV platforms.</p>
+      <h4>What you need from the client / backend</h4>
+      <ul>
+        <li>Channel list with stable IDs and logos</li>
+        <li>Schedule API: program start/end, title, metadata, optional images</li>
+        <li>Time-window queries (e.g. now − 2h through now + 8h)</li>
+        <li>Server time or timezone rules for the “NOW” line</li>
+      </ul>
+      <h4>Client-safe commitment</h4>
+      <p><strong>Yes</strong> — full grid EPG is a primary engineering workstream, not a platform blocker.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>3. “My Channels” / favorites row</h3>
+        <span class="badge badge-yes">Supported</span>
+      </div>
+      <h4>What it is</h4>
+      <p>A horizontal row of favorite or frequently watched channels, each showing logo, current program title, time remaining, and optional progress — a quick-entry strip above the full guide.</p>
+      <h4>Why Roku is strong here</h4>
+      <p>Horizontal scrolling rows with focus are a native TV pattern on Roku. Implementation is comparable to “continue watching” or catalog rows in any OTT app.</p>
+      <h4>What you need from the client / backend</h4>
+      <ul>
+        <li>Favorites API or derivation from watch history</li>
+        <li>Current program per channel (from EPG or lightweight “now playing” endpoint)</li>
+      </ul>
+      <h4>Client-safe commitment</h4>
+      <p><strong>Yes</strong> — standard UI plus API integration.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>4. Featured hero &amp; “Watch Now”</h3>
+        <span class="badge badge-yes">Supported</span>
+      </div>
+      <h4>What it is</h4>
+      <p>A large cinematic area at the top of the Live TV home screen showing the selected or featured channel: live preview or key art, LIVE badge, program title, time remaining, and a primary call-to-action to watch fullscreen.</p>
+      <h4>Why Roku is strong here</h4>
+      <p>Hero layouts with overlaid metadata are standard on TV OTT apps. Live preview video can run in the hero while the user browses the guide below — the expected pattern for Roku live TV (see inline preview in Part II).</p>
+      <h4>Client-safe commitment</h4>
+      <p><strong>Yes</strong> — aligns with approved Live TV UX patterns.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>5. Channel zap &amp; fullscreen live player</h3>
+        <span class="badge badge-yes">Supported</span>
+      </div>
+      <h4>What it is</h4>
+      <p>Changing channels from the guide (zap) and entering a dedicated fullscreen live viewing experience with appropriate controls: back, info, captions where available, and “go to live” when timeshift exists.</p>
+      <h4>Why Roku is strong here</h4>
+      <p>Stream switching is implemented by stopping the current playback, loading a new URL, and playing — the same model used across live TV on connected devices. Fullscreen player is a dedicated screen in the app navigation stack.</p>
+      <h4>Live vs VOD player differences</h4>
+      <ul>
+        <li>Seek bar may be disabled or limited on true live edge</li>
+        <li>“Progress” often reflects program schedule (EPG), not file duration</li>
+        <li>Pause behavior depends on CDN capabilities (see Timeshift, Part II)</li>
+      </ul>
+      <h4>Client-safe commitment</h4>
+      <p><strong>Yes</strong> — with live-specific player UX called out in design.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>6. Automatic video quality (ABR)</h3>
+        <span class="badge badge-yes">Supported</span>
+      </div>
+      <h4>What it is</h4>
+      <p>The player automatically selects the best bitrate based on network conditions — users stay on “Auto” without picking 720p or 1080p manually.</p>
+      <h4>Why Roku is strong here</h4>
+      <p>Native HLS playback includes adaptive bitrate when fed a standard master playlist with multiple renditions. No custom player SDK required.</p>
+      <h4>Client-safe commitment</h4>
+      <p><strong>Yes</strong> — recommend Auto as default and primary quality mode for live.</p>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+
+  <!-- QUALIFIED / ALTERNATIVES -->
+  <section>
+    <h2>Part II — Qualified Scope &amp; Alternatives</h2>
+    <p class="muted">These features are often requested. They are not “impossible,” but they must be explained accurately and scoped with dependencies.</p>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>7. Manual quality selection (mid-stream)</h3>
+        <span class="badge badge-warn">Qualified</span>
+      </div>
+      <h4>What the client often wants</h4>
+      <p>A settings menu to force 1080p / 720p / 480p during playback, with a smooth switch like web HLS.js or Netflix.</p>
+      <h4>Roku reality</h4>
+      <p>Roku does not expose fine-grained manual rendition switching during playback the way browser-based HLS libraries do. <strong>Auto quality works well.</strong> Manual selection typically requires stopping playback, loading a specific variant URL at the current position, and resuming — users may see a <strong>brief rebuffer or visible glitch</strong>.</p>
+      <div class="grid-2">
+        <div class="mini-panel"><strong>Cannot promise</strong> Seamless manual quality identical to web</div>
+        <div class="mini-panel"><strong>Can promise</strong> Auto ABR; optional manual with acceptable interruption</div>
+      </div>
+      <h4>Alternative for proposals</h4>
+      <p>Ship live with <strong>Auto only</strong> in v1. Add manual quality in v2 if product accepts rebuffer on change.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>8. Picture-in-Picture (PiP) while browsing</h3>
+        <span class="badge badge-alt">Alternative</span>
+      </div>
+      <h4>What it is</h4>
+      <p><strong>Picture-in-Picture (PiP)</strong> means video keeps playing in a small floating window while the user does something else — for example, browsing the guide with the match still visible in a corner of the screen.</p>
+      <h4>What the client often wants</h4>
+      <p>PiP on mobile or desktop: video in a floating corner while navigating other parts of the app or the operating system.</p>
+      <h4>Roku reality</h4>
+      <p>There is <strong>no OS-level Picture-in-Picture (PiP)</strong> for third-party channel apps. The channel runs full screen. Video does not persist when the user leaves the app.</p>
+      <h4>The standard alternative: inline live preview</h4>
+      <p>Place a <strong>Video node in the Live TV screen layout</strong> (hero area) while the EPG occupies the lower portion. When the user moves focus across channels, swap the stream URL in that preview. This is how credible Roku live apps behave and matches typical TV Guide + preview designs.</p>
+      <div class="grid-2">
+        <div class="mini-panel"><strong>Do not say</strong> “Picture-in-Picture (PiP) like iPhone”</div>
+        <div class="mini-panel"><strong>Do say</strong> “Live preview while browsing the program guide”</div>
+      </div>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>9. Advanced DVR &amp; cloud recording</h3>
+        <span class="badge badge-warn">Qualified</span>
+      </div>
+      <h4>What the client often wants</h4>
+      <p>Record shows, series recording, storage quotas, scheduling conflicts, and a recordings library — YouTube TV / cable DVR class features.</p>
+      <h4>Roku reality</h4>
+      <p>The Roku app provides <strong>UI and playback</strong>. Recording, storage, conflicts, and entitlements are <strong>cloud/backend services</strong> (nDVR). The TV does not record to local disk in a practical OTT model.</p>
+      <h4>Architecture (simplified)</h4>
+      <ul>
+        <li>User taps Record → API schedules capture on nDVR service</li>
+        <li>CDN stores segments → recording appears in library API</li>
+        <li>App plays recording URL like VOD</li>
+      </ul>
+      <h4>Alternative for proposals</h4>
+      <p><strong>Phase 1:</strong> Live only, optional “Start over” if catch-up URL exists.<br />
+      <strong>Phase 2+:</strong> Full DVR as separate SOW tied to streaming vendor selection.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>10. Ads &amp; interactive overlays</h3>
+        <span class="badge badge-warn">Qualified</span>
+      </div>
+      <h4>What the client often wants</h4>
+      <p>Same ad experience as the website: Google IMA, clickable overlays, VAST/VMAP, skip-after-5s, choose-your-ad.</p>
+      <h4>Roku reality</h4>
+      <p><strong>Google IMA does not run on Roku.</strong> Monetization uses <strong>Roku Advertising Framework (RAF)</strong> and/or <strong>SSAI</strong> (server-side ad insertion into the HLS stream).</p>
+      <div class="grid-2">
+        <div class="mini-panel"><strong>SSAI</strong> Ads stitched in manifest — app plays one URL. Common for live. Lower client complexity.</div>
+        <div class="mini-panel"><strong>RAF / CSAI</strong> Client requests and plays ad assets — more control, separate integration and certification.</div>
+      </div>
+      <h4>Alternative for proposals</h4>
+      <p>Do not commit to “same ad stack as web.” Commit to <strong>ad-supported live via SSAI or RAF</strong> as a distinct workstream.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>11. Real-time EPG synchronization</h3>
+        <span class="badge badge-alt">Alternative</span>
+      </div>
+      <h4>What the client often wants</h4>
+      <p>Instant grid updates when schedules change — WebSocket-style push to every device.</p>
+      <h4>Roku reality</h4>
+      <p>Channels typically use <strong>HTTP polling</strong> (e.g. every 60–180 seconds) plus a <strong>local device clock</strong> to animate the “NOW” line between refreshes. This is industry-normal for TV guides.</p>
+      <h4>Alternative for proposals</h4>
+      <p>Commit to guide accuracy within <strong>~1 minute</strong> and refresh on channel change / screen focus. WebSockets are optional and rarely necessary for v1.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>12. DRM &amp; premium encrypted channels</h3>
+        <span class="badge badge-warn">Qualified</span>
+      </div>
+      <h4>What it is</h4>
+      <p>Encrypted live streams requiring a license from a DRM server (commonly Widevine) before playback — typical for premium sports and studio content.</p>
+      <h4>Roku reality</h4>
+      <p>Roku <strong>supports DRM</strong> (typically Widevine) through native player configuration. However, <strong>web DRM setup does not copy directly</strong>. License servers must issue Roku-compatible licenses; auth headers and token refresh must be designed for TV.</p>
+      <h4>Pre-commitment requirement</h4>
+      <p>Run a <strong>hardware proof-of-concept</strong> with one encrypted live stream before fixing delivery dates for DRM channels.</p>
+      <h4>Alternative for proposals</h4>
+      <p>Clear HLS + signed URLs for v1 FAST-style launch; DRM tier as Phase 2 when rights require it.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>13. Timeshift, pause live &amp; rewind</h3>
+        <span class="badge badge-warn">Qualified</span>
+      </div>
+      <h4>What the client often wants</h4>
+      <p>Pause live TV for 30+ minutes, rewind 15 minutes, jump back to live — cable DVR behavior.</p>
+      <h4>Roku reality</h4>
+      <p>Plain live HLS only buffers a <strong>short rolling window</strong> (often seconds to a few minutes). Extended pause and rewind require <strong>nDVR or catch-up URLs</strong> from the CDN. The app plays whichever URL the backend provides — Roku does not create long buffers on the device.</p>
+      <table>
+        <thead><tr><th>Capability</th><th>Without nDVR</th><th>With nDVR / catch-up</th></tr></thead>
+        <tbody>
+          <tr><td>Short pause</td><td>Sometimes</td><td>Yes</td></tr>
+          <tr><td>Pause 30+ minutes</td><td>No</td><td>Yes</td></tr>
+          <tr><td>Rewind within show</td><td>No</td><td>Yes</td></tr>
+          <tr><td>“Back to live”</td><td>N/A</td><td>Yes (switch to live-edge URL)</td></tr>
+        </tbody>
+      </table>
+      <h4>Important distinction</h4>
+      <p>A program progress bar (“75 minutes left”) can be shown from <strong>EPG schedule math</strong> without proving long pause-live works.</p>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+
+  <!-- NOT ON ROKU -->
+  <section>
+    <h2>Part III — Not Available on Roku</h2>
+    <p class="muted">Do not list these as Roku deliverables. Offer alternatives where noted.</p>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>14. Playback speed (0.5× – 2×)</h3>
+        <span class="badge badge-no">Not on Roku</span>
+      </div>
+      <p>The native Roku Video node does <strong>not support variable playback speed</strong> in a reliable, platform-supported way. This is a hardware/OS limitation, not a scheduling gap.</p>
+      <p><strong>For live TV:</strong> Rarely requested for linear channels. For catch-up recordings, clients must accept that speed control is not available on Roku unless they pursue impractical server-side workarounds.</p>
+      <p><strong>Proposal language:</strong> Exclude from Roku scope explicitly.</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>15. Chromecast &amp; cast-from-phone</h3>
+        <span class="badge badge-no">Not applicable</span>
+      </div>
+      <p>Roku <strong>is the TV device</strong>. Users launch your channel on Roku; they do not cast to Roku from a custom mobile app the way they cast to Chromecast.</p>
+      <p><strong>Alternative:</strong> A separate companion mobile app with shared backend is a different project. Deep-linking into the channel with launch parameters is possible but is not “casting.”</p>
+    </div>
+
+    <div class="feature-card avoid-break">
+      <div class="head">
+        <h3>16. Mobile-style push notifications</h3>
+        <span class="badge badge-no">Not on Roku</span>
+      </div>
+      <p>Roku channels do not receive FCM/APNs-style notifications when closed. Users must open the channel from the Roku home screen.</p>
+      <p><strong>Alternatives for “remind me when show starts”:</strong></p>
+      <ul>
+        <li>Email or SMS from your notification platform</li>
+        <li>Companion mobile app (separate scope)</li>
+        <li>In-app prompts when Live TV is already open</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+
+  <!-- MATRIX & PHASES -->
+  <section>
+    <h2>Client Commitment Matrix</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Status</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Live HLS playback</td><td><span class="badge badge-yes">Supported</span></td><td>Commit in v1</td></tr>
+        <tr><td>EPG grid</td><td><span class="badge badge-yes">Supported</span></td><td>Commit in v1</td></tr>
+        <tr><td>My Channels / favorites</td><td><span class="badge badge-yes">Supported</span></td><td>Commit in v1</td></tr>
+        <tr><td>Hero + Watch Now</td><td><span class="badge badge-yes">Supported</span></td><td>Commit in v1</td></tr>
+        <tr><td>Fullscreen live player</td><td><span class="badge badge-yes">Supported</span></td><td>Commit in v1</td></tr>
+        <tr><td>Auto quality (ABR)</td><td><span class="badge badge-yes">Supported</span></td><td>Commit in v1</td></tr>
+        <tr><td>Manual quality (smooth)</td><td><span class="badge badge-warn">Qualified</span></td><td>Qualify or defer to v2</td></tr>
+        <tr><td>Live preview while browsing guide</td><td><span class="badge badge-alt">Alternative</span></td><td>Commit; use “live preview,” not Picture-in-Picture (PiP)</td></tr>
+        <tr><td>Cloud DVR / series record</td><td><span class="badge badge-warn">Qualified</span></td><td>Phase 2+; backend required</td></tr>
+        <tr><td>Web-identical ads (IMA)</td><td><span class="badge badge-no">Not on Roku</span></td><td>SSAI or RAF — separate SOW</td></tr>
+        <tr><td>Chromecast</td><td><span class="badge badge-no">N/A</span></td><td>Exclude from Roku scope</td></tr>
+        <tr><td>Push notifications</td><td><span class="badge badge-no">Not on Roku</span></td><td>Email / mobile / in-app</td></tr>
+        <tr><td>Real-time EPG (WebSocket)</td><td><span class="badge badge-alt">Alternative</span></td><td>Polling is standard for v1</td></tr>
+        <tr><td>DRM premium channels</td><td><span class="badge badge-warn">Qualified</span></td><td>POC before date commit</td></tr>
+        <tr><td>Long pause / rewind live</td><td><span class="badge badge-warn">Qualified</span></td><td>Requires nDVR from CDN</td></tr>
+        <tr><td>Playback speed</td><td><span class="badge badge-no">Not on Roku</span></td><td>Exclude from scope</td></tr>
+      </tbody>
+    </table>
+
+    <h2 style="margin-top: 28px;">Suggested Phased Delivery</h2>
+
+    <div class="phase-row avoid-break">
+      <div class="phase-num">01</div>
+      <div>
+        <strong>Live TV MVP</strong>
+        <p class="muted">Live play · EPG · channel list · favorites row · hero · channel zap · fullscreen player · Auto quality</p>
+      </div>
+    </div>
+    <div class="phase-row avoid-break">
+      <div class="phase-num">02</div>
+      <div>
+        <strong>Enhanced guide &amp; playback</strong>
+        <p class="muted">Catch-up / start-over · program search · captions · improved EPG refresh · optional manual quality</p>
+      </div>
+    </div>
+    <div class="phase-row avoid-break">
+      <div class="phase-num">03</div>
+      <div>
+        <strong>Premium &amp; monetization</strong>
+        <p class="muted">Cloud DVR UI · DRM tiers · SSAI or RAF ads · advanced entitlements</p>
+      </div>
+    </div>
+
+    <h2 style="margin-top: 28px;">Pre-Commitment Workshop Questions</h2>
+    <div class="grid-2">
+      <div class="mini-panel">
+        <strong>Product</strong>
+        <ul style="margin: 6px 0 0 16px;">
+          <li>v1 must-haves vs nice-to-haves?</li>
+          <li>Parity target competitor?</li>
+          <li>Hero: featured vs grid-focused?</li>
+        </ul>
+      </div>
+      <div class="mini-panel">
+        <strong>Streaming / backend</strong>
+        <ul style="margin: 6px 0 0 16px;">
+          <li>Clear HLS or DRM day one?</li>
+          <li>nDVR / catch-up available?</li>
+          <li>EPG source and refresh model?</li>
+          <li>SSAI, RAF, or ad-free v1?</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="exec-box" style="margin-top: 24px;">
+      <p><strong>Leadership one-liner.</strong> We can deliver a strong Live TV experience on Roku aligned with modern TV Guide UX. We should not commit to web/mobile parity on playback speed, Chromecast, push, or Google IMA. DVR, long pause-live, DRM, and advanced ads require streaming infrastructure and belong in separate phases with separate estimates.</p>
+    </div>
+
+    <footer class="doc-footer">
+      Live TV on Roku — Platform Capability Brief · Internal use · Streaming platform reference document
+    </footer>
+  </section>
+
+</body>
+</html>

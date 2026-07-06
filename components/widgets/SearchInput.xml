@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Search input — parity searchbar.tsx: bg-neutral-700, rounded-xl, primary-500 ring on focus. -->
+<!-- Search input — parity searchbar.tsx: bg-black, neutral-400 border on focus. -->
 <component name="SearchInput" extends="Group">
   <interface>
     <field id="value" type="string" value="" onChange="OnValueChanged" />
     <field id="placeholder" type="string" value="Search Raven, She..." onChange="OnValueChanged" />
     <field id="fieldWidth" type="integer" value="700" onChange="OnSizeChanged" />
     <field id="fieldHeight" type="integer" value="70" onChange="OnSizeChanged" />
-    <field id="bgColor" type="string" value="0x181818ff" onChange="ApplyStyle" />
-    <field id="borderColor" type="string" value="0x0092ffff" onChange="ApplyStyle" />
+    <field id="bgColor" type="string" value="0x000000ff" onChange="ApplyStyle" />
+    <field id="borderColor" type="string" value="0xc8c8c8ff" onChange="ApplyStyle" />
     <field id="textColor" type="string" value="0xffffffff" onChange="ApplyStyle" />
     <field id="placeholderColor" type="string" value="0x6b7280ff" onChange="ApplyStyle" />
     <field id="focusedState" type="boolean" value="false" onChange="ApplyStyle" />

@@ -75,7 +75,7 @@
 
     <!-- PageContainer bg-neutral-700 behind Spinner; spinner centered in content pane. -->
     <Group id="homeLoaderHost" translation="[0, 0]" visible="true">
-      <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x181818ff" visible="false" />
+      <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x000000ff" visible="false" />
       <Group id="loaderCenter" translation="[960, 518]">
         <HomeLoader id="homeLoader" />
       </Group>

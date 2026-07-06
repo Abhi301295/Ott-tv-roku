@@ -21,6 +21,7 @@
     <field id="bootBackgroundColor" type="string" value="#0b1120" />
 
     <field id="reelsEnabled" type="boolean" value="false" />
+    <field id="epgEnabled" type="boolean" value="false" />
     <field id="geoBlockingEnabled" type="boolean" value="true" />
     <field id="subscriptionEnabled" type="boolean" value="true" />
   </interface>

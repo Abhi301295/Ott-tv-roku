@@ -120,8 +120,8 @@ sub LoadBrowseTokens()
 end sub
 
 sub ApplyStaticColors()
-    if m.bg <> invalid then m.bg.color = m.cNeutral800
-    m.pageBgRest = m.cNeutral800
+    m.pageBgRest = SK_LoadingPageBg()
+    if m.bg <> invalid then m.bg.color = m.pageBgRest
     if m.titleLabel <> invalid then m.titleLabel.color = m.cNeutral50
     if m.emptyLabel <> invalid then m.emptyLabel.color = m.cNeutral50
     ApplyPageLoaderColors()
@@ -505,10 +505,8 @@ sub EnterSeriesHeader()
     if m.vm = invalid then return
     menuItems = m.vm.menuItems
     if menuItems = invalid or menuItems.Count() = 0 then
-        reels = false
-        tm = m.top.getScene().findNode("themeManager")
-        if tm <> invalid and tm.reelsEnabled = true then reels = true
-        menuItems = HeaderMenuItems(reels)
+        flags = HeaderMenuFeatureFlags(m.top)
+        menuItems = HeaderMenuItems(flags.reels, flags.epg)
     end if
     navState = { type: m.listType }
     idx = HeaderSelectedIndexForNav(menuItems, RouteSeries(), navState)

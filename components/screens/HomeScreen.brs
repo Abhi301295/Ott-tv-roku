@@ -323,8 +323,7 @@ sub LoadThemeTokens()
     ApplyHomePageBackground()
 end sub
 
-' Netflix home uses bg-black once NetflixContent mounts; OTT uses bg-neutral-100.
-' While the page loader runs, match PageContainer bg-neutral-700 (pagecontainer/index.tsx).
+' React home/content.tsx + netflixContent.tsx + PageContainer: bg-black.
 sub ApplyHomePageBackground()
     if m.bg = invalid then return
     layout = m.homeLayout
@@ -576,18 +575,10 @@ sub SetupHeader()
         return
     end if
 
-    reels = false
-    resolved = invalid
-    if m.global <> invalid then resolved = m.global.businessResolved
-    if resolved <> invalid then reels = IsFeatureEnabled(resolved, "reelsEnabled")
-    if not reels then
-        tm = m.top.getScene().findNode("themeManager")
-        if tm <> invalid and tm.reelsEnabled = true then reels = true
-    end if
-
-    m.menuItems = HeaderMenuItems(reels)
+    flags = HeaderMenuFeatureFlags(m.top)
+    m.menuItems = HeaderMenuItems(flags.reels, flags.epg)
     if ThemeIsSidebarHeader() then
-        m.header.menuItems = SidebarMenuItems(reels)
+        m.header.menuItems = SidebarMenuItems(flags.reels, flags.epg)
     else
         texts = []
         for each it in m.menuItems

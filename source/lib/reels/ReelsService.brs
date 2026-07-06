@@ -209,28 +209,33 @@ function ReelsDescription(reel as object) as string
     return reel.description.ToStr()
 end function
 
-' Parity with React: currentReel.createdBy?.[0]?.name — array index 0 only.
-' Do not read createdBy.name on a root object (that wrongly surfaced tenant labels like "Roku Tv").
+' Parity with React getCreatedByName: array → [0].name; object → .name.
 function ReelsCreatorName(reel as object) as string
     if reel = invalid then return ""
     cb = reel.createdBy
     if cb = invalid then return ""
 
-    first = invalid
     t = type(cb)
     if t = "roArray" then
-        if cb.Count() > 0 then first = cb[0]
-    else if t = "roAssociativeArray" or t = "AssociativeArray" then
-        ' JSON arrays may deserialize as AA with string key "0" — never use integer keys on AA.
-        key0 = "0"
-        if cb[key0] <> invalid then first = cb[key0]
+        if cb.Count() < 1 then return ""
+        first = cb[0]
+        if first = invalid then return ""
+        if first.name = invalid or first.name = "" then return ""
+        return first.name.ToStr()
     end if
 
-    if first = invalid then return ""
-    ft = type(first)
-    if ft <> "roAssociativeArray" and ft <> "AssociativeArray" then return ""
-    if first.name = invalid or first.name = "" then return ""
-    return first.name.ToStr()
+    if t = "roAssociativeArray" or t = "AssociativeArray" then
+        key0 = "0"
+        if cb[key0] <> invalid then
+            first = cb[key0]
+            ft = type(first)
+            if ft = "roAssociativeArray" or ft = "AssociativeArray" then
+                if first.name <> invalid and first.name <> "" then return first.name.ToStr()
+            end if
+        end if
+        if cb.name <> invalid and cb.name <> "" then return cb.name.ToStr()
+    end if
+    return ""
 end function
 
 function ReelsObjectName(val as object) as string

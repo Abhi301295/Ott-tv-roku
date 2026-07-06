@@ -1,4 +1,4 @@
-' BrowsePageLoader.brs — PageContainer bg-neutral-700 + HomeLoader (spinner.tsx).
+' BrowsePageLoader.brs — PageContainer bg-black + HomeLoader (spinner.tsx).
 ' Screens implement OnBrowseLoaderTimeout() to force-hide when paint never signals.
 ' Host fields: top, bg, loaderHost, loaderPageBg, pageLoader, pageBgRest, tokens,
 ' cNeutral700, cNeutral50, cPrimary600, loaderVeilBg (optional), loaderParent (optional).
@@ -8,12 +8,8 @@ function BrowseLoaderMaxSec() as float
 end function
 
 function BrowseLoaderPageBg(host as object) as string
-    if host = invalid then return ThemeTokenColor({}, "neutral-700", "#181818")
-    if host.loaderVeilBg <> invalid and host.loaderVeilBg <> "" then return host.loaderVeilBg
-    if host.cNeutral700 <> invalid and host.cNeutral700 <> "" then return host.cNeutral700
-    tokens = host.tokens
-    if tokens = invalid then tokens = {}
-    return ThemeTokenColor(tokens, "neutral-700", "#181818")
+    if host <> invalid and host.loaderVeilBg <> invalid and host.loaderVeilBg <> "" then return host.loaderVeilBg
+    return "0x000000ff"
 end function
 
 sub BrowseApplyPageLoaderColors(host as object)

@@ -287,8 +287,9 @@ sub ApplyKeyFocus()
             end if
             if border <> invalid then
                 if isFoc then
-                    border.color = m.top.cPrimary500
+                    border.visible = false
                 else
+                    border.visible = true
                     border.color = m.top.cNeutral700
                 end if
             end if

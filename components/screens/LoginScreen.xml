@@ -25,8 +25,8 @@
     <Poster id="bgImage" width="1920" height="1080" loadDisplayMode="scaleToFill" visible="false" />
     <Rectangle id="bgOverlay" width="1920" height="1080" color="0x000000a6" />
 
-    <Poster id="logoPoster" translation="[810, 56]" width="300" height="72" loadDisplayMode="scaleToFit" visible="false" />
-    <Label id="logoLabel" text="OTT Accelerator" translation="[760, 70]" width="400" horizAlign="center"
+    <Poster id="logoPoster" translation="[720, 94]" width="480" height="100" loadDisplayMode="scaleToFit" visible="false" />
+    <Label id="logoLabel" text="OTT Accelerator" translation="[720, 114]" width="480" horizAlign="center"
       font="font:LargeBoldSystemFont" color="0x0b75e0ff" visible="false" />
 
     <Label id="title" text="Choose how to Sign In" translation="[0, 228]" width="1920" horizAlign="center" color="0xf8f1f7ff">

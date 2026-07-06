@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!-- Shimmer skeleton (parity with react-loading-skeleton SkeletonBox).
-     Rounded base + a soft, feathered highlight band that sweeps left→right, looping. -->
+     Default: sharp Rectangle blocks (any aspect ratio). Set shapeUri to a same-size PNG
+     mask when the React source uses border-radius (e.g. sk_detail_title.png 400×80). -->
 <component name="Skeleton" extends="Group">
   <interface>
     <field id="boxWidth" type="float" value="150" onChange="OnSizeChanged" />
@@ -10,22 +11,25 @@
     <field id="running" type="boolean" value="false" onChange="OnRunningChanged" />
     <field id="animate" type="boolean" value="true" onChange="OnRunningChanged" />
     <!-- Colors: set in source/lib/theme/SkeletonConfig.brs (login excluded). -->
-    <!-- Swap the placeholder shape (e.g. a circle for radius-full dots). -->
-    <field id="shapeUri" type="string" value="pkg:/images/ui/sk_base.png" onChange="OnShapeChanged" />
+    <!-- Same-size PNG mask for rounded shapes; empty = square Rectangle. -->
+    <field id="shapeUri" type="string" value="" onChange="OnShapeChanged" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/components/widgets/Skeleton.brs" />
 
   <children>
-    <!-- Rounded neutral-700 base with a lighter highlight overlay that pulses opacity. -->
-    <Poster id="base" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
-      loadDisplayMode="scaleToFill" blendColor="0xffffffff" />
-    <Poster id="shine" width="150" height="150" uri="pkg:/images/ui/sk_base.png"
-      loadDisplayMode="scaleToFill" blendColor="0xf3f3f3ff" opacity="0.0" />
+    <Rectangle id="baseRect" width="150" height="150" color="0xffffffff" />
+    <Rectangle id="shineRect" width="150" height="150" color="0xf3f3f3ff" opacity="0.0" />
+    <Poster id="basePoster" width="150" height="150" uri="" visible="false"
+      loadDisplayMode="scaleToFit" blendColor="0xffffffff" />
+    <Poster id="shinePoster" width="150" height="150" uri="" visible="false"
+      loadDisplayMode="scaleToFit" blendColor="0xf3f3f3ff" opacity="0.0" />
     <!-- Opaque base + highlight overlay pulse (base opacity never drops — shimmer must not go transparent). -->
     <Animation id="anim" duration="1.1" repeat="true" easeFunction="inOutQuad">
-      <FloatFieldInterpolator id="interp" key="[0.0,0.5,1.0]"
-        keyValue="[0.0,0.85,0.0]" fieldToInterp="shine.opacity" />
+      <FloatFieldInterpolator id="interpRect" key="[0.0,0.5,1.0]"
+        keyValue="[0.0,0.85,0.0]" fieldToInterp="shineRect.opacity" />
+      <FloatFieldInterpolator id="interpPoster" key="[0.0,0.5,1.0]"
+        keyValue="[0.0,0.85,0.0]" fieldToInterp="shinePoster.opacity" />
     </Animation>
   </children>
 </component>

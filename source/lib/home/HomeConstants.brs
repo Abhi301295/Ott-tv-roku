@@ -40,11 +40,11 @@ end function
 
 ' Home page fill behind hero + rows — hardcoded, not API tokens (light themes remap neutrals).
 function HC_HomeCinematicBg() as string
-    return "0x0a0a0aff"
+    return "0x000000ff"
 end function
 
 function HC_HomeOttPageBg() as string
-    return "0xf8f8f8ff"
+    return "0x000000ff"
 end function
 
 function HC_WelcomePhaseDwellSec() as float

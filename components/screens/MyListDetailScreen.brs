@@ -436,10 +436,8 @@ end sub
 
 sub EnterMyListHeader()
     if m.vm = invalid then return
-    reels = false
-    tm = m.top.getScene().findNode("themeManager")
-    if tm <> invalid and tm.reelsEnabled = true then reels = true
-    menuIdx = HeaderSelectedIndex(HeaderMenuItems(reels), RouteMyListDetail())
+    flags = HeaderMenuFeatureFlags(m.top)
+    menuIdx = HeaderSelectedIndex(HeaderMenuItems(flags.reels, flags.epg), RouteMyListDetail())
     ShellEnterHeader(m.vm, menuIdx)
 end sub
 

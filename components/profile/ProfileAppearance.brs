@@ -100,6 +100,9 @@ end sub
 sub ApplyProfileSkeletonLayout()
     pitch = ProfileRowPitch()
     square = ProfileUsesSquareAvatars()
+    s = ProfileUiSpec()
+    nameX = s.skAvatarSize + s.skNameMarginLeft
+    nameY = Int((s.skRowHeight - s.skNameHeight) / 2.0 + 0.5)
     slots = [
         { a: "sk0a", b: "sk0b", y: 0 }
         { a: "sk1a", b: "sk1b", y: pitch }
@@ -108,14 +111,26 @@ sub ApplyProfileSkeletonLayout()
     for each slot in slots
         skA = m.top.findNode(slot.a)
         skB = m.top.findNode(slot.b)
-        if skA <> invalid then skA.translation = [0, slot.y]
+        if skA <> invalid then
+            skA.translation = [0, slot.y]
+            if square then
+                if skA.hasField("shapeUri") then skA.shapeUri = SkeletonProfileAvatarShapeUri(true)
+            else
+                if skA.hasField("shapeUri") then skA.shapeUri = SkeletonProfileAvatarShapeUri(false)
+            end if
+            if skA.hasField("boxWidth") then skA.boxWidth = s.skAvatarSize
+            if skA.hasField("boxHeight") then skA.boxHeight = s.skAvatarSize
+        end if
         if skB <> invalid then
             if square then
                 skB.visible = false
                 skB.running = false
             else
                 skB.visible = true
-                skB.translation = [170, slot.y + 66]
+                skB.translation = [nameX, slot.y + nameY]
+                if skB.hasField("boxWidth") then skB.boxWidth = s.skNameWidth
+                if skB.hasField("boxHeight") then skB.boxHeight = s.skNameHeight
+                if skB.hasField("shapeUri") then skB.shapeUri = SkeletonProfileNameShapeUri()
             end if
         end if
     end for
@@ -123,7 +138,8 @@ end sub
 
 
 sub ApplyProfileColors()
-    if m.bg <> invalid then m.bg.color = m.cNeutral900
+    if m.bg <> invalid then m.bg.color = "0x000000ff"
+    ApplyProfileFocusBackground()
     if m.headerTextBackdrop <> invalid then
         m.headerTextBackdrop.color = "0x000000ff"
         if m.uiSpec <> invalid then
@@ -241,8 +257,20 @@ sub ApplyProfileBranding()
 
     if m.bgImage <> invalid then
         m.bgImage.uri = m.profileBgUri
-        m.bgImage.opacity = 1.0
     end if
+    ApplyProfileFocusBackground()
+end sub
+
+
+' React profile.tsx: bg-black base; loginBackgroundImage only when a profile is focused.
+sub ApplyProfileFocusBackground()
+    if m.bgImage = invalid then return
+    showImage = false
+    if m.profilesLoaded = true and m.focusArea = "profiles" then
+        if m.avatars <> invalid and m.avatars.Count() > 0 then showImage = true
+    end if
+    m.bgImage.opacity = 0.0
+    if showImage then m.bgImage.opacity = 1.0
 end sub
 
 ' ── Loading / shimmer ──────────────────────────────────────────────────────────

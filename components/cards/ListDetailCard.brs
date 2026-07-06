@@ -232,7 +232,7 @@ end sub
 
 sub LD_ApplySkeleton(sk as object, running as boolean)
     if sk = invalid then return
-    CardApplySkeletonFromConfig(sk, CardSkeletonThemeTokens(m.top), running)
+    CardApplyHomeCardSkeleton(sk, running)
 end sub
 
 sub ApplySkeletonMode(loading as boolean)

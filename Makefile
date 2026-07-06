@@ -30,9 +30,13 @@ profile-square:
 	@python3 scripts/gen_profile_square_arc.py
 	@echo "Regenerated images/ui/profile_sq_*.png"
 
+profile-circular-masks:
+	@python3 scripts/gen_profile_circular_arc_geometry.py
+	@echo "Regenerated images/ui/profile_arc_mask_*.png + avatar_ring.png"
+
 # Simulator: pre-colored profile_arc_*.png (regenerate when portal colors change).
 # Device: profile_arc_mask_*.png in pkg for runtime bake; colored arcs are fallback until bake completes.
-profile-arcs:
+profile-arcs: profile-circular-masks
 	@python3 scripts/gen_profile_circular_arc_colored.py \
 		--primary "$(or $(PORTAL_PRIMARY),#0b75e0)" \
 		--secondary "$(or $(PORTAL_SECONDARY),#d355cb)" \
@@ -57,7 +61,9 @@ zip: validate
 	@if [ -f config.json ]; then zip -q $(OUT_DIR)/$(APP_NAME).zip config.json; fi
 	@echo "Built $(OUT_DIR)/$(APP_NAME).zip"
 
-sim: zip
+sim:
+	@python3 scripts/gen_livetv_dev_tz.py
+	@$(MAKE) zip
 	@bash scripts/roku-sim-deploy.sh
 
 # Phase F: validate + sim deploy + telnet log assertions (requires brs-desktop).

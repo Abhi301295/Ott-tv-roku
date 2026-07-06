@@ -32,7 +32,8 @@ sub init()
     m.creatorRow = m.top.findNode("creatorRow")
     m.creatorAvatar = m.top.findNode("creatorAvatar")
     m.creatorInitial = m.top.findNode("creatorInitial")
-    m.creatorLbl = m.top.findNode("creatorLbl")
+    m.creatorLblBold = m.top.findNode("creatorLblBold")
+    m.creatorLblRest = m.top.findNode("creatorLblRest")
     m.contentTypeLbl = m.top.findNode("contentTypeLbl")
     m.titleLbl = m.top.findNode("titleLbl")
     m.descLbl = m.top.findNode("descLbl")
@@ -190,8 +191,8 @@ sub LoadReelsTokens()
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then m.tokens = tm.themeTokens
 
-    ' Theme — same tokens as React (bg-neutral-900, border-neutral-400, primary-*, text-neutral-50 empty state).
-    m.cPageBg = TC("neutral-900", "#0a0a0a")
+    ' Theme — React reels/index.tsx bg-black.
+    m.cPageBg = SK_LoadingPageBg()
     m.cPrimary500 = TC("primary-500", "#0b75e0")
     m.cPrimary600 = TC("primary-600", "#0760bb")
     m.cPrimary700 = TC("primary-700", "#04478b")
@@ -242,7 +243,8 @@ sub ApplyStaticColors()
     if m.emptyLbl <> invalid then m.emptyLbl.color = m.cNeutral50
     if m.creatorAvatar <> invalid then m.creatorAvatar.blendColor = m.cPrimary600
     if m.creatorInitial <> invalid then m.creatorInitial.color = m.cNeutral50
-    if m.creatorLbl <> invalid then m.creatorLbl.color = m.cTextWhite80
+    if m.creatorLblBold <> invalid then m.creatorLblBold.color = m.cTextWhite80
+    if m.creatorLblRest <> invalid then m.creatorLblRest.color = m.cTextWhite80
     if m.contentTypeLbl <> invalid then m.contentTypeLbl.color = m.cTextWhite80
     if m.titleLbl <> invalid then m.titleLbl.color = m.cTextWhite
     if m.descLbl <> invalid then m.descLbl.color = m.cTextWhite85
@@ -310,7 +312,7 @@ end sub
 
 sub ApplyMetaWidths()
     cw = m.metaColW
-    if m.creatorLbl <> invalid then m.creatorLbl.width = cw - 40
+    if m.creatorLblRest <> invalid then m.creatorLblRest.width = cw - 58
     if m.contentTypeLbl <> invalid then m.contentTypeLbl.width = cw
     if m.titleLbl <> invalid then m.titleLbl.width = cw
     if m.descLbl <> invalid then m.descLbl.width = cw
@@ -376,7 +378,6 @@ sub ApplyPageLoaderLayout(viewportW as integer)
 end sub
 
 sub ShowPageLoader(reason as string)
-    m.loaderVeilBg = m.cPageBg
     BrowseShowPageLoader(m, m.pageBgRest)
 end sub
 
@@ -657,9 +658,23 @@ sub ApplyMeta(reel as object)
         m.creatorRow.visible = showCreator
         if showCreator then
             initial = ""
-            if Len(creator) > 0 then initial = UCase(Left(creator, 1))
+            rest = ""
+            if Len(creator) > 0 then
+                initial = UCase(Left(creator, 1))
+                if Len(creator) > 1 then rest = Mid(creator, 2)
+            end if
             if m.creatorInitial <> invalid then m.creatorInitial.text = initial
-            if m.creatorLbl <> invalid then m.creatorLbl.text = creator
+            if m.creatorLblBold <> invalid then
+                m.creatorLblBold.text = initial
+                m.creatorLblBold.visible = initial <> ""
+            end if
+            if m.creatorLblRest <> invalid then
+                m.creatorLblRest.text = rest
+                m.creatorLblRest.visible = rest <> ""
+            end if
+        else
+            if m.creatorLblBold <> invalid then m.creatorLblBold.visible = false
+            if m.creatorLblRest <> invalid then m.creatorLblRest.visible = false
         end if
     end if
 

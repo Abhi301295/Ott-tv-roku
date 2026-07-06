@@ -1,8 +1,12 @@
 ' SkeletonConfig.brs — app-wide skeleton shimmer palette (edit here).
 '
 ' Default matches React SkeletonBox / profile: primary-700 base + primary-500 highlight.
-' Used by Detail, Home, Watchlist, Reels, cards, etc.
+' Page/skeleton backdrop during loading matches React PageContainer + browse loaders: bg-black.
 ' Login QR placeholder is excluded — LoginScreen.brs keeps its own white skeleton.
+
+function SK_LoadingPageBg() as string
+    return "0x000000ff"
+end function
 
 function SK_BaseToken() as string
     return "primary-700"
@@ -21,7 +25,7 @@ function SK_HighlightFallbackHex() as string
 end function
 
 function SK_DefaultPageBg() as string
-    return "0x0a0a0aff"
+    return SK_LoadingPageBg()
 end function
 
 function SK_HexToRoku(hex as string, alpha as string) as string
@@ -53,4 +57,14 @@ end function
 function CardVerticalSkeletonShapeUri(w as integer, h as integer) as string
     if w = 272 and h = 340 then return "pkg:/images/ui/sk_vertical_card_272x340.png"
     return "pkg:/images/ui/sk_vertical_card_220x300.png"
+end function
+
+' profile.tsx SkeletonBox borderRadius={9999} — circle avatar + pill name bar.
+function SkeletonProfileAvatarShapeUri(squareAvatars as boolean) as string
+    if squareAvatars then return "pkg:/images/ui/sk_rounded_150_r12.png"
+    return "pkg:/images/ui/sk_avatar_150.png"
+end function
+
+function SkeletonProfileNameShapeUri() as string
+    return "pkg:/images/ui/sk_pill_190x22.png"
 end function

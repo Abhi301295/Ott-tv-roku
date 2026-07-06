@@ -14,7 +14,7 @@
 
   <children>
     <!-- Opaque veil — blocks hero/row pixels until the whole screen reveals together. -->
-    <Rectangle id="veil" width="1920" height="1080" color="0x0a0a0aff" />
+    <Rectangle id="veil" width="1920" height="1080" color="0x000000ff" />
     <!-- Hero metadata shimmer — mirrors HeroBannerOtt metaHost at [48, 200]. -->
     <Group id="heroPulse" visible="false">
       <Skeleton id="skHeroTitle" translation="[48, 200]" boxWidth="400" boxHeight="80"

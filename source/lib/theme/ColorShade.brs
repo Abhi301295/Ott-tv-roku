@@ -284,6 +284,19 @@ function BuildThemeTokens(resolved as object) as object
     return tokens
 end function
 
+' Tailwind bg-neutral-950 / text-neutral-950: neutral.950 is absent from tailwind.config.js
+' (only 50–900 and 1000 map to var(--neutral-*)). The compiled class uses Tailwind's
+' built-in shade #0a0a0a — not generateBgTokens()'s --neutral-950 CSS var.
+function TailwindNeutral950Color() as string
+    return HexToRokuColor("#0a0a0a", "ff")
+end function
+
+' When an input has no placeholder:text-* class, Tailwind preflight sets
+' ::placeholder to theme(colors.gray.400) → #9ca3af (see preflight.css).
+function TailwindPreflightPlaceholderColor() as string
+    return HexToRokuColor("#9ca3af", "ff")
+end function
+
 ' Read a token from a tokens map and return it as a Roku "0xRRGGBBaa" color.
 function ThemeTokenColor(tokens as object, name as string, fallbackHex as string) as string
     hex = fallbackHex
@@ -325,6 +338,7 @@ function ApplyResolvedTheme(theme as object, resolved as object) as void
     theme.appName = resolved.appName
 
     theme.reelsEnabled = IsFeatureEnabled(resolved, "reelsEnabled")
+    theme.epgEnabled = IsFeatureEnabled(resolved, "epgManagement")
     theme.geoBlockingEnabled = IsFeatureEnabled(resolved, "geoBlockingEnabled")
     theme.subscriptionEnabled = IsFeatureEnabled(resolved, "subscriptionEnabled")
 

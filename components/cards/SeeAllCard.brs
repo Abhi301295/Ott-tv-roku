@@ -32,7 +32,7 @@ sub ApplyAll()
     m.focusBorder.boxHeight = h + 6
     m.fill.width = w
     m.fill.height = h
-    m.fill.color = m.top.cNeutral800
+    m.fill.color = CardWhite10Color()
     m.label.width = w
     m.label.translation = [0, Int((h - 40) / 2)]
     m.label.color = m.top.cNeutral50

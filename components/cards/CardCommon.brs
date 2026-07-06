@@ -8,6 +8,35 @@ function CardProgressTrackColor() as string
     return "0x0a0a0aff"
 end function
 
+' React Tailwind bg-white/10 — rgba(255,255,255,0.1); used on CW/horizontal loaders (0fa24a8).
+function CardWhite10Color() as string
+    return "0xffffff1a"
+end function
+
+function CardHomeCardSkeletonColors() as object
+    return {
+        base: CardWhite10Color()
+        highlight: "0xffffff33"
+    }
+end function
+
+sub CardApplyHomeCardSkeleton(skeleton as object, running as boolean)
+    if skeleton = invalid then return
+    colors = CardHomeCardSkeletonColors()
+    CardApplySkeleton(skeleton, colors.base, colors.highlight)
+    if running and skeleton.hasField("running") then skeleton.running = true
+end sub
+
+sub CardApplyHomeCardSkeletonTree(node as object, running as boolean)
+    if node = invalid then return
+    colors = CardHomeCardSkeletonColors()
+    CardApplySkeletonTree(node, colors.base, colors.highlight, running)
+end sub
+
+function CardCwProgressTrackColor() as string
+    return CardWhite10Color()
+end function
+
 function CardThumbPlaceholderBg() as string
     ' React verticalCard.tsx animate-pulse bg-neutral-800 (#262626).
     return "0x262626ff"

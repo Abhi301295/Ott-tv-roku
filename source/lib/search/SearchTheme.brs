@@ -18,15 +18,15 @@ sub SearchApplyThemeColors(m as object)
     if m = invalid then return
     tokens = SearchThemeTokens(m.top)
 
-    m.cPageBg = STC(tokens, "neutral-1000", "#1f1f22")
-    m.cInputBg = STC(tokens, "neutral-700", "#181818")
-    m.cInputBorderFocus = STC(tokens, "primary-500", "#0092ff")
+    m.cPageBg = "0x000000ff"
+    m.cInputBg = "0x000000ff"
+    m.cInputBorderFocus = STC(tokens, "neutral-400", "#c8c8c8")
     m.cText = STC(tokens, "neutral-50", "#ffffff")
     m.cPlaceholder = SR_PlaceholderColor()
     m.cPrimary500 = STC(tokens, "primary-500", "#0092ff")
     m.cPrimary700 = STC(tokens, "primary-700", "#80bbe9")
     m.cKeyBg = SR_KeyFillColor()
-    m.cKeyBorder = SR_KeyBorderColor()
+    m.cKeyBorder = STC(tokens, "neutral-700", "#404040")
 
     bg = m.top.findNode("bg")
     if bg <> invalid then bg.color = m.cPageBg

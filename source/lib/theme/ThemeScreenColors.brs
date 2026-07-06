@@ -34,7 +34,7 @@ function ThemeWatchlistPalette(fromNode as object) as object
         cNeutral50: ThemeTokenColor(tokens, "neutral-50", "#ffffff")
         cNeutral700: ThemeTokenColor(tokens, "neutral-700", "#181818")
         cNeutral800: ThemeTokenColor(tokens, "neutral-800", "#262626")
-        cPageBg: ThemeTokenColor(tokens, "background", "#0a0a0a")
+        cPageBg: "0x000000ff"
     }
 end function
 
