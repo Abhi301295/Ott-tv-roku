@@ -4,7 +4,10 @@ sub init()
     m.bg = m.top.findNode("bg")
     m.contentHost = m.top.findNode("contentHost")
     m.hero = m.top.findNode("hero")
-    m.genreSkeleton = m.top.findNode("genreSkeleton")
+    m.loaderHost = m.top.findNode("loaderHost")
+    m.loaderPageBg = m.top.findNode("loaderPageBg")
+    m.loaderCenter = m.top.findNode("loaderCenter")
+    m.pageLoader = m.top.findNode("pageLoader")
     m.rowsHost = m.top.findNode("rowsHost")
     m.rowsAnim = m.top.findNode("rowsAnim")
     m.rowsInterp = m.top.findNode("rowsInterp")
@@ -29,6 +32,7 @@ sub init()
     m.cardIndex = 0
     m.layoutAnchorY = GL_RowAnchorY()
     m.firstRowWatch = invalid
+    m.pageBgRest = m.cNeutral950
     m.prefetchWarmupIdx = 1
     m.interacting = false
     m.pendingHeroUpdate = false
@@ -85,6 +89,45 @@ sub ApplyGenreShellLayout()
         m.hero.contentWidth = viewportW
         ApplyHeroTheme()
     end if
+    ApplyPageLoaderLayout(viewportW)
+end sub
+
+sub ApplyPageLoaderLayout(viewportW as integer)
+    if viewportW < 1 then viewportW = 1920
+    if m.loaderPageBg <> invalid then m.loaderPageBg.width = viewportW
+    if m.loaderCenter <> invalid then m.loaderCenter.translation = [Int(viewportW / 2), 518]
+end sub
+
+sub ApplyPageLoaderColors()
+    BrowseApplyPageLoaderColors(m)
+end sub
+
+sub ShowLoader(show as boolean)
+    if show then
+        BrowseShowPageLoader(m, m.pageBgRest)
+        if m.rowsHost <> invalid then m.rowsHost.visible = false
+        if m.hero <> invalid then m.hero.visible = false
+        if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
+    else
+        BrowseHidePageLoader(m, m.pageBgRest)
+        if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
+        if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "stop"
+        DetachGenrePaintWatch()
+    end if
+end sub
+
+sub OnBrowseLoaderTimeout()
+    if not BrowsePageLoaderRunning(m) then return
+    if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
+    if m.rowWidgets.Count() > 0 then
+        row0 = m.rowWidgets[0]
+        if row0 <> invalid then
+            row0.callFunc("BuildCardsNow", 6)
+            row0.callFunc("ForceReveal", invalid)
+        end if
+    end if
+    if not m.rowsRevealed then PrepareGenreReveal()
+    if BrowsePageLoaderRunning(m) then CompleteGenreReveal()
 end sub
 
 sub OnShellEnterContent()
@@ -112,6 +155,7 @@ sub OnDispose()
     BrowseDbg("genre_dispose", "stopping timers + row builds + catalogue fetch")
     m.loading = false
     m.hasMore = false
+    DetachGenrePaintWatch()
     DetachFirstRowWatch()
     AbortAllGenreRowBuilds()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
@@ -121,6 +165,7 @@ sub OnDispose()
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
     if m.rowPrefetchTimer <> invalid then m.rowPrefetchTimer.control = "stop"
+    BrowseDisarmLoaderTimeout(m)
     KillCatalogueTask(m.catalogueTask)
     m.catalogueTask = invalid
     if m.hero <> invalid then
@@ -149,6 +194,10 @@ sub OnBusinessResolved()
     ApplyHeroTheme()
     RefreshRowThemes()
     ApplyGenreShellLayout()
+    if BrowsePageLoaderRunning(m) then
+        BrowseApplyPageLoaderColors(m)
+        BrowseApplyLoaderVeil(m, true, m.pageBgRest)
+    end if
 end sub
 
 sub LoadGenreTokens()
@@ -179,14 +228,14 @@ function TokenColor(tokens as object, name as string, fallbackHex as string) as 
 end function
 
 sub ApplyStaticColors()
-    ' Full-screen chrome stays dark like HomeScreen.xml / HeroBannerOtt (poster covers the rest).
-    if m.bg <> invalid then m.bg.color = "0x0a0a0aff"
+    if m.bg <> invalid then m.bg.color = m.cNeutral950
+    m.pageBgRest = m.cNeutral950
     if m.emptyLabel <> invalid then
         m.emptyLabel.color = m.cNeutral50
         ApplyEmptyLabelFont()
     end if
     ApplyHeroTheme()
-    ApplySkeletonColors()
+    ApplyPageLoaderColors()
 end sub
 
 sub ApplyEmptyLabelFont()
@@ -206,13 +255,6 @@ sub ApplyHeroTheme()
     m.hero.contentWidth = 1920
 end sub
 
-sub ApplySkeletonColors()
-    if m.genreSkeleton = invalid then return
-    colors = SkeletonResolveColors(m.tokens)
-    m.genreSkeleton.baseColor = colors.base
-    m.genreSkeleton.highlightColor = colors.highlight
-end sub
-
 sub ResetAndFetch()
     m.page = 0
     m.hasMore = true
@@ -227,44 +269,14 @@ sub ResetAndFetch()
     ShowEmpty(false)
     if m.hero <> invalid then m.hero.visible = false
     if m.rowsHost <> invalid then m.rowsHost.visible = false
-    ShowGenreSkeleton(true, true)
-    BrowseDbg("genre_boot", "shimmer on — fetch catalogue")
+    ShowLoader(true)
+    BrowseDbg("genre_boot", "loader on — fetch catalogue")
     FetchNextPage()
-end sub
-
-sub SyncGenreSkeletonVisible()
-    if m.genreSkeleton = invalid then return
-    heroOn = m.genreSkeleton.heroRunning
-    rowsOn = m.genreSkeleton.rowsRunning
-    m.genreSkeleton.visible = heroOn or rowsOn
-end sub
-
-' Unified loading veil — hero and row shimmers toggle together via ShowGenreSkeleton / HideGenreSkeleton.
-sub ShowGenreSkeleton(hero as boolean, rows as boolean)
-    if m.genreSkeleton = invalid then return
-    m.genreSkeleton.heroRunning = hero
-    m.genreSkeleton.rowsRunning = rows
-    if hero or rows then
-        m.genreSkeleton.visible = true
-        if rows and m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
-    else
-        if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
-    end if
-    SyncGenreSkeletonVisible()
-end sub
-
-sub HideGenreSkeleton()
-    if m.genreSkeleton = invalid then return
-    m.genreSkeleton.heroRunning = false
-    m.genreSkeleton.rowsRunning = false
-    m.genreSkeleton.visible = false
-    if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "stop"
-    if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
-    BrowseDbg("genre_boot", "shimmer off (all)")
 end sub
 
 sub OnHeroSkeletonTimeout()
     if not m.rowsRevealed then PrepareGenreReveal()
+    if m.pageLoader <> invalid and m.pageLoader.running = true then CompleteGenreReveal()
 end sub
 
 sub FetchNextPage()
@@ -294,7 +306,7 @@ sub OnCatalogueResponse()
     if api = invalid or api.ok <> true then
         BrowseDbg("genre_response", "fail: api not ok")
         m.hasMore = false
-        HideGenreSkeleton()
+        ShowLoader(false)
         if m.categories.Count() = 0 then ShowEmpty(true)
         return
     end if
@@ -316,7 +328,7 @@ sub OnCatalogueResponse()
     BrowseDbg("genre_response", "batch=" + Str(listing.Count()) + " added=" + Str(added) + " totalCats=" + Str(m.categories.Count()) + " hasMore=" + BrowseDbgStr(m.hasMore))
 
     if m.categories.Count() = 0 then
-        HideGenreSkeleton()
+        ShowLoader(false)
         BrowseDbg("genre_response", "empty catalogue — show empty state")
         ShowEmpty(true)
         return
@@ -346,7 +358,7 @@ sub PrimeHeroFromCategories()
     if item <> invalid then
         m.hero.activeItem = item
         BrowseDbg("genre_hero", "primed title=" + BrowseDbgStr(item.title))
-        if m.genreSkeleton <> invalid and m.genreSkeleton.heroRunning = true then
+        if m.loaderHost <> invalid and m.loaderHost.visible = true then
             if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "start"
         end if
     end if
@@ -413,7 +425,7 @@ sub AppendRowsFrom(startIdx as integer)
 end sub
 
 sub OnRowsSkeletonTimeout()
-    BrowseDbg("genre_reveal", "skeleton timeout — force reveal")
+    BrowseDbg("genre_reveal", "loader timeout — force reveal")
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     if m.rowWidgets.Count() > 0 then
         row0 = m.rowWidgets[0]
@@ -423,6 +435,7 @@ sub OnRowsSkeletonTimeout()
         end if
     end if
     if not m.rowsRevealed then PrepareGenreReveal()
+    if m.pageLoader <> invalid and m.pageLoader.running = true then CompleteGenreReveal()
 end sub
 
 sub PrepareGenreReveal()
@@ -436,11 +449,52 @@ sub PrepareGenreReveal()
         end if
     end if
     m.rowsRevealed = true
-    HideGenreSkeleton()
     if m.hero <> invalid then m.hero.visible = true
     if m.rowsHost <> invalid then m.rowsHost.visible = true
-    ' Neighbor-row warm-up waits for idle so row-0 horizontal nav stays responsive.
     m.pendingPrefetchWarmup = true
+    AttachGenrePaintWatch()
+    if GenrePaintGateOpen() then CompleteGenreReveal()
+end sub
+
+function GenrePaintGateOpen() as boolean
+    heroOk = false
+    if m.hero <> invalid and m.hero.posterReady = true then heroOk = true
+    rowOk = false
+    if m.rowWidgets.Count() > 0 then
+        row0 = m.rowWidgets[0]
+        if row0 <> invalid and row0.hasField("paintedReady") and row0.paintedReady = true then rowOk = true
+    end if
+    return heroOk OR rowOk
+end function
+
+sub AttachGenrePaintWatch()
+    DetachGenrePaintWatch()
+    if m.hero <> invalid then m.hero.observeField("posterReady", "OnGenrePaintReady")
+    if m.rowWidgets.Count() > 0 then
+        row0 = m.rowWidgets[0]
+        if row0 <> invalid then
+            m.firstRowWatch = row0
+            row0.observeField("paintedReady", "OnGenrePaintReady")
+        end if
+    end if
+end sub
+
+sub DetachGenrePaintWatch()
+    if m.hero <> invalid then m.hero.unobserveField("posterReady")
+    DetachFirstRowWatch()
+end sub
+
+sub OnGenrePaintReady()
+    if not m.rowsRevealed then return
+    if not BrowsePageLoaderRunning(m) then return
+    if GenrePaintGateOpen() then CompleteGenreReveal()
+end sub
+
+sub CompleteGenreReveal()
+    if not BrowsePageLoaderRunning(m) then return
+    if m.rowsHost <> invalid then m.rowsHost.visible = true
+    if m.hero <> invalid then m.hero.visible = true
+    BrowseHidePageLoader(m, m.pageBgRest)
     ApplyGenreFocus()
     if m.vm <> invalid and m.categories.Count() > 0 and not GenreEmptyVisible() then
         wasHeader = false
@@ -448,7 +502,7 @@ sub PrepareGenreReveal()
         ShellEnterContent(m.vm)
         BrowseDbg("genre_reveal", "handoff_to_rows categories=" + Str(m.categories.Count()) + " fromHeader=" + BrowseDbgStr(wasHeader))
     end if
-    BrowseDbg("genre_reveal", "rows visible focus applied")
+    BrowseDbg("genre_reveal", "loader off — hero or row0 painted")
 end sub
 
 sub WarmGenreRow(row as object)
@@ -511,7 +565,7 @@ sub ShowEmpty(show as boolean)
     if m.emptyLabel <> invalid then m.emptyLabel.visible = show
     if m.rowsHost <> invalid then m.rowsHost.visible = not show and m.rowsRevealed
     if m.hero <> invalid then m.hero.visible = not show
-    if show then HideGenreSkeleton()
+    if show then ShowLoader(false)
 end sub
 
 sub ClearRows()

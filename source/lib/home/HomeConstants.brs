@@ -1,5 +1,10 @@
 ' HomeConstants.brs — card/row types and paging (parity with variable.constant.ts).
 
+' Turbo home load: rows first, hero trailer after first content is visible.
+function HomeLoadTurboEnabled() as boolean
+    return true
+end function
+
 function HC_TypeContinueWatching() as string
     return "CONTINUE_WATCHING"
 end function
@@ -119,6 +124,7 @@ end function
 ' Max time the loading skeleton waits for the hero poster to paint before it drops
 ' anyway, so a slow/blocked image can never strand the shimmer on screen.
 function HC_HomeSkeletonMaxSec() as float
+    if HomeLoadTurboEnabled() then return 2.0
     return 5.0
 end function
 
@@ -133,6 +139,7 @@ end function
 ' this window gives the preview the render thread first. If a slide has no trailer, rows
 ' still appear promptly.
 function HC_RowBuildGateSec() as float
+    if HomeLoadTurboEnabled() then return 0.0
     return 3.5
 end function
 
@@ -150,6 +157,7 @@ end function
 
 ' Safety net for the rows shimmer — mirror HC_HomeSkeletonMaxSec for the hero.
 function HC_RowsSkeletonMaxSec() as float
+    if HomeLoadTurboEnabled() then return 1.5
     return 8.0
 end function
 

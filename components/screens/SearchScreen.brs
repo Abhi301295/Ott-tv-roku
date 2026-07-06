@@ -11,7 +11,13 @@ sub init()
     m.gridScrollHost = m.top.findNode("gridScrollHost")
     m.gridHost = m.top.findNode("gridHost")
     m.loadingHost = m.top.findNode("loadingHost")
-    m.skeletonHost = m.top.findNode("skeletonHost")
+    m.searchLoaderBg = m.top.findNode("searchLoaderBg")
+    m.searchLoaderCenter = m.top.findNode("searchLoaderCenter")
+    m.searchLoaderSpin = m.top.findNode("searchLoaderSpin")
+    m.searchLoaderRing = m.top.findNode("searchLoaderRing")
+    m.searchLoaderArc = m.top.findNode("searchLoaderArc")
+    m.searchLoaderText = m.top.findNode("searchLoaderText")
+    m.searchLoaderAnim = m.top.findNode("searchLoaderAnim")
     m.emptyHost = m.top.findNode("emptyHost")
     m.emptyIcon = m.top.findNode("emptyIcon")
     m.emptyLbl = m.top.findNode("emptyLbl")
@@ -31,6 +37,7 @@ sub init()
     m.keyRow = 0
     m.keyCol = 0
     m.loading = false
+    m.thumbPaintWatch = invalid
     m.viewportW = 1920
     m.leftW = 768
     m.rightW = 1152
@@ -91,6 +98,8 @@ sub OnDispose()
     if m.gridBuildTimer <> invalid then m.gridBuildTimer.control = "stop"
     if m.searchDebouncePoll <> invalid then m.searchDebouncePoll.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
+    DetachSearchPaintWatch()
+    BrowseDisarmLoaderTimeout(m)
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid then tm.unobserveField("ready")
     if m.global <> invalid and m.global.hasField("businessResolved") then
@@ -130,6 +139,7 @@ sub ApplySearchTokens()
     ApplyKeyboardTheme()
     ApplyInputFocus()
     ApplyGridFocus()
+    ApplySearchLoaderColors()
 end sub
 
 sub ApplySearchInputTheme()
@@ -186,6 +196,7 @@ sub ApplySearchShellLayout()
     end if
     m.gridCols = SearchGridCols(m.rightW)
     ApplyGridViewport()
+    ApplySearchLoaderLayout()
     RebuildGridPositions()
     ApplyGridScroll()
     ApplyEmptyLayout()
@@ -195,6 +206,24 @@ sub ApplyGridViewport()
     if m.gridViewport = invalid then return
     viewH = SR_GridViewHeight()
     m.gridViewport.clippingRect = [0, 0, m.rightW, viewH]
+end sub
+
+' searchgrid.tsx: bg-black loader centered in the right 60% column.
+sub ApplySearchLoaderLayout()
+    viewH = SR_GridViewHeight()
+    if m.searchLoaderBg <> invalid then
+        m.searchLoaderBg.width = m.rightW
+        m.searchLoaderBg.height = viewH
+    end if
+    if m.searchLoaderCenter <> invalid then
+        m.searchLoaderCenter.translation = [Int(m.rightW / 2), Int(viewH / 2)]
+    end if
+end sub
+
+sub ApplySearchLoaderColors()
+    if m.searchLoaderRing <> invalid then m.searchLoaderRing.blendColor = m.cText
+    if m.searchLoaderArc <> invalid then m.searchLoaderArc.blendColor = m.cPrimary500
+    if m.searchLoaderText <> invalid then m.searchLoaderText.color = m.cText
 end sub
 
 function SearchGridCols(panelW as integer) as integer
@@ -244,7 +273,7 @@ sub FetchSearch(keyword as string)
     m.pendingSearchGen = m.searchFetchGen
     m.inFlightKeyword = keyword
     m.loading = true
-    ' Show grid shimmer as soon as the debounced API fires (replaces any prior results).
+    ' Show right-pane loader as soon as the debounced API fires (replaces any prior results).
     BeginSearchLoading()
     print "[SEARCH_DBG] fetch kw="; keyword; " gen="; m.pendingSearchGen; " cards_before="; m.cardNodes.Count()
     path = SearchBuildPath(keyword, 1, SR_ApiLimit())
@@ -308,46 +337,64 @@ sub ShowLoading(show as boolean)
         m.gridHost.visible = not show
     end if
     if show then
-        BuildSkeletonGrid()
+        ApplySearchLoaderColors()
+        BrowseArmLoaderTimeout(m)
+        if m.searchLoaderAnim <> invalid then
+            m.searchLoaderAnim.control = "stop"
+            m.searchLoaderAnim.control = "start"
+        end if
     else
-        ClearSkeletonGrid()
+        BrowseDisarmLoaderTimeout(m)
+        BrowseDetachHostPaintWatch(m)
+        if m.searchLoaderAnim <> invalid then m.searchLoaderAnim.control = "stop"
+        if m.searchLoaderSpin <> invalid then m.searchLoaderSpin.rotation = 0.0
         if m.gridHost <> invalid and m.emptyHost <> invalid and m.emptyHost.visible <> true then
             m.gridHost.visible = true
         end if
     end if
 end sub
 
-sub BuildSkeletonGrid()
-    if m.skeletonHost = invalid then return
-    ClearSkeletonGrid()
-    skColors = SkeletonResolveColors(SearchThemeTokens(m.top))
-    rows = SR_SkeletonRows()
-    count = m.gridCols * rows
-    for i = 0 to count - 1
-        cardPos = SearchCardPos(i)
-        tile = m.skeletonHost.createChild("Group")
-        tile.translation = [cardPos[0], cardPos[1]]
-        skThumb = tile.createChild("Skeleton")
-        skThumb.translation = [0, SR_CardTitleMarginTop()]
-        skThumb.boxWidth = SR_CardW()
-        skThumb.boxHeight = SR_CardH()
-        skThumb.shapeUri = SR_SkeletonThumbShapeUri()
-        CardApplySkeleton(skThumb, skColors.base, skColors.highlight)
-        skThumb.running = true
-        titleY = SR_CardTitleMarginTop() + SR_CardH() + SR_CardTitleMarginTop()
-        skTitle = tile.createChild("Skeleton")
-        skTitle.translation = [0, titleY]
-        skTitle.boxWidth = SR_CardTitleMaxW()
-        skTitle.boxHeight = SR_CardTitleH()
-        skTitle.shapeUri = SR_SkeletonTitleShapeUri()
-        CardApplySkeleton(skTitle, skColors.base, skColors.highlight)
-        skTitle.running = true
-    end for
+sub DetachSearchPaintWatch()
+    BrowseDetachHostPaintWatch(m)
 end sub
 
-sub ClearSkeletonGrid()
-    if m.skeletonHost = invalid then return
-    m.skeletonHost.removeChildrenIndex(m.skeletonHost.getChildCount(), 0)
+sub AttachSearchPaintWatch()
+    if m.cardNodes.Count() < 1 then return
+    card = m.cardNodes[0]
+    if card = invalid then return
+    thumb = card.findNode("thumb")
+    if BrowseAttachThumbPaintWatch(m, thumb, "OnSearchFirstPainted") then OnSearchFirstPainted()
+end sub
+
+sub OnSearchFirstPainted()
+    TryCompleteSearchReveal()
+end sub
+
+function SearchPaintGateOpen() as boolean
+    if m.cardNodes.Count() < 1 then return false
+    card = m.cardNodes[0]
+    if card = invalid then return true
+    return BrowseThumbPaintComplete(card.findNode("thumb"))
+end function
+
+sub TryCompleteSearchReveal()
+    if m.loadingHost = invalid or m.loadingHost.visible <> true then return
+    if SearchPaintGateOpen() then CompleteSearchReveal()
+end sub
+
+sub CompleteSearchReveal()
+    if m.loadingHost = invalid or m.loadingHost.visible <> true then return
+    if not SearchPaintGateOpen() then return
+    DetachSearchPaintWatch()
+    if m.gridHost <> invalid and m.emptyHost <> invalid and m.emptyHost.visible <> true then
+        m.gridHost.visible = true
+    end if
+    ShowLoading(false)
+end sub
+
+sub OnBrowseLoaderTimeout()
+    if m.loadingHost = invalid or m.loadingHost.visible <> true then return
+    CompleteSearchReveal()
 end sub
 
 sub ShowEmpty(show as boolean)
@@ -425,14 +472,16 @@ sub StartGridBuild(fresh as boolean)
     if m.gridHost = invalid or m.results = invalid then return
     if m.results.Count() = 0 then return
     if m.gridBuildIdx >= m.results.Count() then
-        RevealSearchResults()
+        AttachSearchPaintWatch()
+        TryCompleteSearchReveal()
         FinishGridBuild()
         return
     end if
-    ' Cold load: fill the skeleton viewport synchronously, then progressive rows below.
+    ' Cold load: fill the first viewport synchronously, then progressive rows below.
     if fresh then
         AppendGridRows(SR_SkeletonRows())
-        RevealSearchResults()
+        AttachSearchPaintWatch()
+        TryCompleteSearchReveal()
     end if
     if m.gridBuildIdx >= m.results.Count() then
         FinishGridBuild()
@@ -462,13 +511,15 @@ sub OnGridBuildTick()
     total = m.results.Count()
     if m.gridBuildIdx >= total then
         StopGridBuild()
-        RevealSearchResults()
+        AttachSearchPaintWatch()
+        TryCompleteSearchReveal()
         FinishGridBuild()
         return
     end if
 
     AppendGridRows(1)
-    RevealSearchResults()
+    AttachSearchPaintWatch()
+    TryCompleteSearchReveal()
 
     if m.gridBuildIdx >= total then
         StopGridBuild()
@@ -502,12 +553,6 @@ sub AppendGridRows(rowCount as integer)
         m.gridBuildIdx = rowEnd
         rowsBuilt = rowsBuilt + 1
     end while
-end sub
-
-sub RevealSearchResults()
-    if m.cardNodes.Count() < 1 then return
-    if m.loadingHost = invalid or m.loadingHost.visible <> true then return
-    ShowLoading(false)
 end sub
 
 sub FinishGridBuild()

@@ -4,7 +4,10 @@ sub init()
     m.bg = m.top.findNode("bg")
     m.vm = FindViewManager(m.top)
     m.contentHost = m.top.findNode("contentHost")
-    m.skeletonHost = m.top.findNode("skeletonHost")
+    m.loaderHost = m.top.findNode("loaderHost")
+    m.loaderPageBg = m.top.findNode("loaderPageBg")
+    m.pageLoader = m.top.findNode("pageLoader")
+    m.loaderCenter = m.top.findNode("loaderCenter")
     m.videoColumn = m.top.findNode("videoColumn")
     m.videoFrame = m.top.findNode("videoFrame")
     m.videoBorder = m.top.findNode("videoBorder")
@@ -37,7 +40,6 @@ sub init()
     m.emptyHost = m.top.findNode("emptyHost")
     m.emptyLbl = m.top.findNode("emptyLbl")
     m.seekPreviewTimer = m.top.findNode("seekPreviewTimer")
-    m.skeletonTimeout = m.top.findNode("skeletonTimeout")
 
     m.reels = []
     m.currentIndex = 0
@@ -64,7 +66,6 @@ sub init()
     m.pillBlockH = 0
     m.disposed = false
     m.reelsTask = invalid
-    m.showingSkeleton = false
     m.fetchingPage = 1
     m.useInlineVideo = ReelsUseInlineVideo()
 
@@ -83,14 +84,12 @@ sub init()
         m.seekPreviewTimer.duration = RL_SeekPreviewMs()
         m.seekPreviewTimer.observeField("fire", "OnSeekPreviewHide")
     end if
-    if m.skeletonTimeout <> invalid then
-        m.skeletonTimeout.duration = RL_SkeletonMaxSec()
-        m.skeletonTimeout.observeField("fire", "OnSkeletonTimeout")
-    end if
     if m.overlayAnim <> invalid then m.overlayAnim.control = "start"
 
     if m.videoPoster <> invalid then m.videoPoster.observeField("loadStatus", "OnReelPosterLoad")
 
+    m.pageBgRest = m.cPageBg
+    ApplyPageLoaderLayout(m.viewportW)
     m.top.observeField("keyEvent", "OnKey")
     m.top.observeField("visible", "OnReelsVisibleChanged")
     if m.global <> invalid and m.global.hasField("businessResolved") then
@@ -137,7 +136,9 @@ end sub
 
 sub OnBusinessResolved()
     LoadReelsTokens()
+    m.pageBgRest = m.cPageBg
     ApplyStaticColors()
+    BrowseApplyPageLoaderColors(m)
 end sub
 
 sub OnDispose()
@@ -147,6 +148,7 @@ sub OnDispose()
     KillReelsTask()
     StopVideo()
     StopTimers()
+    BrowseHidePageLoader(m, m.pageBgRest)
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")
     end if
@@ -172,10 +174,6 @@ sub StopTimers()
     if m.seekPreviewTimer <> invalid then
         m.seekPreviewTimer.control = "stop"
         m.seekPreviewTimer.unobserveField("fire")
-    end if
-    if m.skeletonTimeout <> invalid then
-        m.skeletonTimeout.control = "stop"
-        m.skeletonTimeout.unobserveField("fire")
     end if
 end sub
 
@@ -367,8 +365,47 @@ sub ResetAndFetch()
     StopVideo()
     HideContent()
     ShowEmpty(false)
-    ShowSkeleton(true, "boot")
+    ShowPageLoader("boot")
     FetchPage(1)
+end sub
+
+sub ApplyPageLoaderLayout(viewportW as integer)
+    if viewportW < 1 then viewportW = 1920
+    if m.loaderPageBg <> invalid then m.loaderPageBg.width = viewportW
+    if m.loaderCenter <> invalid then m.loaderCenter.translation = [Int(viewportW / 2), 518]
+end sub
+
+sub ShowPageLoader(reason as string)
+    m.loaderVeilBg = m.cPageBg
+    BrowseShowPageLoader(m, m.pageBgRest)
+end sub
+
+sub HidePageLoader(reason as string)
+    if not BrowsePageLoaderRunning(m) then return
+    BrowseHidePageLoader(m, m.pageBgRest)
+end sub
+
+sub OnBrowseLoaderTimeout()
+    if not BrowsePageLoaderRunning(m) then return
+    if m.reels.Count() > 0 and m.videoColumn <> invalid and m.videoColumn.visible = false then
+        ShowReelContent()
+    end if
+    CompleteReelsReveal()
+end sub
+
+function ReelsPaintGateOpen() as boolean
+    return BrowseThumbPaintComplete(m.videoPoster)
+end function
+
+sub TryCompleteReelsReveal()
+    if not BrowsePageLoaderRunning(m) then return
+    if ReelsPaintGateOpen() then CompleteReelsReveal()
+end sub
+
+sub CompleteReelsReveal()
+    if not BrowsePageLoaderRunning(m) then return
+    if m.reels.Count() > 0 then ShowReelContent()
+    BrowseHidePageLoader(m, m.pageBgRest)
 end sub
 
 sub HideContent()
@@ -386,77 +423,6 @@ sub ShowEmpty(show as boolean)
     ReelsDbg("empty", "visible=" + ReelsDbgStr(show))
     if m.emptyHost <> invalid then m.emptyHost.visible = show
     if m.emptyLbl <> invalid then m.emptyLbl.text = RL_EmptyCopy()
-end sub
-
-sub ShowSkeleton(show as boolean, reason as string)
-    m.showingSkeleton = show
-    if m.skeletonHost = invalid then return
-    m.skeletonHost.removeChildrenIndex(m.skeletonHost.getChildCount(), 0)
-    if show then
-        ApplyReelsShellLayout()
-        BuildReelsSkeleton()
-    end if
-    m.skeletonHost.visible = show
-    if show then
-        ReelsDbg("skeleton", "on reason=" + reason)
-        if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "start"
-    else
-        ReelsDbg("skeleton", "off reason=" + reason)
-        if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
-    end if
-end sub
-
-sub BuildReelsSkeleton()
-    if m.skeletonHost = invalid then return
-    colors = SkeletonResolveColors(m.tokens)
-    skBase = colors.base
-    skHi = colors.highlight
-    ReelsDbg("skeleton", "palette base=" + skBase)
-
-    tile = m.skeletonHost.createChild("Group")
-    tile.translation = [m.videoX, 0]
-    sk = tile.createChild("Skeleton")
-    sk.boxWidth = RL_VideoW()
-    sk.boxHeight = RL_VideoH()
-    sk.shapeUri = RL_VideoSkeletonShapeUri()
-    CardApplySkeleton(sk, skBase, skHi)
-    sk.running = true
-
-    meta = m.skeletonHost.createChild("Group")
-    skLines = [48, 28, 60, 48]
-    skGap = 16
-    skH = 0
-    for each lh in skLines
-        skH = skH + lh + skGap
-    end for
-    skH = skH - skGap
-    meta.translation = [m.metaX, RL_VideoH() - RL_MetaBottomReserve() - skH]
-    skW1 = Int(m.metaColW * 0.4)
-    skW2 = Int(m.metaColW * 0.7)
-    skW3 = m.metaColW
-    skW4 = Int(m.metaColW * 0.85)
-    lines = [48, 28, 60, 48]
-    widths = [skW1, skW2, skW3, skW4]
-    ly = 0
-    for i = 0 to 3
-        ln = meta.createChild("Skeleton")
-        ln.boxWidth = widths[i]
-        ln.boxHeight = lines[i]
-        ln.translation = [0, ly]
-        ln.shapeUri = RL_VideoSkeletonShapeUri()
-        CardApplySkeleton(ln, skBase, skHi)
-        ln.running = true
-        ly = ly + lines[i] + 16
-    end for
-    ReelsDbg("skeleton", "built pulse=on videoX=" + Str(m.videoX) + " metaY=" + Str(meta.translation[1]))
-end sub
-
-sub OnSkeletonTimeout()
-    ReelsDbg("skeleton", "timeout — force off")
-    ShowSkeleton(false, "timeout")
-    if m.reels.Count() > 0 and m.videoColumn <> invalid and m.videoColumn.visible = false then
-        ShowReelContent()
-    end if
 end sub
 
 sub ApplyVideoPosterLayout()
@@ -523,6 +489,7 @@ sub OnReelPosterLoad()
     if status = "ready" then
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         m.videoPoster.visible = true
+        TryCompleteReelsReveal()
     else if status = "failed" then
         ReelsDbg("poster_load", "failed -> dummy placeholder")
         m.videoPoster.uri = RL_DummyThumbPosterUri()
@@ -530,6 +497,7 @@ sub OnReelPosterLoad()
         if m.videoPlaceholder <> invalid then
             m.videoPlaceholder.color = HexToRokuColor(RL_DummyThumbBgHex(), "ff")
         end if
+        TryCompleteReelsReveal()
     end if
 end sub
 
@@ -540,7 +508,7 @@ sub FetchPage(pageNum as integer)
     m.loadingMore = true
     m.loading = true
     m.fetchingPage = pageNum
-    if pageNum = 1 then ShowSkeleton(true, "fetch")
+    if pageNum = 1 then ShowPageLoader("fetch")
 
     path = Endpoints().REELS_LIST
     q = ReelsBuildQuery(pageNum, RL_PageLimit(), m.seed)
@@ -566,7 +534,7 @@ sub OnReelsResponse()
     batch = parsed.items
     if api = invalid or api.ok <> true or (api.statusCode <> invalid and api.statusCode <> 200) then
         if m.reels.Count() = 0 then
-            ShowSkeleton(false, "fetch_fail")
+            HidePageLoader("fetch_fail")
             ShowEmpty(true)
             ShowAlert(m.top, 2, RL_ErrorCopy())
         end if
@@ -589,7 +557,7 @@ sub OnReelsResponse()
     ReelsDbg("response", "accumulated=" + Str(accumulated) + " hasMore=" + ReelsDbgStr(m.hasMore))
 
     if accumulated = 0 then
-        ShowSkeleton(false, "empty")
+        HidePageLoader("empty")
         ShowEmpty(true)
         return
     end if
@@ -621,9 +589,9 @@ sub LoadCurrentReel(isNew as boolean)
     ReelsDbg("video_load", "index=" + Str(m.currentIndex) + " url=" + Left(m.pendingStreamUrl, 80) + " poster=" + ReelsDbgStr(ReelsHasPoster(reel)))
 
     ApplyMeta(reel)
-    ShowSkeleton(false, "reel_ready")
     ShowReelContent()
     ApplyReelPoster(reel)
+    TryCompleteReelsReveal()
 
     m.position = 0.0
     m.duration = 0.0
@@ -847,7 +815,7 @@ sub OnVideoState()
         if m.videoNode <> invalid then m.videoNode.visible = true
         if m.videoPoster <> invalid then m.videoPoster.visible = false
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
-        ShowSkeleton(false, "playing")
+        HidePageLoader("playing")
         UpdateOverlay()
     else if state = "paused" then
         m.isPlaying = false
@@ -861,7 +829,7 @@ sub OnVideoState()
         ReelsDbg("video_state", "error — keep poster")
         m.isBuffering = false
         m.isPlaying = false
-        ShowSkeleton(false, "error")
+        HidePageLoader("error")
         ShowPosterFrame()
         UpdateOverlay()
     end if
@@ -885,7 +853,7 @@ sub OnVideoPosition()
         if m.videoPoster <> invalid then m.videoPoster.visible = false
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         if m.videoNode <> invalid then m.videoNode.visible = true
-        ShowSkeleton(false, "position")
+        HidePageLoader("position")
     end if
     UpdateProgressBar()
     UpdateOverlay()

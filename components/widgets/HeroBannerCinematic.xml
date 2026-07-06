@@ -16,6 +16,8 @@
     <!-- True while a trailer is actually playing, so the screen knows the mute control is
          available for D-pad focus (parity with isVideoPlaying gating the mute button). -->
     <field id="trailerPlaying" type="boolean" value="false" />
+    <!-- Home turbo boot: defer trailer API + playback until content rows are visible. -->
+    <field id="holdTrailerBoot" type="boolean" value="false" />
 
     <!-- D-pad actions invoked by HomeScreen via callFunc when a hero control is OK'd.
          callFunc ONLY reaches functions declared here — without these the prev/next

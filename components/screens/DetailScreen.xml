@@ -26,6 +26,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailStrings.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/detail/DetailService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowsePageLoader.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/DetailScreen.brs" />
@@ -44,36 +45,6 @@
     <!-- bg-gradient-to-t from-black/85 to-transparent to-[20%] — bottom 216px only. -->
     <Poster id="gradBottom" uri="pkg:/images/ui/grad_bottom.png" translation="[0, 864]"
       width="1920" height="216" loadDisplayMode="scaleToFill" opacity="0.85" visible="false" />
-
-    <!-- Loading shimmer — parity with the detail skeleton (neutral-700 boxes, animate-pulse).
-         Positions track the real content below so the hand-off is seamless. -->
-    <Group id="skeletonGroup" visible="false">
-      <!-- Each shape is a native-size PNG (1:1). brs-engine does NOT stretch 9-patches. -->
-      <Skeleton id="skTitle" translation="[50, 340]" boxWidth="400" boxHeight="80"
-        shapeUri="pkg:/images/ui/sk_detail_title.png" />
-      <Skeleton id="skRateNum" translation="[50, 432]" boxWidth="40" boxHeight="40"
-        shapeUri="pkg:/images/ui/sk_detail_rate.png" />
-      <Skeleton id="skStar0" translation="[100, 440]" boxWidth="24" boxHeight="24"
-        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
-      <Skeleton id="skStar1" translation="[132, 440]" boxWidth="24" boxHeight="24"
-        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
-      <Skeleton id="skStar2" translation="[164, 440]" boxWidth="24" boxHeight="24"
-        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
-      <Skeleton id="skStar3" translation="[196, 440]" boxWidth="24" boxHeight="24"
-        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
-      <Skeleton id="skStar4" translation="[228, 440]" boxWidth="24" boxHeight="24"
-        shapeUri="pkg:/images/ui/sk_detail_dot.png" />
-      <Skeleton id="skDesc0" translation="[50, 500]" boxWidth="1116" boxHeight="20"
-        shapeUri="pkg:/images/ui/sk_detail_line_1116.png" />
-      <Skeleton id="skDesc1" translation="[50, 532]" boxWidth="1060" boxHeight="20"
-        shapeUri="pkg:/images/ui/sk_detail_line_1060.png" />
-      <Skeleton id="skDesc2" translation="[50, 564]" boxWidth="948" boxHeight="20"
-        shapeUri="pkg:/images/ui/sk_detail_line_948.png" />
-      <Skeleton id="skBtn1" translation="[60, 620]" boxWidth="500" boxHeight="60"
-        shapeUri="pkg:/images/ui/sk_detail_btn.png" />
-      <Skeleton id="skBtn2" translation="[60, 700]" boxWidth="500" boxHeight="60"
-        shapeUri="pkg:/images/ui/sk_detail_btn.png" />
-    </Group>
 
     <Group id="contentHost" visible="false">
       <!-- Title — fw-800 fs-50 lh-60 (×1.2 = 60px), neutral-50, ls 0.02em (~1.2px), m-b-10.
@@ -147,6 +118,14 @@
         <Vector2DFieldInterpolator id="moreLikeDrawerInterp" key="[0.0, 1.0]"
           keyValue="[[0.0, 1080.0], [0.0, 0.0]]" fieldToInterp="moreLikeDrawer.translation" />
       </Animation>
+    </Group>
+
+    <!-- PageContainer bg-neutral-700 + Spinner while detail content loads. -->
+    <Group id="loaderHost" translation="[0, 0]" visible="false">
+      <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
+      <Group id="loaderCenter" translation="[960, 518]">
+        <HomeLoader id="pageLoader" />
+      </Group>
     </Group>
   </children>
 </component>

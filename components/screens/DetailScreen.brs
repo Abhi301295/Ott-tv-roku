@@ -1,8 +1,12 @@
 sub init()
+    m.bg = m.top.findNode("bg")
     m.banner = m.top.findNode("banner")
     m.gradLeft = m.top.findNode("gradLeft")
     m.gradBottom = m.top.findNode("gradBottom")
-    m.skeletonGroup = m.top.findNode("skeletonGroup")
+    m.loaderHost = m.top.findNode("loaderHost")
+    m.loaderPageBg = m.top.findNode("loaderPageBg")
+    m.pageLoader = m.top.findNode("pageLoader")
+    m.loaderCenter = m.top.findNode("loaderCenter")
     m.contentHost = m.top.findNode("contentHost")
     m.titleLabel = m.top.findNode("titleLabel")
     m.ratingHost = m.top.findNode("ratingHost")
@@ -45,12 +49,16 @@ sub init()
     m.loading = true
     m.watchlistBusy = false
     m.detailFetchSilent = false
+    m.detailRevealed = false
 
     m.vm = FindViewManager(m.top)
     LoadDetailTokens()
+    m.pageBgRest = m.cNeutral950
+    ApplyPageLoaderLayout(1920)
     SetupActionButtons()
     ApplyContentColors()
-    ApplySkeletonColors()
+
+    if m.banner <> invalid then m.banner.observeField("loadStatus", "OnBannerPaintReady")
 
     m.top.observeField("keyEvent", "OnKey")
     if m.vm <> invalid then m.vm.observeField("overlayDismiss", "OnOverlayDismiss")
@@ -99,7 +107,9 @@ sub OnDispose()
         m.global.unobserveField("businessResolved")
     end if
     m.top.unobserveField("keyEvent")
-    StopDetailSkeletons()
+    if m.banner <> invalid then m.banner.unobserveField("loadStatus")
+    BrowseHidePageLoader(m, m.pageBgRest)
+    StopMoreLikeSkeleton()
 end sub
 
 sub KillDetailTask(task as object)
@@ -107,17 +117,17 @@ sub KillDetailTask(task as object)
     task.unobserveField("apiResult")
 end sub
 
-sub StopDetailSkeletons()
-    SetDetailSkeletonRunning(false)
+sub StopMoreLikeSkeleton()
     if m.moreLikeSkeletonHost = invalid then return
     SkeletonApplyTree(m.moreLikeSkeletonHost, m.tokens, false)
 end sub
 
 sub OnBusinessResolved()
     LoadDetailTokens()
+    m.pageBgRest = m.cNeutral950
     ApplyButtonThemes()
     ApplyContentColors()
-    ApplySkeletonColors()
+    BrowseApplyPageLoaderColors(m)
     ApplyMoreLikeSkeletonColors()
     ApplyActionFocus()
     ApplyMoreLikeCardFocus()
@@ -133,6 +143,7 @@ sub LoadDetailTokens()
     m.cNeutral50 = TC("neutral-50", "#f5f5f5")
     m.cNeutral300 = TC("neutral-300", "#adadad")
     m.cNeutral700 = TC("neutral-700", "#404040")
+    m.cNeutral950 = TC("neutral-950", "#0a0a0a")
     ' React hardcodes the focused action glow as shadow-[0_0_8px_#1e90ff] (not a theme token).
     m.cGlow = "0x1e90ffff"
 end sub
@@ -174,34 +185,60 @@ sub ApplyContentColors()
     if m.descLabel <> invalid then m.descLabel.color = m.cNeutral300
 end sub
 
-' Detail skeleton — SkeletonConfig.brs palette (same as Profile).
-sub SetDetailSkeletonRunning(running as boolean)
-    if m.skeletonGroup = invalid then return
-    SkeletonApplyTree(m.skeletonGroup, m.tokens, running)
+sub ApplyPageLoaderLayout(viewportW as integer)
+    if viewportW < 1 then viewportW = 1920
+    if m.loaderPageBg <> invalid then m.loaderPageBg.width = viewportW
+    if m.loaderCenter <> invalid then m.loaderCenter.translation = [Int(viewportW / 2), 518]
 end sub
-
-sub ApplySkeletonColors()
-    running = false
-    if m.skeletonGroup <> invalid and m.skeletonGroup.visible = true then running = true
-    SetDetailSkeletonRunning(running)
-end sub
-
-function LightenHexColor(hex as string, amount as integer) as string
-    return CardLightenHex(hex, amount)
-end function
 
 sub ShowLoading(show as boolean)
     m.loading = show
-    m.skeletonGroup.visible = show
-    m.contentHost.visible = not show
-    m.banner.visible = not show
-    m.gradLeft.visible = not show
-    m.gradBottom.visible = not show
     if show then
-        SetDetailSkeletonRunning(true)
+        m.detailRevealed = false
+        BrowseShowPageLoader(m, m.pageBgRest)
+        m.contentHost.visible = false
+        m.banner.visible = false
+        m.gradLeft.visible = false
+        m.gradBottom.visible = false
     else
-        SetDetailSkeletonRunning(false)
+        BrowseHidePageLoader(m, m.pageBgRest)
     end if
+end sub
+
+function DetailPaintGateOpen() as boolean
+    if m.content = invalid then return false
+    uri = DetailBannerUri(m.content)
+    if uri = "" then return true
+    return BrowseThumbPaintComplete(m.banner)
+end function
+
+sub PrepareDetailReveal()
+    if m.detailRevealed then return
+    m.detailRevealed = true
+    m.contentHost.visible = true
+    m.banner.visible = true
+    m.gradLeft.visible = true
+    m.gradBottom.visible = true
+    if DetailPaintGateOpen() then CompleteDetailReveal()
+end sub
+
+sub OnBannerPaintReady()
+    if not m.detailRevealed then return
+    if not BrowsePageLoaderRunning(m) then return
+    if DetailPaintGateOpen() then CompleteDetailReveal()
+end sub
+
+sub CompleteDetailReveal()
+    if not BrowsePageLoaderRunning(m) then return
+    BrowseHidePageLoader(m, m.pageBgRest)
+    m.loading = false
+    ApplyActionFocus()
+end sub
+
+sub OnBrowseLoaderTimeout()
+    if not BrowsePageLoaderRunning(m) then return
+    if not m.detailRevealed then PrepareDetailReveal()
+    if BrowsePageLoaderRunning(m) then CompleteDetailReveal()
 end sub
 
 sub FetchDetail(silent as boolean)
@@ -230,7 +267,8 @@ sub OnDetailResponse()
             return
         end if
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
-        ShowLoading(false)
+        BrowseHidePageLoader(m, m.pageBgRest)
+        m.loading = false
         return
     end if
 
@@ -239,7 +277,8 @@ sub OnDetailResponse()
     if raw = invalid then
         if silent then return
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
-        ShowLoading(false)
+        BrowseHidePageLoader(m, m.pageBgRest)
+        m.loading = false
         return
     end if
 
@@ -251,10 +290,9 @@ sub OnDetailResponse()
         if m.actionIndex >= m.actionIds.Count() then m.actionIndex = 0
         ApplyActionFocus()
     else
-        ShowLoading(false)
         RebuildActionList()
         m.actionIndex = 0
-        ApplyActionFocus()
+        PrepareDetailReveal()
     end if
 end sub
 

@@ -9,9 +9,9 @@ function WelcomeDismissReadyForRow0() as boolean
     return cat.type = HC_TypeContinueWatching()
 end function
 
-sub OnRowsSkeletonTimeout()
-    print "[HOME] rows skeleton timeout -> force first row reveal"
-    HomeBootLog(m.bootSpan, "rows skeleton timeout", "force reveal")
+sub OnRowsLoaderTimeout()
+    print "[HOME] home loader timeout -> force first row reveal"
+    HomeBootLog(m.bootSpan, "loader timeout", "force reveal")
     row0 = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
     if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
@@ -33,17 +33,18 @@ end sub
 
 
 sub OnRowsForceHideTimer()
-    print "[HOME] rows force-hide safety -> drop shimmer"
+    print "[HOME] loader force-hide safety -> drop loader"
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
     row0 = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
+    if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
     painted = false
     if row0 <> invalid and row0.hasField("paintedReady") then painted = row0.paintedReady
-    if painted and WelcomeDismissReadyForRow0() and m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true then
+    if painted and WelcomeDismissReadyForRow0() and m.homeLoader <> invalid and m.homeLoader.running = true then
         CwPerfInstant("force-hide", "paintedReady=true -> reveal")
         PrepareFirstRowReveal()
     else
-        CwPerfInstant("force-hide skipped", "paintedReady=" + CwPerfBool(painted) + " shimmer=" + CwPerfBool(m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning = true))
+        CwPerfInstant("force-hide skipped", "paintedReady=" + CwPerfBool(painted) + " loader=" + CwPerfBool(m.homeLoader <> invalid and m.homeLoader.running = true))
     end if
 end sub
 
@@ -66,7 +67,7 @@ sub MaybeInsertLateContinueWatchingRow()
     m.rowsBuilt = false
     if m.rowsRevealed then
         m.rowsRevealed = false
-        ShowRowsSkeleton(true)
+        ShowHomeLoader(true)
     end if
     m.rowsDataReady = true
     m.rowGateElapsed = true
@@ -93,7 +94,6 @@ sub BuildContentRows()
     m.rowIndex = 0
     m.cardIndex = 0
     m.rowsHost.visible = (m.contentRowCats.Count() > 0)
-    ' Row build timing (CwPerfMark/HomeBootLog are no-ops unless re-enabled in HomePerf.brs).
     m.rowBuildSpan = CreateObject("roTimespan")
     m.cwRowBuildSpan = CreateObject("roTimespan")
     m.rowBuildCostMs = 0
@@ -103,7 +103,7 @@ sub BuildContentRows()
     if m.contentRowCats.Count() = 0 then
         HomeBootLog(m.bootSpan, "BuildContentRows", "no rows")
         if ProfileTransitionActive() then HideProfileWelcomeTransition()
-        ShowRowsSkeleton(false)
+        ShowHomeLoader(false)
         if m.categoriesPrefetched = true then
             m.categoriesPrefetched = false
             m.categories = []
@@ -118,8 +118,12 @@ sub BuildContentRows()
         return
     end if
 
-    ' Skeleton visibility is owned by OnHeroPosterReady / OnSkeletonTimeout, so we don't
-    ' toggle it here — rows build underneath and the shimmer drops once the hero paints.
+    if HomeLoadTurboEnabled() then
+        BuildContentRowsTurbo()
+        return
+    end if
+
+    ' Loader visibility is owned by PrepareFirstRowReveal; rows build underneath.
     if m.contentRowCats.Count() > 0 then
         if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "start"
         if ProfileTransitionActive() then
@@ -130,6 +134,66 @@ sub BuildContentRows()
             m.rowBuildTimer.control = "start"
         end if
     end if
+end sub
+
+
+' Turbo path: sync-build row 0 cards, reveal immediately, finish remaining rows on a fast timer.
+sub BuildContentRowsTurbo()
+    theme = HomeRowTheme()
+    m.rowBuildCostMs = 0
+
+    if m.contentRowCats.Count() > 0 then
+        cat = m.contentRowCats[0]
+        rowSpan = CreateObject("roTimespan")
+        catName = ""
+        if cat <> invalid and cat.name <> invalid then catName = cat.name
+        row = CRC_CreateDataRow(m.rowsHost, cat, 0, theme)
+        if row <> invalid then
+            row.cardFocusIndex = -1
+            row.ottRowReveal = true
+            row.rowPeekVisible = true
+            if ThemeIsOttHome() then
+                m.rowBuildY = CRC_AppendRowRecord(m, row, 0, cat)
+            else
+                m.rowWidgets.Push(row)
+                m.rowBuildY = m.layoutRowPitch
+            end if
+            ReleaseHeroTrailerBoot()
+            row.callFunc("BuildCardsNow", 6)
+            DetachFirstRowWatch()
+            m.firstRowWatch = row
+            row.observeField("paintedReady", "OnFirstRowPainted")
+            if row.hasField("paintedReady") and row.paintedReady = true then OnFirstRowPainted()
+            rowMs = rowSpan.TotalMilliseconds()
+            m.rowBuildCostMs = rowMs
+            print "[PERF] turbo build row 0 '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
+        end if
+    end if
+
+    m.rowBuildIndex = 1
+    wall = 0
+    if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
+    print "[PERF] turbo row0 ready wall="; wall; "ms render="; m.rowBuildCostMs; "ms"
+    HomeBootLog(m.bootSpan, "turbo row0 ready", "render=" + Str(m.rowBuildCostMs) + "ms wall=" + Str(wall) + "ms")
+
+    if m.rowBuildIndex < m.contentRowCats.Count() then
+        if m.rowBuildTimer <> invalid then
+            m.rowBuildTimer.duration = 0.001
+            m.rowBuildTimer.control = "start"
+        end if
+    else
+        m.rowBuildIndex = m.contentRowCats.Count()
+        m.rowContentHeight = m.rowBuildY
+        ApplyHomeFocus()
+        MaybeLandContentFocus()
+    end if
+end sub
+
+
+sub ReleaseHeroTrailerBoot()
+    if m.hero = invalid then return
+    if m.hero.hasField("holdTrailerBoot") then m.hero.holdTrailerBoot = false
+    m.hero.callFunc("ResumeHeroPlayback", invalid)
 end sub
 
 
@@ -208,7 +272,9 @@ sub OnRowBuildTick()
     ' Welcome overlay waits for row 0 paintedReady (CW row when CW is in the catalogue).
     if m.rowBuildIndex = 0 then
         row.rowPeekVisible = true
-        row.callFunc("BuildCardsNow", 6)
+        cardLimit = 6
+        if HomeLoadTurboEnabled() then cardLimit = 6
+        row.callFunc("BuildCardsNow", cardLimit)
         if row.cardCount = 0 then
             if WelcomeDismissReadyForRow0() then OnFirstRowPainted()
         else
@@ -231,6 +297,9 @@ sub OnRowBuildTick()
         wall = 0
         if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
         print "[PERF] all rows built: "; m.rowBuildIndex; " rows, render-cost="; m.rowBuildCostMs; "ms, wall="; wall; "ms"
+        if HomeLoadTurboEnabled() then
+            HomeBootLog(m.bootSpan, "turbo all rows built", "render=" + Str(m.rowBuildCostMs) + "ms wall=" + Str(wall) + "ms")
+        end if
         ' Do not materialize row 1 or run focus scroll until CW has painted — that work
         ' was starving the render thread and caused the post-shimmer black gap.
         if m.rowsRevealed then
@@ -291,38 +360,52 @@ sub LogCwRowState(tag as string)
     host = row.findNode("cardsHost")
     if host <> invalid then chop = host.opacity
     pulseVis = false
-    if m.homeSkeleton <> invalid and m.homeSkeleton.rowsRunning <> invalid then
-        pulseVis = m.homeSkeleton.rowsRunning
+    if m.homeLoader <> invalid and m.homeLoader.running <> invalid then
+        pulseVis = m.homeLoader.running
     end if
     detail = "rowOp=" + Str(row.opacity) + " cardsHostOp=" + Str(chop)
     detail = detail + " peek=" + CwPerfBool(row.rowPeekVisible) + " focused=" + CwPerfBool(row.rowFocused)
-    detail = detail + " shimmerRunning=" + CwPerfBool(pulseVis) + " zone=" + m.focusZone
+    detail = detail + " loaderRunning=" + CwPerfBool(pulseVis) + " zone=" + m.focusZone
     CwPerfInstant(tag, detail)
 end sub
 
-' Cut the HomeSkeleton row strip before revealing real cards so the two shimmer
-' systems (HomeSkeleton rectangles vs per-card Skeleton widgets) never overlap.
+function HomeFirstRowPaintComplete() as boolean
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return true
+    row0 = m.rowWidgets[0]
+    if row0 = invalid then return true
+    if row0.hasField("paintedReady") and row0.paintedReady <> true then return false
+    if row0.opacity < 1.0 then return false
+    host = row0.findNode("cardsHost")
+    if host <> invalid and host.opacity < 1.0 then return false
+    return true
+end function
+
+' Drop the page loader only after row 0 is painted underneath the opaque veil.
 sub PrepareFirstRowReveal()
     if m.rowsRevealed then
         if ProfileTransitionActive() then HideProfileWelcomeTransition()
         return
     end if
+    if not HomeFirstRowPaintComplete() then
+        HomeBootLog(m.bootSpan, "reveal deferred", "row0 not painted under loader")
+        return
+    end if
     m.rowsRevealed = true
-    HomeBootLog(m.bootSpan, "rows revealed", "shimmer off")
-    LogCwRowState("cards painted -> hide shimmer")
+    HomeBootLog(m.bootSpan, "rows revealed", "loader off")
+    LogCwRowState("cards painted -> hide loader")
     if ProfileTransitionActive() then HideProfileWelcomeTransition()
-    ShowRowsSkeleton(false)
-    EnsureFirstRowVisibleUnderShimmer()
+    EnsureFirstRowVisibleUnderLoader()
+    ShowHomeLoader(false)
     UpdateRowsScrim()
-    LogCwRowState("shimmer hidden")
+    LogCwRowState("loader hidden")
     ApplyHomeFocus()
     MaybeLandContentFocus()
-    LogCwRowState("post-focus zone=" + m.focusZone)
     WarmWelcomeRowsWindow()
+    LogCwRowState("post-focus zone=" + m.focusZone)
 end sub
 
 
-sub EnsureFirstRowVisibleUnderShimmer()
+sub EnsureFirstRowVisibleUnderLoader()
     if m.rowsHost <> invalid then m.rowsHost.visible = true
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
     row0 = m.rowWidgets[0]

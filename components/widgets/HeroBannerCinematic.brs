@@ -829,6 +829,7 @@ end sub
 
 ' Resolve in the background when the poster is ready; playback waits TRAILER_LOAD_DELAY.
 sub ScheduleTrailer()
+    if m.top.holdTrailerBoot = true then return
     StopTrailer()
     BeginTrailerPrefetch()
     StartTrailerLoadTimer()

@@ -30,6 +30,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/browse/SeriesListService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/watchlist/MyListConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/watchlist/WatchlistService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowsePageLoader.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeScreenColors.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/grid/GridFocus.brs" />
@@ -40,8 +41,6 @@
     <Rectangle id="bg" width="1920" height="1080" color="0x0a0a0aff" />
 
     <Group id="contentHost">
-      <Group id="skeletonHost" translation="[56, 162]" visible="false" />
-
       <Group id="rowsHost" translation="[56, 162]" clippingRect="[0, 0, 1814, 900]" />
 
       <Group id="emptyHost" visible="false">
@@ -49,6 +48,14 @@
           horizAlign="center" vertAlign="center" text="No data in watchList">
           <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="43" />
         </Label>
+      </Group>
+
+      <!-- list-detail/index.tsx inside PageContainer bg-neutral-700 + Spinner -->
+      <Group id="loaderHost" translation="[0, 0]" visible="false">
+        <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
+        <Group id="loaderCenter" translation="[904, 476]">
+          <HomeLoader id="pageLoader" />
+        </Group>
       </Group>
     </Group>
   </children>

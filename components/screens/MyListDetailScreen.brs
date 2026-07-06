@@ -4,7 +4,10 @@ sub init()
     m.vm = FindViewManager(m.top)
     m.bg = m.top.findNode("bg")
     m.contentHost = m.top.findNode("contentHost")
-    m.skeletonHost = m.top.findNode("skeletonHost")
+    m.loaderHost = m.top.findNode("loaderHost")
+    m.loaderPageBg = m.top.findNode("loaderPageBg")
+    m.loaderCenter = m.top.findNode("loaderCenter")
+    m.pageLoader = m.top.findNode("pageLoader")
     m.rowsHost = m.top.findNode("rowsHost")
     m.emptyHost = m.top.findNode("emptyHost")
     m.emptyLabel = m.top.findNode("emptyLabel")
@@ -23,6 +26,8 @@ sub init()
     m.fetchGen = 0
     m.viewportW = 1808
     m.itemsPerRow = 6
+    m.thumbPaintWatch = invalid
+    m.loaderParent = m.contentHost
 
     LoadMyListTokens()
     ApplyStaticColors()
@@ -62,10 +67,16 @@ sub OnBusinessResolved()
     LoadMyListTokens()
     ApplyStaticColors()
     RefreshCardThemes()
+    if BrowsePageLoaderRunning(m) then
+        BrowseApplyPageLoaderColors(m)
+        BrowseApplyLoaderVeil(m, true, m.pageBgRest)
+    end if
 end sub
 
 sub OnDispose()
     if not m.top.dispose then return
+    DetachWatchlistPaintWatch()
+    BrowseDisarmLoaderTimeout(m)
     KillTask(m.folderTask)
     KillTask(m.detailTask)
     m.folderTask = invalid
@@ -87,6 +98,7 @@ end sub
 
 sub ApplyStaticColors()
     if m.bg <> invalid then m.bg.color = m.cPageBg
+    m.pageBgRest = m.cPageBg
     ApplyEmptyLayout()
 end sub
 
@@ -122,6 +134,65 @@ sub ApplyMyListShellLayout()
     m.itemsPerRow = WL_ItemsPerRow(m.viewportW)
     if m.contentHost <> invalid then m.contentHost.translation = [offX, 0]
     ApplyEmptyLayout()
+    ApplyPageLoaderLayout()
+end sub
+
+sub ApplyPageLoaderLayout()
+    if m.loaderHost = invalid then return
+    viewH = WL_ViewHeight()
+    cx = Int(m.viewportW / 2)
+    cy = WL_RowStartY() + Int(viewH / 2)
+    if m.loaderPageBg <> invalid then m.loaderPageBg.width = m.viewportW
+    if m.loaderCenter <> invalid then
+        m.loaderCenter.translation = [cx, cy]
+    else if m.loaderHost <> invalid then
+        m.loaderHost.translation = [0, 0]
+    end if
+end sub
+
+sub ApplyPageLoaderColors()
+    BrowseApplyPageLoaderColors(m)
+end sub
+
+sub ShowLoader(show as boolean)
+    if show then
+        BrowseShowPageLoader(m, m.pageBgRest)
+        if m.rowsHost <> invalid then m.rowsHost.visible = false
+    else
+        BrowseDetachHostPaintWatch(m)
+        BrowseHidePageLoader(m, m.pageBgRest)
+        if m.rowsHost <> invalid and m.rows.Count() > 0 then m.rowsHost.visible = true
+    end if
+end sub
+
+sub OnBrowseLoaderTimeout()
+    if not BrowsePageLoaderRunning(m) then return
+    BrowseDetachHostPaintWatch(m)
+    if m.rowsHost <> invalid and m.rows.Count() > 0 then m.rowsHost.visible = true
+    BrowseHidePageLoader(m, m.pageBgRest)
+end sub
+
+sub DetachWatchlistPaintWatch()
+    BrowseDetachHostPaintWatch(m)
+end sub
+
+sub AttachWatchlistPaintWatch()
+    if m.rowNodes.Count() = 0 then return
+    entry = m.rowNodes[0]
+    if entry = invalid or entry.cards = invalid or entry.cards.Count() = 0 then return
+    card = entry.cards[0]
+    if card = invalid then return
+    thumb = card.findNode("thumb")
+    if thumb = invalid then return
+    if BrowseAttachThumbPaintWatch(m, thumb, "OnWatchlistFirstPainted") then OnWatchlistFirstPainted()
+end sub
+
+sub OnWatchlistFirstPainted()
+    if not BrowsePageLoaderRunning(m) then return
+    if not BrowseThumbPaintComplete(m.thumbPaintWatch) then return
+    BrowseDetachHostPaintWatch(m)
+    if m.rowsHost <> invalid and m.rows.Count() > 0 then m.rowsHost.visible = true
+    BrowseHidePageLoader(m, m.pageBgRest)
 end sub
 
 sub ResetAndFetch()
@@ -145,30 +216,6 @@ sub ResetAndFetch()
     FetchFolders()
 end sub
 
-sub ShowSkeleton(show as boolean)
-    if m.skeletonHost <> invalid then
-        m.skeletonHost.removeChildrenIndex(m.skeletonHost.getChildCount(), 0)
-        if show then BuildSkeletonRow()
-        m.skeletonHost.visible = show
-    end if
-    if m.rowsHost <> invalid and show then m.rowsHost.visible = false
-end sub
-
-sub BuildSkeletonRow()
-    if m.skeletonHost = invalid then return
-    x = 0
-    n = m.itemsPerRow
-    if n < 1 then n = WL_ItemsPerRow(m.viewportW)
-    for i = 0 to n - 1
-        card = m.skeletonHost.createChild("ListDetailCard")
-        card.translation = [x, 0]
-        card.isLoading = true
-        CardInjectTheme(card, m.cPrimary500, m.cPrimary600, m.cPrimary700, m.cNeutral50, m.cNeutral800, m.cNeutral700)
-        card.cPageBg = m.cPageBg
-        x = x + WL_CardPitch()
-    end for
-end sub
-
 sub ShowEmpty(show as boolean)
     if m.emptyHost <> invalid then m.emptyHost.visible = show
     if m.rowsHost <> invalid then
@@ -176,7 +223,7 @@ sub ShowEmpty(show as boolean)
     end if
     if show then
         LoadMyListTokens()
-        ShowSkeleton(false)
+        ShowLoader(false)
         ApplyEmptyLayout()
         if m.emptyHost <> invalid and m.contentHost <> invalid then
             m.contentHost.removeChild(m.emptyHost)
@@ -189,7 +236,7 @@ sub FetchFolders()
     if m.loading then return
     m.loading = true
     m.folderFetchGen = m.fetchGen
-    ShowSkeleton(true)
+    ShowLoader(true)
     KillTask(m.folderTask)
     path = Endpoints().MY_LIST.MY_LIST_LISTING
     m.folderTask = ApiGet(path)
@@ -212,7 +259,7 @@ sub OnFoldersResponse()
         m.loading = false
         m.initialLoad = false
         m.hasMore = false
-        ShowSkeleton(false)
+        ShowLoader(false)
         ShowEmpty(true)
         return
     end if
@@ -245,15 +292,16 @@ sub OnDetailResponse()
     m.detailTask.unobserveField("apiResult")
     api = m.detailTask.apiResult
     m.detailTask = invalid
+    wasInitial = m.initialLoad
     m.loading = false
     m.initialLoad = false
-    ShowSkeleton(false)
 
     items = WL_ParseDetailItems(api)
     count = items.Count()
 
     if count = 0 then
         m.hasMore = false
+        ShowLoader(false)
         if m.rows.Count() = 0 then ShowEmpty(true)
         return
     end if
@@ -263,6 +311,11 @@ sub OnDetailResponse()
     m.rows = SL_AppendRows(m.rows, items, m.itemsPerRow)
     AppendRowNodes(count)
     if m.rowsHost <> invalid then m.rowsHost.visible = true
+    if wasInitial and m.page = 1 then
+        AttachWatchlistPaintWatch()
+    else if BrowsePageLoaderRunning(m) then
+        BrowseHidePageLoader(m, m.pageBgRest)
+    end if
     ApplyFocus()
 end sub
 

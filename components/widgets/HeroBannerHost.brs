@@ -90,6 +90,18 @@ sub SyncToActiveHero()
     SyncHeroTheme()
     SyncHeroFocus()
     SyncHeroViewport()
+    SyncHoldTrailerBoot()
+end sub
+
+sub SyncHoldTrailerBoot()
+    if m.activeHero = invalid then return
+    if m.activeHero.hasField("holdTrailerBoot") then
+        m.activeHero.holdTrailerBoot = m.top.holdTrailerBoot
+    end if
+end sub
+
+sub OnHoldTrailerBootChanged()
+    SyncHoldTrailerBoot()
 end sub
 
 sub SyncHeroTheme()

@@ -11,7 +11,13 @@ sub init()
     m.scrimGradLayoutInterp = m.top.findNode("scrimGradLayoutInterp")
     m.scrimLayoutInterp = m.top.findNode("scrimLayoutInterp")
     m.skeletonLayoutInterp = m.top.findNode("skeletonLayoutInterp")
-    m.homeSkeleton = m.top.findNode("homeSkeleton")
+    m.homeSkeleton = invalid
+    m.homeLoaderHost = m.top.findNode("homeLoaderHost")
+    m.loaderPageBg = m.top.findNode("loaderPageBg")
+    m.loaderCenter = m.top.findNode("loaderCenter")
+    m.homeLoader = m.top.findNode("homeLoader")
+    m.pageLoader = m.homeLoader
+    m.loaderHost = m.homeLoaderHost
     m.rowsScrim = m.top.findNode("rowsScrim")
     m.rowsScrimGrad = m.top.findNode("rowsScrimGrad")
     m.bg = m.top.findNode("bg")
@@ -139,22 +145,22 @@ sub init()
     m.top.appendChild(m.rowPrefetchTimer)
     m.rowPrefetchTimer.observeField("fire", "OnRowPrefetchTimer")
 
-    ' Hero shimmer hides once the hero poster actually paints, with a safety timeout so
-    ' a slow/blocked image can never strand it.
     if m.hero <> invalid then
         m.hero.observeField("posterReady", "OnHeroPosterReady")
         m.hero.observeField("trailerPlaying", "OnHeroTrailerPlayingChanged")
     end if
+
+    ' Safety net: never let the page loader outlive the boot wait.
     m.skeletonTimeout = CreateObject("roSGNode", "Timer")
     m.skeletonTimeout.duration = HC_HomeSkeletonMaxSec()
     m.skeletonTimeout.repeat = false
     m.top.appendChild(m.skeletonTimeout)
-    m.skeletonTimeout.observeField("fire", "OnSkeletonTimeout")
+    m.skeletonTimeout.observeField("fire", "OnHomeLoaderTimeout")
     m.rowsSkeletonTimeout = CreateObject("roSGNode", "Timer")
     m.rowsSkeletonTimeout.duration = HC_RowsSkeletonMaxSecForLayout(m.homeLayout)
     m.rowsSkeletonTimeout.repeat = false
     m.top.appendChild(m.rowsSkeletonTimeout)
-    m.rowsSkeletonTimeout.observeField("fire", "OnRowsSkeletonTimeout")
+    m.rowsSkeletonTimeout.observeField("fire", "OnRowsLoaderTimeout")
     m.firstRowWatch = invalid
     m.rowsForceHideTimer = CreateObject("roSGNode", "Timer")
     m.rowsForceHideTimer.duration = 4.0
@@ -299,6 +305,7 @@ sub LoadThemeTokens()
     tokens = {}
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then tokens = tm.themeTokens
+    m.tokens = tokens
 
     ' Fallbacks mirror the static React dark theme (dark.theme.ts) so colors
     ' match LG even before BE-driven themeTokens resolve.
@@ -316,11 +323,8 @@ sub LoadThemeTokens()
     ApplyHomePageBackground()
 end sub
 
-' Netflix home is always cinematic dark (netflixContent.tsx bg-black). OTT uses neutral-100
-' (content.tsx). API background/neutral tokens are light on some tenants — never use them here.
-
-' Netflix home is always cinematic dark (netflixContent.tsx bg-black). OTT uses neutral-100
-' (content.tsx). API background/neutral tokens are light on some tenants — never use them here.
+' Netflix home uses bg-black once NetflixContent mounts; OTT uses bg-neutral-100.
+' While the page loader runs, match PageContainer bg-neutral-700 (pagecontainer/index.tsx).
 sub ApplyHomePageBackground()
     if m.bg = invalid then return
     layout = m.homeLayout
@@ -332,6 +336,7 @@ sub ApplyHomePageBackground()
         bg = HC_HomeOttPageBg()
     end if
     m.cHomeBg = bg
+    m.pageBgRest = bg
     m.bg.color = bg
 end sub
 
@@ -359,7 +364,7 @@ sub OnBusinessResolved()
     LoadThemeTokens()
     InjectRowTheme()
     ApplyThemeToHero()
-    ApplyHomeSkeletonColors()
+    ApplyHomeLoaderColors()
     if IsHomeForeground() then SetupHeader()
 end sub
 
@@ -419,16 +424,6 @@ sub ApplyLayoutGeometry(animate = false as boolean)
     end if
 
     NormalizeOttRowsHostY()
-    ApplySkeletonLayout()
-end sub
-
-' Drive HomeSkeleton placeholder positions from the active layout case.
-sub ApplySkeletonLayout()
-    if m.homeSkeleton = invalid then return
-    mode = "netflix"
-    if ThemeIsOttHome() then mode = "ott"
-    m.homeSkeleton.layoutMode = mode
-    m.homeSkeleton.anchorY = m.layoutAnchorY
 end sub
 
 ' OTT rows default to y=702 in XML (Netflix anchor); snap to OTT anchor unless scrolled down.
@@ -468,7 +463,14 @@ sub ApplyContentLayout(offX as integer, viewportW as integer)
         curY = m.rowsHost.translation[1]
         m.rowsHost.translation = [offX, curY]
     end if
-    if m.homeSkeleton <> invalid then m.homeSkeleton.translation = [offX, 0]
+    if m.homeLoaderHost <> invalid then ApplyHomeLoaderLayout(offX, viewportW)
+end sub
+
+
+sub ApplyHomeLoaderLayout(offX as integer, viewportW as integer)
+    if m.homeLoaderHost <> invalid then m.homeLoaderHost.translation = [offX, 0]
+    if m.loaderPageBg <> invalid then m.loaderPageBg.width = viewportW
+    if m.loaderCenter <> invalid then m.loaderCenter.translation = [Int(viewportW / 2), 518]
 end sub
 
 
@@ -500,9 +502,9 @@ sub StartLayoutOffsetAnim(targetOffX as integer, targetViewportW as integer)
         fromT = m.rowsScrim.translation
         m.scrimLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
     end if
-    if m.skeletonLayoutInterp <> invalid and m.homeSkeleton <> invalid then
-        fromT = m.homeSkeleton.translation
-        m.skeletonLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
+    if m.loaderLayoutInterp <> invalid and m.homeLoaderHost <> invalid then
+        fromT = m.homeLoaderHost.translation
+        m.loaderLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
     end if
 
     ' Width snaps at end of slide; hero clips continuously via contentWidth.

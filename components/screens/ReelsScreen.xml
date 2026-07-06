@@ -26,6 +26,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/video/VideoService.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowsePageLoader.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/ReelsScreen.brs" />
@@ -59,8 +60,6 @@
         </Label>
         <Group id="pillHost" />
       </Group>
-
-      <Group id="skeletonHost" visible="false" />
 
       <Group id="videoColumn" visible="false">
         <Group id="videoFrame">
@@ -121,6 +120,13 @@
     </Group>
 
     <Timer id="seekPreviewTimer" duration="0.8" repeat="false" />
-    <Timer id="skeletonTimeout" duration="12" repeat="false" />
+
+    <!-- reels/index.tsx bg-neutral-900 + centered Spinner -->
+    <Group id="loaderHost" translation="[0, 0]" visible="false">
+      <Rectangle id="loaderPageBg" width="1920" height="1080" color="0x00000000" visible="false" />
+      <Group id="loaderCenter" translation="[960, 518]">
+        <HomeLoader id="pageLoader" />
+      </Group>
+    </Group>
   </children>
 </component>
