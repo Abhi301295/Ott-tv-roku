@@ -61,6 +61,7 @@ end sub
 sub SyncThemeToActiveHeader()
     if m.activeHeader = invalid then return
     m.activeHeader.cPrimary500 = m.top.cPrimary500
+    if m.activeHeader.hasField("cPrimary700") then m.activeHeader.cPrimary700 = m.top.cPrimary700
     m.activeHeader.cNeutral50 = m.top.cNeutral50
     m.activeHeader.cNeutral200 = m.top.cNeutral200
     m.activeHeader.cNeutral800 = m.top.cNeutral800

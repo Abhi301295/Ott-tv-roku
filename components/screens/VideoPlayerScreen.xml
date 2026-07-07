@@ -56,7 +56,6 @@
           fieldToInterp="loaderSpin.rotation" />
       </Animation>
     </Group>
-
     <!-- Skip Intro pill (bottom-right, above the control bar). -->
     <Group id="skipIntroBtn" translation="[1620, 850]" visible="false">
       <Poster id="skipIntroBg" uri="pkg:/images/ui/video_pill.png" width="220" height="64" />
@@ -69,57 +68,80 @@
       </Label>
     </Group>
 
-    <!-- Binge / Next Episode card (bottom-right). -->
-    <Group id="bingeCard" translation="[1480, 720]" visible="false">
-      <Label id="bingeNextUp" text="Next Up" translation="[0, -40]" width="360" height="32"
-        color="0xf5f5f5ff">
-        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
-      </Label>
-      <Poster id="bingeGlow" uri="pkg:/images/ui/btn_detail_glow.png" translation="[-12, -12]"
-        width="384" height="280" blendColor="0x0b75e0ff" opacity="0.0" visible="false" />
-      <Rectangle id="bingeBg" width="360" height="256" color="0x0a0a0aef" />
-      <Poster id="bingeThumb" translation="[0, 0]" width="360" height="190"
-        loadDisplayMode="scaleToZoom" />
-      <Label id="bingeTitle" translation="[16, 198]" width="328" height="48" wrap="true"
-        maxLines="1" color="0xf5f5f5ff">
-        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="22" />
-      </Label>
-      <Label id="bingeCountdownLabel" translation="[16, 198]" width="328" height="48"
-        horizAlign="right" color="0xadadadff">
-        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
-      </Label>
-    </Group>
-
     <!-- Control bar (bottom). Visible toggles with idle auto-hide. -->
-    <Group id="controlsGroup" visible="false">
-      <Poster id="controlsScrim" uri="pkg:/images/ui/video_scrim.png" translation="[0, 880]"
-        width="1920" height="200" />
+    <Group id="controlsGroup" translation="[10, 1012]" visible="false">
+      <Poster id="controlsScrim" uri="pkg:/images/ui/video_controls_bg.png" translation="[0, 0]"
+        width="1900" height="68" loadDisplayMode="scaleToFill" />
 
       <!-- White (neutral-50) glyphs dimmed via opacity (op-30) and brightened to op-100
            on focus — parity with React. blendColor/opacity are re-applied from theme
            tokens at runtime in ApplyControlColors/ApplyControlFocus. -->
-      <Poster id="btnBack" translation="[60, 980]" width="48" height="48"
+      <Poster id="btnBack" translation="[15, 10]" width="48" height="48"
         uri="pkg:/images/ui/ic_v_back.png" blendColor="0xf5f5f5ff" opacity="0.3" />
-      <Poster id="btnPlay" translation="[128, 980]" width="48" height="48"
+      <Poster id="btnPlay" translation="[73, 10]" width="48" height="48"
         uri="pkg:/images/ui/ic_v_play.png" blendColor="0xf5f5f5ff" opacity="0.3" />
-      <Poster id="btnFwd" translation="[196, 980]" width="48" height="48"
+      <Poster id="btnFwd" translation="[131, 10]" width="48" height="48"
         uri="pkg:/images/ui/ic_v_fwd.png" blendColor="0xf5f5f5ff" opacity="0.3" />
 
-      <Label id="timeLabel" translation="[268, 980]" width="240" height="48" vertAlign="center"
+      <Label id="timeLabel" translation="[189, 10]" width="230" height="48" vertAlign="center"
         text="00:--:--  /  00:--:--" color="0xf5f5f5ff">
-        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
       </Label>
 
       <!-- Scrubber: opaque grey track + primary fill + knob. -->
-      <Group id="scrubber" translation="[520, 1001]">
-        <Rectangle id="scrubTrack" width="1280" height="6" color="0x55555fff" />
+      <Group id="scrubber" translation="[429, 31]">
+        <Rectangle id="scrubTrack" width="1408" height="6" color="0x55555fff" />
         <Rectangle id="scrubFill" width="0" height="6" color="0x0b75e0ff" />
         <Poster id="scrubKnob" translation="[-10, -7]" width="20" height="20"
           uri="pkg:/images/ui/ic_v_knob.png" blendColor="0x0b75e0ff" />
       </Group>
 
-      <Poster id="btnSettings" translation="[1824, 980]" width="48" height="48"
+      <Poster id="btnSettings" translation="[1842, 10]" width="48" height="48"
         uri="pkg:/images/ui/ic_v_settings.png" blendColor="0xf5f5f5ff" opacity="0.3" />
+    </Group>
+
+    <!-- Binge / Next Episode card overlays above the control bar (React z-30 vs controls z-10). -->
+    <Group id="bingeCard" translation="[1554, 800]" visible="false">
+      <Label id="bingeNextUp" text="Next Up" translation="[0, -44]" width="350" height="32"
+        color="0xf5f5f5ff" horizAlign="center">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="20" />
+      </Label>
+      <Poster id="bingeBaseBorder" uri="pkg:/images/ui/binge_card_focus.png" translation="[-1, -1]"
+        width="352" height="194" loadDisplayMode="scaleToFill" blendColor="0xffffff1a" />
+      <FocusFrame id="bingeFocusBorder" translation="[-2, -2]" boxWidth="354" boxHeight="196"
+        color="0x0760bbff" thickness="2" radius="14" visible="false" />
+      <MaskGroup id="bingeMask" maskUri="pkg:/images/ui/binge_card_mask.png" maskSize="[350, 192]">
+        <Rectangle id="bingeBg" width="350" height="192" color="0x000000e6" />
+        <Poster id="bingeThumb" translation="[0, 0]" width="350" height="192"
+          loadDisplayMode="scaleToZoom" />
+        <Rectangle id="bingeBottomBand" translation="[0, 144]" width="350" height="48" color="0x000000cc" />
+      </MaskGroup>
+      <Group id="bingeThumbLoading" translation="[175, 96]" visible="false">
+        <Group id="bingeThumbLoadingSpin" rotation="0">
+          <Poster id="bingeThumbLoadingRing" translation="[-24, -24]" width="48" height="48"
+            uri="pkg:/images/ui/spinner_ring.png" loadDisplayMode="scaleToFit" />
+          <Poster id="bingeThumbLoadingArc" translation="[-24, -24]" width="48" height="48"
+            uri="pkg:/images/ui/spinner_arc.png" blendColor="0xffffffff" loadDisplayMode="scaleToFit" />
+        </Group>
+      </Group>
+      <Group id="bingePlayOverlay" translation="[175, 96]">
+        <Group id="bingePlaySpin" rotation="0">
+          <Poster id="bingePlayRing" translation="[-40, -40]" width="80" height="80"
+            uri="pkg:/images/ui/spinner_ring.png" blendColor="0xffffff12" loadDisplayMode="scaleToFit" />
+          <Poster id="bingePlayArc" translation="[-40, -40]" width="80" height="80"
+            uri="pkg:/images/ui/spinner_arc.png" blendColor="0x0b75e0ff" loadDisplayMode="scaleToFit" />
+        </Group>
+        <Poster id="bingePlayDisc" width="56" height="56"
+          translation="[-28, -28]" uri="pkg:/images/ui/binge_play_disc.png" loadDisplayMode="scaleToFit" />
+      </Group>
+      <Label id="bingeTitle" translation="[16, 156]" width="80" height="24" wrap="false"
+        maxLines="1" color="0xf5f5f5ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="18" />
+      </Label>
+      <Label id="bingeCountdownLabel" translation="[0, 0]" width="1" height="1" visible="false"
+        horizAlign="right" color="0xadadadff">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
     </Group>
 
     <!-- Settings popup (right-side panel, parity with settingPopUp.tsx). -->

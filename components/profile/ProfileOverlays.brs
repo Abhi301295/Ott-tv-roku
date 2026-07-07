@@ -65,9 +65,6 @@ end sub
 
 ' ── OTP (parental lock) ──────────────────────────────────────────────────────
 
-
-' ── OTP (parental lock) ──────────────────────────────────────────────────────
-
 sub OpenOtp()
     m.popup = "otp"
     m.otpPopup.verifying = false
@@ -119,9 +116,6 @@ sub OnVerifyResponse()
         m.otpPopup.resetPin = true
     end if
 end sub
-
-' ── Overlay back-handling (Back closes the open popup) ───────────────────────
-
 
 ' ── Overlay back-handling (Back closes the open popup) ───────────────────────
 

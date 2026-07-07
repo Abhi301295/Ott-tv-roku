@@ -2,6 +2,7 @@
 
 sub init()
     m.bg = m.top.findNode("bg")
+    m.sidebarOccluder = m.top.findNode("sidebarOccluder")
     m.contentHost = m.top.findNode("contentHost")
     m.heroBackdropHost = m.top.findNode("heroBackdropHost")
     m.heroControlsHost = m.top.findNode("heroControlsHost")
@@ -124,7 +125,14 @@ sub ApplyShellLayout()
     vw = ShellContentViewportW(header)
     m.shellOffX = offX
     m.viewportW = vw
-    if m.contentHost <> invalid then m.contentHost.translation = [offX, 0]
+    if m.sidebarOccluder <> invalid then
+        m.sidebarOccluder.width = offX
+        m.sidebarOccluder.visible = offX > 0
+    end if
+    if m.contentHost <> invalid then
+        m.contentHost.translation = [offX, 0]
+        m.contentHost.clippingRect = [0, 0, vw, LT_CanvasH()]
+    end if
     if m.bg <> invalid then
         m.bg.translation = [offX, 0]
         m.bg.width = vw
@@ -864,9 +872,12 @@ sub HandleDown()
         return
     end if
     if m.focusZone = "channel" then
-        m.focusZone = "program"
-        CenterScrollForFocus()
-        RenderAll()
+        if m.channelIndex < m.channels.Count() - 1 then
+            m.channelIndex = m.channelIndex + 1
+            SyncSelectedProgram()
+            CenterScrollForFocus()
+            RenderAll()
+        end if
         return
     end if
     if m.focusZone = "program" then
@@ -899,8 +910,9 @@ sub HandleLeft()
         ch = m.channels[m.channelIndex]
         prog = m.selectedProgram
         if ch = invalid or prog = invalid then return
-        if LT_IsFirstVisibleProgram(ch, prog, m.displayTimelineStart, m.displayTimelineEnd) then
+        if LT_IsFirstVisibleProgramAtScroll(ch, prog, m.displayTimelineStart, m.scrollLeft, LT_PixelsPerMinute()) then
             m.focusZone = "channel"
+            print "[LIVETV_DBG] focus program->channel row="; m.channelIndex; " prog="; m.programIndex
             RenderAll()
             return
         end if
@@ -914,8 +926,14 @@ sub HandleLeft()
         return
     end if
     if m.focusZone = "channel" then
+        if NavLeftOpensSidebarFromContent(true) then
+            print "[LIVETV_DBG] focus channel->sidebar row="; m.channelIndex
+            EnterLiveTvHeader()
+            return
+        end if
         m.scrollLeft = m.scrollLeft - (30 * LT_PixelsPerMinute())
         if m.scrollLeft < 0 then m.scrollLeft = 0
+        print "[LIVETV_DBG] channel scrollLeft="; m.scrollLeft
         RenderAll()
     end if
 end sub

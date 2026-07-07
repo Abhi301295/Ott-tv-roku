@@ -3,9 +3,12 @@
 ' opens the player with the full cross-season binge queue; selecting a trailer plays it alone.
 
 ' ── Geometry ─────────────────────────────────────────────────────────────────
-function SE_SeasonTabWidth() as integer: return 560: end function
-function SE_SeasonTabHeight() as integer: return 64: end function
-function SE_SeasonTabPitch() as integer: return 80: end function
+' seasonTabs.tsx: p-18 + fs-24 row ≈ 60px tall; flex flex-col gap-y-11 → 44px between rows.
+function SE_SeasonTabWidth() as integer: return 550: end function
+function SE_SeasonTabHeight() as integer: return 60: end function
+function SE_SeasonTabGap() as integer: return 44: end function
+function SE_SeasonTabPitch() as integer: return SE_SeasonTabHeight() + SE_SeasonTabGap(): end function
+function SE_SeasonTabLabelY() as integer: return Int((SE_SeasonTabHeight() - 32) / 2.0): end function
 function SE_SeasonBaseY() as integer: return 330: end function
 function SE_SeasonViewHeight() as integer: return 700: end function
 
@@ -61,7 +64,7 @@ sub init()
     m.seasonFocusFullRefresh = true
     m.episodeFocusFullRefresh = true
     m.episodesRevealed = false
-    m.thumbPaintWatch = invalid
+    m.seriesFetchSilent = false
 
     m.vm = FindViewManager(m.top)
     LoadSeriesTokens()
@@ -74,7 +77,40 @@ sub init()
     end if
 
     ShowLoading(true)
+    LayoutSeriesSkeleton()
     BrowseEnsureLoaderTimeout(m)
+end sub
+
+' Place every skeleton block on the same coordinates as the live season/episode UI.
+sub LayoutSeriesSkeleton()
+    SE_LayoutSk("seSkLogo", 60, 64, 280, 48)
+    SE_LayoutSk("seSkTitle", 60, 172, 450, 50)
+    SE_LayoutSk("seSkMeta", 60, 286, 300, 24)
+    for i = 0 to 4
+        SE_LayoutSk("seSkTab" + i.ToStr(), 40, SE_SeasonBaseY() + (i * SE_SeasonTabPitch()), SE_SeasonTabWidth(), SE_SeasonTabHeight())
+    end for
+    SE_LayoutSk("seSkHeading", 700, 120, 200, 36)
+    SE_LayoutSk("seSkSubtitle", 700, 184, 240, 22)
+    hostX = 700
+    for i = 0 to 2
+        rowY = SE_EpBaseY() + (i * SE_CardPitch())
+        pfx = "seSkEp" + i.ToStr()
+        SE_LayoutSk(pfx + "Thumb", hostX + 16, rowY + 10, SE_ThumbW(), SE_ThumbH())
+        SE_LayoutSk(pfx + "Title", hostX + 360, rowY + 14, 400, 32)
+        SE_LayoutSk(pfx + "Desc1", hostX + 360, rowY + 62, 560, 22)
+        SE_LayoutSk(pfx + "Desc2", hostX + 360, rowY + 90, 420, 22)
+        SE_LayoutSk(pfx + "Meta", hostX + 360, rowY + 140, 280, 20)
+    end for
+end sub
+
+sub SE_LayoutSk(id as string, x as integer, y as integer, w as integer, h as integer)
+    node = m.top.findNode(id)
+    if node = invalid then return
+    node.translation = [x, y]
+    node.boxWidth = w
+    node.boxHeight = h
+    uri = SeriesEpisodesSkShapeUri(id, w, h)
+    if uri <> "" and node.hasField("shapeUri") then node.shapeUri = uri
 end sub
 
 sub OnNavStateReady()
@@ -83,7 +119,18 @@ sub OnNavStateReady()
     if state.id <> invalid then m.contentId = state.id
     if state.type <> invalid then m.contentType = state.type
     if m.contentId = "" then return
-    FetchSeries()
+    FetchSeries(false)
+end sub
+
+' ViewManager sets stackResumed when VideoPlayer is popped — refetch CW in the background
+' so episode progress bars reflect the latest watch position (parity DetailScreen).
+sub OnStackResumed()
+    if m.top.stackResumed <> true then return
+    m.top.stackResumed = false
+    if m.top.dispose = true then return
+    if m.contentId = "" then return
+    if m.loading then return
+    FetchSeries(true)
 end sub
 
 sub OnDispose()
@@ -193,6 +240,7 @@ end sub
 
 sub ShowSeriesSkeleton(show as boolean)
     if m.seriesSkeletonHost = invalid then return
+    if show then LayoutSeriesSkeleton()
     m.seriesSkeletonHost.visible = show
     CardApplyHomeCardSkeletonTree(m.seriesSkeletonHost, show)
 end sub
@@ -277,8 +325,11 @@ end sub
 
 ' ── Fetch ────────────────────────────────────────────────────────────────────
 
-sub FetchSeries()
-    ShowLoading(true)
+sub FetchSeries(silent as boolean)
+    KillSeriesTask(m.seriesTask)
+    m.seriesTask = invalid
+    m.seriesFetchSilent = silent
+    if not silent then ShowLoading(true)
     tp = m.contentType
     if tp = "" then tp = "SERIES_AND_EPISODES"
     path = DetailContentPath(m.contentId, tp)
@@ -293,8 +344,11 @@ sub OnSeriesResponse()
     m.seriesTask.unobserveField("apiResult")
     api = m.seriesTask.apiResult
     m.seriesTask = invalid
+    silent = m.seriesFetchSilent = true
+    m.seriesFetchSilent = false
 
     if api = invalid or api.statusCode = invalid or api.statusCode <> 200 or api.result = invalid then
+        if silent then return
         ShowAlert(m.top, 2, CopyDetailLoadFailed())
         ShowLoading(false)
         m.loading = false
@@ -302,6 +356,12 @@ sub OnSeriesResponse()
     end if
 
     data = api.result
+    if silent then
+        if data.continueWatching <> invalid then m.continueWatching = data.continueWatching
+        RefreshEpisodeProgressBars()
+        return
+    end if
+
     if data.seasons <> invalid then m.seasons = data.seasons
     if data.continueWatching <> invalid then m.continueWatching = data.continueWatching
     if data.genres <> invalid then m.genres = data.genres
@@ -462,7 +522,7 @@ sub RebuildSeasonTabs()
         ' 24px padding each side; the right column is sized to fit "NN episodes" without
         ' truncation (parity with the justify-between season button).
         leftLabel = node.createChild("Label")
-        leftLabel.translation = [24, 16]
+        leftLabel.translation = [24, SE_SeasonTabLabelY()]
         leftLabel.width = 250
         leftLabel.height = 32
         leftLabel.maxLines = 1
@@ -471,7 +531,7 @@ sub RebuildSeasonTabs()
         font.size = 24
 
         rightLabel = node.createChild("Label")
-        rightLabel.translation = [284, 16]
+        rightLabel.translation = [284, SE_SeasonTabLabelY()]
         rightLabel.width = SE_SeasonTabWidth() - 24 - 284
         rightLabel.height = 32
         rightLabel.horizAlign = "right"
@@ -600,21 +660,7 @@ sub RebuildEpisodeCards()
         ' Progress bar (parity with the EpisodeCard progress overlay).
         pct = 0.0
         if not m.isTrailerActive then pct = SE_EpisodeProgress(m.continueWatching, m.activeSeason, ep)
-        if pct > 0 then
-            track = card.createChild("Rectangle")
-            track.translation = [16, 182]
-            track.width = SE_ThumbW()
-            track.height = 6
-            track.color = m.cNeutral700
-            fill = card.createChild("Rectangle")
-            fill.translation = [16, 182]
-            fw = Int(SE_ThumbW() * pct / 100)
-            if fw < 2 then fw = 2
-            if fw > SE_ThumbW() then fw = SE_ThumbW()
-            fill.width = fw
-            fill.height = 6
-            fill.color = m.cPrimary500
-        end if
+        SE_ApplyEpisodeCardProgress(card, pct)
 
         titleLabel = card.createChild("Label")
         titleLabel.translation = [360, 14]
@@ -666,6 +712,49 @@ sub RebuildEpisodeCards()
     if m.episodeIndex >= m.epCards.Count() then m.episodeIndex = 0
     m.episodeFocusFullRefresh = true
     m.prevEpisodeFocusIndex = -1
+end sub
+
+' Repaint CW progress bars on existing cards after a silent stack resume (no full rebuild).
+sub RefreshEpisodeProgressBars()
+    if m.isTrailerActive then return
+    if m.epCards = invalid or m.episodes = invalid then return
+    for i = 0 to m.epCards.Count() - 1
+        if i >= m.episodes.Count() then exit for
+        card = m.epCards[i]
+        ep = m.episodes[i]
+        if card = invalid or ep = invalid then continue for
+        pct = SE_EpisodeProgress(m.continueWatching, m.activeSeason, ep)
+        SE_ApplyEpisodeCardProgress(card, pct)
+    end for
+end sub
+
+sub SE_ClearCardProgress(card as object)
+    if card = invalid then return
+    for i = card.getChildCount() - 1 to 0 step -1
+        ch = card.getChild(i)
+        if ch = invalid or ch.subtype() <> "Rectangle" then continue for
+        tr = ch.translation
+        if tr <> invalid and tr[0] = 16 and tr[1] = 182 then card.removeChild(ch)
+    end for
+end sub
+
+sub SE_ApplyEpisodeCardProgress(card as object, pct as float)
+    if card = invalid then return
+    SE_ClearCardProgress(card)
+    if pct <= 0 then return
+    track = card.createChild("Rectangle")
+    track.translation = [16, 182]
+    track.width = SE_ThumbW()
+    track.height = 6
+    track.color = m.cNeutral700
+    fill = card.createChild("Rectangle")
+    fill.translation = [16, 182]
+    fw = Int(SE_ThumbW() * pct / 100.0)
+    if fw < 2 then fw = 2
+    if fw > SE_ThumbW() then fw = SE_ThumbW()
+    fill.width = fw
+    fill.height = 6
+    fill.color = m.cPrimary500
 end sub
 
 sub ApplyEpisodeFocus()

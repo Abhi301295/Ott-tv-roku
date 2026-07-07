@@ -48,6 +48,12 @@
   <children>
     <Rectangle id="bg" width="1920" height="1080" />
     <Poster id="bgImage" width="1920" height="1080" loadDisplayMode="scaleToFill" opacity="1.0" />
+    <!-- profile.tsx always-on: smooth bottom vignette (no hard horizontal band). -->
+    <Poster id="bgBottomVignette" width="1920" height="1080"
+      uri="pkg:/images/ui/profile_bg_bottom_vignette.png" loadDisplayMode="scaleToFill" opacity="1.0" />
+    <!-- profile.tsx focusedProfile: left-to-right scrim over poster bg only. -->
+    <Poster id="bgFocusScrim" width="1920" height="1080"
+      uri="pkg:/images/ui/profile_focus_bg_gradient.png" loadDisplayMode="scaleToFill" opacity="0.0" />
 
     <!-- Profile list layer (behind header chrome — scroll must never paint over the title). -->
     <Group id="skeletonGroup" translation="[64, 265]" visible="false">

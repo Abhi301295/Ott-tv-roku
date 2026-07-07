@@ -125,20 +125,15 @@ sub ApplyProfileSkeletonLayout()
             boxA.glowVisible = true
         end if
         if boxB <> invalid then
-            if square then
-                boxB.visible = false
-                boxB.running = false
-                boxB.glowVisible = false
-            else
-                boxB.visible = true
-                boxB.translation = [nameX, slot.y + nameY]
-                boxB.layoutScale = 1.0
-                boxB.glowKind = "pill"
-                boxB.boxWidth = s.skNameWidth
-                boxB.boxHeight = s.skNameHeight
-                boxB.shapeUri = pillShape
-                boxB.glowVisible = true
-            end if
+            ' profile.tsx / userProfile.tsx loading: 190x22 name pill beside avatar (ml-20).
+            boxB.visible = true
+            boxB.translation = [nameX, slot.y + nameY]
+            boxB.layoutScale = 1.0
+            boxB.glowKind = "pill"
+            boxB.boxWidth = s.skNameWidth
+            boxB.boxHeight = s.skNameHeight
+            boxB.shapeUri = pillShape
+            boxB.glowVisible = true
         end if
     end for
 end sub
@@ -192,7 +187,13 @@ sub ApplyProfileColors()
     ' Profile name inherits body/title light text (React: same tone as text-neutral-50 h1).
     for each av in m.avatars
         if av <> invalid then
-            if av.hasField("nameColor") then av.nameColor = m.cNeutral50
+            if av.hasField("nameColor") then
+                if av.hasField("cardTopColor") then
+                    av.nameColor = m.cNeutral400
+                else
+                    av.nameColor = m.cNeutral50
+                end if
+            end if
             if av.hasField("hintColor") then av.hintColor = m.cNeutral400
             if av.hasField("skBaseColor") then av.skBaseColor = skColors.base
             if av.hasField("skHighlightColor") then av.skHighlightColor = skColors.highlight
@@ -210,7 +211,6 @@ sub ApplySquareAvatarColors()
         av.cardBottomColor = m.cNeutral800
         av.cardBackingColor = m.cBg
         av.borderColor = m.cPrimary700
-        av.nameColor = m.cNeutral50
         av.hintColor = m.cNeutral400
         if av.hasField("skBaseColor") then av.skBaseColor = skColors.base
         if av.hasField("skHighlightColor") then av.skHighlightColor = skColors.highlight
@@ -279,13 +279,18 @@ end sub
 ' React profile.tsx: loginBackgroundImage while a profile is focused; focusedProfile
 ' persists when the logout button is focused so the backdrop does not snap to black.
 sub ApplyProfileFocusBackground()
-    if m.bgImage = invalid then return
     showImage = false
     if m.profilesLoaded = true and m.avatars <> invalid and m.avatars.Count() > 0 then
         if m.focusArea = "profiles" or m.focusArea = "logout" then showImage = true
     end if
-    m.bgImage.opacity = 0.0
-    if showImage then m.bgImage.opacity = 1.0
+    if m.bgImage <> invalid then
+        m.bgImage.opacity = 0.0
+        if showImage then m.bgImage.opacity = 1.0
+    end if
+    if m.bgFocusScrim <> invalid then
+        m.bgFocusScrim.opacity = 0.0
+        if showImage then m.bgFocusScrim.opacity = 1.0
+    end if
 end sub
 
 ' ── Loading / shimmer ──────────────────────────────────────────────────────────

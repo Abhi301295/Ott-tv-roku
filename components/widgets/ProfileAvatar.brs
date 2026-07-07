@@ -53,6 +53,14 @@ end sub
 
 sub OnSelectingChanged()
     show = (m.top.selectingState = true)
+    if m.nameLabel <> invalid then m.nameLabel.visible = (not show and m.top.focusedState = true)
+    if m.hintLabel <> invalid then
+        if show then
+            m.hintLabel.visible = false
+        else
+            m.hintLabel.visible = (m.top.focusedState = true and m.top.hintText <> "")
+        end if
+    end if
     if m.selectingGroup <> invalid then
         m.selectingGroup.visible = show
         if show then
@@ -189,7 +197,7 @@ sub OnHintChanged()
     if m.hintLabel = invalid then return
     txt = m.top.hintText
     m.hintLabel.text = txt
-    m.hintLabel.visible = (m.top.focusedState = true and txt <> "")
+    m.hintLabel.visible = (m.top.selectingState <> true and m.top.focusedState = true and txt <> "")
 end sub
 
 sub OnFocusChanged()
@@ -227,8 +235,15 @@ sub ApplyFocusChrome()
     if m.editIcon <> invalid then m.editIcon.visible = (showBadge and not locked)
     if m.leftLockIcon <> invalid then m.leftLockIcon.visible = (showBadge and locked)
     m.lockBadge.visible = false
-    m.nameLabel.visible = false
-    m.hintLabel.visible = false
+    if focused then
+        m.nameLabel.visible = true
+        if m.hintLabel <> invalid then
+            m.hintLabel.visible = (m.top.hintText <> "")
+        end if
+    else
+        m.nameLabel.visible = false
+        if m.hintLabel <> invalid then m.hintLabel.visible = false
+    end if
 end sub
 
 ' Focus in: ~300ms ease-out (React duration-300). Focus out: shorter ease on the row

@@ -6,6 +6,7 @@
     <field id="navState" type="assocarray" onChange="OnNavStateReady" />
     <field id="stackResumed" type="boolean" value="false" alwaysNotify="true" onChange="OnStackResumed" />
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="shellHeaderNavTick" type="integer" value="0" alwaysNotify="true" onChange="OnShellHeaderNavTick" />
     <field id="shellEnterContent" type="boolean" value="false" alwaysNotify="true" onChange="OnShellEnterContent" />
     <field id="shellEnterAction" type="string" value="" />
     <!-- Set by ViewManager right before this screen is removed, so we can stop the hero

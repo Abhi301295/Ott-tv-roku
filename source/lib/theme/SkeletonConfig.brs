@@ -147,3 +147,19 @@ end function
 function SkeletonProfileNameShapeUri() as string
     return "pkg:/images/ui/sk_pill_190x22.png"
 end function
+
+' seriesEpisode.tsx loading pulse blocks — rounded masks (parity DetailScreen sk_detail_*).
+function SeriesEpisodesSkShapeUri(id as string, w as integer, h as integer) as string
+    if id = "seSkLogo" then return "pkg:/images/ui/sk_series_block_280x48.png"
+    if id = "seSkTitle" then return "pkg:/images/ui/sk_series_block_450x50.png"
+    if id = "seSkMeta" then return "pkg:/images/ui/sk_detail_line_300x24.png"
+    if Left(id, 7) = "seSkTab" then return "pkg:/images/ui/sk_series_block_" + w.ToStr() + "x" + h.ToStr() + ".png"
+    if id = "seSkHeading" then return "pkg:/images/ui/sk_detail_line_200x36.png"
+    if id = "seSkSubtitle" then return "pkg:/images/ui/sk_detail_line_240x22.png"
+    if Right(id, 5) = "Thumb" then return "pkg:/images/ui/sk_episode_thumb.png"
+    if Right(id, 5) = "Title" then return "pkg:/images/ui/sk_detail_line_400x32.png"
+    if Right(id, 5) = "Desc1" then return "pkg:/images/ui/sk_detail_line_560x22.png"
+    if Right(id, 5) = "Desc2" then return "pkg:/images/ui/sk_detail_line_420x22.png"
+    if Right(id, 4) = "Meta" then return "pkg:/images/ui/sk_detail_line_280x20.png"
+    return ""
+end function

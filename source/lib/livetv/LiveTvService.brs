@@ -209,6 +209,24 @@ function LT_IsFirstVisibleProgram(channel as object, prog as object, timelineSta
     return first.startTime = prog.startTime and first.endTime = prog.endTime
 end function
 
+function LT_IsFirstVisibleProgramAtScroll(channel as object, prog as object, timelineStart as longinteger, scrollLeft as integer, ppm as integer) as boolean
+    if channel = invalid or prog = invalid then return false
+    if ppm <= 0 then return false
+    if channel.programs = invalid then return false
+    firstVisible = invalid
+    for each p in channel.programs
+        if p = invalid then continue for
+        right = Int(((p.endTime - timelineStart) / (60& * 1000&)) * ppm)
+        if right > scrollLeft then
+            firstVisible = p
+            exit for
+        end if
+    end for
+    if firstVisible = invalid then return false
+    if firstVisible.id <> invalid and prog.id <> invalid then return firstVisible.id = prog.id
+    return firstVisible.startTime = prog.startTime and firstVisible.endTime = prog.endTime
+end function
+
 function LT_FindProgramLeftNeighbor(channel as object, current as object) as integer
     if channel = invalid or channel.programs = invalid or current = invalid then return -1
     progs = channel.programs
