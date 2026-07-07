@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "images" / "ui"
@@ -82,10 +82,16 @@ def padded_viewbox(vb: str, ratio: float = 0.18) -> str:
     return f"{x - pad} {y - pad} {w + pad * 2} {h + pad * 2}"
 
 
-def svg_for_render(svg: str, fill: str) -> str:
+def icon_viewbox(name: str, vb: str) -> str:
+    if name == "live_tv":
+        return "-1 -1 26 24"
+    return padded_viewbox(vb)
+
+
+def svg_for_render(name: str, svg: str, fill: str) -> str:
     inner = normalize_svg(svg, fill)
     vb = re.search(r'viewBox="([^"]+)"', inner)
-    view_box = padded_viewbox(vb.group(1)) if vb else "0 0 24 24"
+    view_box = icon_viewbox(name, vb.group(1)) if vb else "0 0 24 24"
     path_body = inner[inner.find(">") + 1 : inner.rfind("</svg>")]
     return (
         f'<svg viewBox="{view_box}" width="{RENDER_SIZE}" height="{RENDER_SIZE}" '
@@ -167,11 +173,78 @@ def fit_square(img: Image.Image, size: int, pad_ratio: float = 0.08, binarize_wh
     return out
 
 
+def icon_pad_ratio(name: str) -> float:
+    if name == "live_tv":
+        return 0.14
+    if name == "tv":
+        return 0.04
+    return 0.08
+
+
+def build_live_tv_icon(size: int, rgba: tuple[int, int, int, int]) -> Image.Image:
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    left = 10
+    right = 86
+    top = 22
+    bottom = 73
+    stroke = 4
+
+    # TV frame
+    draw.line((left, top, right, top), fill=rgba, width=stroke)
+    draw.line((left, top, left, bottom), fill=rgba, width=stroke)
+    draw.line((right, top, right, bottom), fill=rgba, width=stroke)
+    draw.line((left, bottom, right, bottom), fill=rgba, width=stroke)
+
+    # Antenna
+    cx = size // 2
+    draw.line((cx - 10, 12, cx, 21), fill=rgba, width=stroke)
+    draw.line((cx + 10, 12, cx, 21), fill=rgba, width=stroke)
+
+    # Inner bars
+    draw.rectangle((28, 35, 33, 64), fill=rgba)
+    draw.rectangle((45, 45, 50, 64), fill=rgba)
+    draw.rectangle((62, 35, 67, 64), fill=rgba)
+    return img
+
+
+def reinforce_live_tv_baseline(img: Image.Image) -> Image.Image:
+    bbox = img.getbbox()
+    if bbox is None:
+        return img
+    left, top, right, bottom = bbox
+    y = bottom - 1
+    if y < top:
+        return img
+    color = img.getpixel((left, top))
+    draw = ImageDraw.Draw(img)
+    draw.line((left + 2, y, right - 3, y), fill=color, width=2)
+    return img
+
+
 def render_icon(name: str, svg: str, fill: str, suffix: str, html_path: Path, shot_path: Path) -> None:
-    inner = svg_for_render(svg, fill)
+    if name == "live_tv":
+        rgba = build_live_tv_icon(
+            SIZE,
+            (143, 143, 143, 255) if suffix == "" else (255, 255, 255, 255),
+        )
+        OUT.mkdir(parents=True, exist_ok=True)
+        out_name = f"menu_{name}.png" if suffix == "" else f"menu_{name}_active.png"
+        rgba.save(OUT / out_name)
+        return
+
+    inner = svg_for_render(name, svg, fill)
     raw = chrome_shot(html_wrap(inner), shot_path, html_path)
     mode = "idle" if suffix == "" else "active"
-    rgba = fit_square(rgb_to_rgba(raw, mode), SIZE, binarize_white=(mode == "active"))
+    rgba = fit_square(
+        rgb_to_rgba(raw, mode),
+        SIZE,
+        pad_ratio=icon_pad_ratio(name),
+        binarize_white=(mode == "active"),
+    )
+    if name == "live_tv":
+        rgba = reinforce_live_tv_baseline(rgba)
     OUT.mkdir(parents=True, exist_ok=True)
     out_name = f"menu_{name}.png" if suffix == "" else f"menu_{name}_active.png"
     rgba.save(OUT / out_name)

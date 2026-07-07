@@ -16,7 +16,9 @@
     <field id="cardBottomColor" type="string" value="0x121212ff" onChange="OnColorsChanged" />
     <field id="cardBackingColor" type="string" value="0x141414ff" onChange="OnColorsChanged" />
     <field id="borderColor" type="string" value="0x04478bff" onChange="OnColorsChanged" />
+    <field id="progressColor" type="string" value="0x04478bff" onChange="OnColorsChanged" />
     <field id="nameColor" type="string" value="0xf8f8f8ff" onChange="OnColorsChanged" />
+    <field id="hintBold" type="boolean" value="false" onChange="OnHintChanged" />
     <field id="hintColor" type="string" value="0xc8c8c8ff" onChange="OnColorsChanged" />
     <field id="rowIndex" type="integer" value="0" />
     <field id="layoutHeight" type="integer" value="0" alwaysNotify="true" />
@@ -59,7 +61,7 @@
         <Poster id="progressTrack" width="150" height="150"
           uri="pkg:/images/ui/profile_sq_track.png" visible="false" />
         <Poster id="progressArc" width="150" height="150"
-          uri="pkg:/images/ui/profile_sq_arc_000.png" visible="false" />
+          uri="pkg:/images/ui/profile_sq_arc_000.png" blendColor="0xffffffff" visible="false" />
       </Group>
 
       <!-- userProfile.tsx loading branch — skeleton inside the focused scale wrapper. -->
@@ -68,13 +70,13 @@
       </Group>
     </Group>
 
-    <Label id="nameLabel" translation="[0, 170]" width="320" height="20"
-      horizAlign="left" vertAlign="top" color="0xffffffff">
-      <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="16" />
+    <Label id="nameLabel" translation="[0, 170]" width="150" height="24"
+      horizAlign="center" vertAlign="top" color="0xffffffff">
+      <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="18" />
     </Label>
-    <Label id="hintLabel" translation="[0, 190]" width="1760" height="14"
+    <Label id="hintLabel" translation="[0, 196]" width="150" height="24"
       horizAlign="center" vertAlign="top" color="0xc8c8c8ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="12" />
+      <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="18" />
     </Label>
 
     <Timer id="sizeAnimTimer" duration="0.012" repeat="true" />

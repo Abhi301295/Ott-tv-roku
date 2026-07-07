@@ -25,9 +25,18 @@ sub init()
     m.skipIntroRing = m.top.findNode("skipIntroRing")
     m.bingeCard = m.top.findNode("bingeCard")
     m.bingeThumb = m.top.findNode("bingeThumb")
+    m.bingeBaseBorder = m.top.findNode("bingeBaseBorder")
+    m.bingeFocusBorder = m.top.findNode("bingeFocusBorder")
     m.bingeTitle = m.top.findNode("bingeTitle")
     m.bingeCountdownLabel = m.top.findNode("bingeCountdownLabel")
     m.bingeGlow = m.top.findNode("bingeGlow")
+    m.bingeThumbLoading = m.top.findNode("bingeThumbLoading")
+    m.bingeThumbLoadingSpin = m.top.findNode("bingeThumbLoadingSpin")
+    m.bingePlayOverlay = m.top.findNode("bingePlayOverlay")
+    m.bingePlaySpin = m.top.findNode("bingePlaySpin")
+    m.bingePlayRing = m.top.findNode("bingePlayRing")
+    m.bingePlayArc = m.top.findNode("bingePlayArc")
+    m.bingePlayDisc = m.top.findNode("bingePlayDisc")
     m.settingsOverlay = m.top.findNode("settingsOverlay")
     m.settingsPanel = m.top.findNode("settingsPanel")
     m.settingsTitle = m.top.findNode("settingsTitle")
@@ -71,6 +80,9 @@ sub init()
     m.skipVisible = false
     m.bingeVisible = false
     m.settingsOpen = false
+    m.BINGE_SPIN_PERIOD_MS = 1600
+    m.bingeSpinClock = CreateObject("roTimespan")
+    m.bingeSpinBaseMs = 0
 
     m.capOptions = []             ' [{ label, lang }] — off + each subtitle lang
     m.selectedSubtitle = "off"
@@ -112,12 +124,19 @@ sub init()
     m.top.appendChild(m.progressTimer)
     m.progressTimer.observeField("fire", "OnProgressTimer")
 
+    m.bingeSpinTimer = CreateObject("roSGNode", "Timer")
+    m.bingeSpinTimer.duration = 0.032
+    m.bingeSpinTimer.repeat = true
+    m.top.appendChild(m.bingeSpinTimer)
+    m.bingeSpinTimer.observeField("fire", "OnBingeSpinTick")
+
     if m.videoNode <> invalid then
         m.videoNode.notificationInterval = 0.5
         m.videoNode.observeField("state", "OnVideoState")
         m.videoNode.observeField("position", "OnVideoPosition")
         m.videoNode.observeField("duration", "OnVideoDuration")
     end if
+    if m.bingeThumb <> invalid then m.bingeThumb.observeField("loadStatus", "OnBingeThumbLoadStatus")
 
     m.top.observeField("keyEvent", "OnKey")
     if m.vm <> invalid then m.vm.observeField("overlayDismiss", "OnOverlayDismiss")
@@ -166,6 +185,7 @@ sub LoadVideoTokens()
     tm = m.top.getScene().findNode("themeManager")
     if tm <> invalid and tm.themeTokens <> invalid then m.tokens = tm.themeTokens
     m.cPrimary500 = ThemeTokenColor(m.tokens, "primary-500", "#0b75e0")
+    m.cPrimary600 = ThemeTokenColor(m.tokens, "primary-600", "#0760bb")
     m.cPrimary700 = ThemeTokenColor(m.tokens, "primary-700", "#04478b")
     m.cNeutral50 = ThemeTokenColor(m.tokens, "neutral-50", "#f5f5f5")
     m.cNeutral300 = ThemeTokenColor(m.tokens, "neutral-300", "#adadad")
@@ -193,7 +213,9 @@ end sub
 sub ApplyControlColors()
     if m.scrubFill <> invalid then m.scrubFill.color = m.cPrimary500
     if m.scrubKnob <> invalid then m.scrubKnob.blendColor = m.cPrimary500
-    if m.bingeGlow <> invalid then m.bingeGlow.blendColor = m.cPrimary500
+    if m.bingeBaseBorder <> invalid then m.bingeBaseBorder.blendColor = "0xffffff1a"
+    if m.bingeFocusBorder <> invalid then m.bingeFocusBorder.color = m.cPrimary600
+    if m.bingePlayArc <> invalid then m.bingePlayArc.blendColor = m.cPrimary600
     if m.loaderArc <> invalid then m.loaderArc.blendColor = m.cPrimary500
     if m.timeLabel <> invalid then m.timeLabel.color = m.cNeutral50
     ' Settings surface matches React's rendered bg-neutral-950; title uses API neutral-50.
@@ -286,9 +308,10 @@ sub LoadAndPlayLive()
 end sub
 
 sub ApplyLiveControlLayout()
-    if m.scrubber <> invalid then m.scrubber.visible = false
-    if m.timeLabel <> invalid then m.timeLabel.text = "LIVE"
-    if m.btnFwd <> invalid then m.btnFwd.opacity = 0.15
+    if m.scrubber <> invalid then m.scrubber.visible = true
+    if m.scrubFill <> invalid then m.scrubFill.width = 0
+    if m.scrubKnob <> invalid then m.scrubKnob.translation = [-10, -7]
+    if m.timeLabel <> invalid then m.timeLabel.text = "00:--:--  /  00:--:--"
     m.skipVisible = false
     m.bingeVisible = false
     if m.skipIntroBtn <> invalid then m.skipIntroBtn.visible = false
@@ -525,7 +548,13 @@ end sub
 
 sub UpdateScrubber()
     if m.isLive then
-        if m.timeLabel <> invalid then m.timeLabel.text = "LIVE"
+        if m.timeLabel <> invalid then
+            if m.position > 0 then
+                m.timeLabel.text = VideoFormatTime(m.position) + "  /  00:--:--"
+            else
+                m.timeLabel.text = "00:--:--  /  00:--:--"
+            end if
+        end if
         return
     end if
     if m.duration <= 0 then return
@@ -658,19 +687,12 @@ sub EvaluateBinge()
 
     if show then
         remaining = m.duration - m.position
-        cd = VP_BingeCountdownSeconds(m.duration, m.position)
         if not m.bingeVisible then
             m.bingeVisible = true
             BuildBingeCard()
             if m.bingeCard <> invalid then m.bingeCard.visible = true
             m.focusMode = "binge"
-            if m.bingeGlow <> invalid then
-                m.bingeGlow.visible = true
-                m.bingeGlow.opacity = 0.6
-            end if
-        end if
-        if m.bingeCountdownLabel <> invalid then
-            m.bingeCountdownLabel.text = "Starts in " + cd.ToStr() + "s"
+            ApplyBingeFocus()
         end if
         ' Auto-advance when the countdown elapses (parity with the countdown effect).
         if VP_BingeShouldAdvance(remaining) then PlayNext()
@@ -678,7 +700,7 @@ sub EvaluateBinge()
         if m.bingeVisible then
             m.bingeVisible = false
             if m.bingeCard <> invalid then m.bingeCard.visible = false
-            if m.bingeGlow <> invalid then m.bingeGlow.visible = false
+            StopBingeSpin()
             if m.focusMode = "binge" then RestoreControlsFocus()
         end if
     end if
@@ -686,19 +708,86 @@ end sub
 
 sub BuildBingeCard()
     if m.nextItem = invalid then return
-    title = ""
-    if m.nextItem.title <> invalid then title = m.nextItem.title
+    title = BingeEpisodeLabel(m.nextItem)
     if m.bingeTitle <> invalid then m.bingeTitle.text = title
     uri = ""
     if m.nextItem.thumbnails <> invalid then
         uri = GetCardImgByType(HC_CardTypeHorizontal(), m.nextItem.thumbnails)
     end if
-    if m.bingeThumb <> invalid then m.bingeThumb.uri = uri
+    if m.bingeThumbLoading <> invalid then m.bingeThumbLoading.visible = (uri <> "")
+    if m.bingeThumb <> invalid then
+        m.bingeThumb.uri = uri
+        if uri = "" then m.bingeThumbLoading.visible = false
+    end if
+    StartBingeSpin()
+end sub
+
+sub StartBingeSpin()
+    if m.bingeSpinClock = invalid then m.bingeSpinClock = CreateObject("roTimespan")
+    if m.bingeSpinBaseMs = 0 then
+        m.bingeSpinClock.Mark()
+        m.bingeSpinBaseMs = m.bingeSpinClock.TotalMilliseconds()
+    end if
+    if m.bingeSpinTimer <> invalid then
+        m.bingeSpinTimer.control = "stop"
+        m.bingeSpinTimer.control = "start"
+    end if
+    OnBingeSpinTick()
+end sub
+
+sub StopBingeSpin()
+    if m.bingeSpinTimer <> invalid then m.bingeSpinTimer.control = "stop"
+    m.bingeSpinBaseMs = 0
+end sub
+
+sub OnBingeSpinTick()
+    if m.bingeSpinClock = invalid then return
+    elapsed = m.bingeSpinClock.TotalMilliseconds() - m.bingeSpinBaseMs
+    if elapsed < 0 then elapsed = 0
+    period = m.BINGE_SPIN_PERIOD_MS
+    if period <= 0 then period = 1600
+    rot = (elapsed mod period) / period * 6.2831853
+    if m.bingePlaySpin <> invalid then m.bingePlaySpin.rotation = rot
+    if m.bingeThumbLoadingSpin <> invalid then m.bingeThumbLoadingSpin.rotation = rot
+end sub
+
+function BingeEpisodeLabel(item as object) as string
+    if item = invalid then return ""
+    if item.contentType <> invalid and item.contentType.name <> invalid and item.contentType.name = "MOVIE" then return ""
+    if item.episode <> invalid then
+        ep = Str(item.episode).Trim()
+        if ep <> "" then return "E" + ep
+    end if
+    return ""
+end function
+
+sub OnBingeThumbLoadStatus()
+    if m.bingeThumb = invalid then return
+    status = m.bingeThumb.loadStatus
+    if status = "ready" or status = "failed" then
+        if m.bingeThumbLoading <> invalid then m.bingeThumbLoading.visible = false
+    end if
+end sub
+
+sub ApplyBingeFocus()
+    focused = (m.focusMode = "binge" and m.bingeVisible)
+    if m.bingeFocusBorder <> invalid then
+        m.bingeFocusBorder.visible = focused
+        if focused then m.bingeFocusBorder.color = m.cPrimary600
+    end if
+    if m.bingeCard <> invalid then
+        if focused then
+            m.bingeCard.scale = [1.05, 1.05]
+        else
+            m.bingeCard.scale = [1.0, 1.0]
+        end if
+    end if
 end sub
 
 sub RestoreControlsFocus()
     m.focusMode = "controls"
     ApplySkipFocus()
+    ApplyBingeFocus()
     if not m.controlsVisible then ShowControls(true)
     ApplyControlFocus()
 end sub
@@ -715,7 +804,6 @@ sub PlayNext()
     ' Reset binge/skip UI before swapping streams.
     m.bingeVisible = false
     if m.bingeCard <> invalid then m.bingeCard.visible = false
-    if m.bingeGlow <> invalid then m.bingeGlow.visible = false
     m.skipVisible = false
     if m.skipIntroBtn <> invalid then m.skipIntroBtn.visible = false
 
@@ -807,7 +895,11 @@ sub HandleControlsKey(key as string)
         return
     end if
     if key = "up" then
-        if m.skipVisible then
+        if m.bingeVisible then
+            m.focusMode = "binge"
+            ApplyBingeFocus()
+            ApplyControlFocus()
+        else if m.skipVisible then
             m.focusMode = "skip"
             ApplySkipFocus()
         end if
@@ -874,7 +966,7 @@ end sub
 sub HandleBingeKey(key as string)
     if key = "OK" or key = "ok" then
         PlayNext()
-    else if key = "down" or key = "left" then
+    else if key = "down" then
         RestoreControlsFocus()
     end if
 end sub
@@ -1241,6 +1333,8 @@ sub OnDispose()
             end if
         end if
     end if
+    if m.bingeThumb <> invalid then m.bingeThumb.unobserveField("loadStatus")
+    StopBingeSpin()
 
     ' Drop observers + overlay flag.
     if m.vm <> invalid then

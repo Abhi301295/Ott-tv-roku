@@ -251,6 +251,8 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
     menuIndex = vm.menuIndex
     if menuIndex = invalid then menuIndex = header.focusedIndex
 
+    NotifyShellHeaderInteraction(vm)
+
     if ThemeIsSidebarHeader() then
         if key = "up" then
             if menuIndex > 0 then
@@ -264,8 +266,6 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
                 menuIndex = menuIndex + 1
                 header.focusedIndex = menuIndex
                 vm.menuIndex = menuIndex
-            else
-                AppShellLeaveHeader(vm, "hero")
             end if
             return true
         else if key = "right" then
@@ -302,6 +302,16 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
     end if
     return false
 end function
+
+sub NotifyShellHeaderInteraction(vm as object)
+    if vm = invalid then return
+    screen = AppShellActiveScreen(vm)
+    if screen = invalid then return
+    if not screen.hasField("shellHeaderNavTick") then return
+    tick = 0
+    if screen.shellHeaderNavTick <> invalid then tick = screen.shellHeaderNavTick
+    screen.shellHeaderNavTick = tick + 1
+end sub
 
 ' True when the header re-selected the same top-level tab with identical nav params
 ' (hand off focus only). Movies vs Series share RouteGenere() but differ by type.

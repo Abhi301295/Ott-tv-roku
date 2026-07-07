@@ -43,8 +43,8 @@ sub SyncHeaderFromShell()
 end sub
 
 ' ViewManager/AppShell sets shellEnterContent when the user leaves the header (DOWN on
-' Netflix bar, DOWN on last sidebar item, RIGHT on sidebar). Home must land hero/rows here
-' because HandleShellKey consumes the key before HomeScreen.OnKey runs.
+' Netflix bar, RIGHT on sidebar). Home must land hero/rows here because HandleShellKey
+' consumes the key before HomeScreen.OnKey runs.
 sub OnShellEnterContent()
     if m.top.shellEnterContent <> true then return
     m.top.shellEnterContent = false
@@ -56,6 +56,14 @@ sub OnShellEnterContent()
         return
     end if
     if m.focusZone = "header" then EnterHeroFromHeader()
+end sub
+
+
+' Shell-consumed header keys never reach HomeScreen.OnKey, so signal the same interaction
+' throttle here and pause row/card building while the user moves around the app header.
+sub OnShellHeaderNavTick()
+    if not IsHomeForeground() then return
+    BeginInteraction()
 end sub
 
 
@@ -287,12 +295,6 @@ sub OnContinueBootTimeout()
     m.continueLoading = false
     MaybeBuildRows()
 end sub
-
-' ── Select-profile (runs on Home so the profile screen can navigate here instantly) ──
-' POST select-profile, retrying a few times on transient 401/404 (a freshly-issued token
-' is briefly not yet active on the backend). On success: persist identity + boot content.
-' On give-up: surface a toast and return to the picker — never log the user out for a
-' transient failure (only a real session-expiry ends the session via HttpClient).
 
 ' ── Select-profile (runs on Home so the profile screen can navigate here instantly) ──
 ' POST select-profile, retrying a few times on transient 401/404 (a freshly-issued token
@@ -626,10 +628,6 @@ function RowsBootLoading() as boolean
     if ThemeIsOttHome() then return m.initialLoading
     return AnyBootLoading()
 end function
-
-' ── Hero (independent of Continue Watching) ──────────────────────────────────
-' Built as soon as categories land. Hero shimmer stays until the poster actually
-' paints (OnHeroPosterReady) or the safety timeout fires.
 
 ' ── Hero (independent of Continue Watching) ──────────────────────────────────
 ' Built as soon as categories land. Hero shimmer stays until the poster actually

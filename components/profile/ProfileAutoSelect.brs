@@ -20,14 +20,10 @@ sub ResetAutoSelect()
 end sub
 
 ' Disarm and stop the countdown.
-
-' Disarm and stop the countdown.
 sub StopAutoSelect()
     m.autoArmedIndex = -1
     if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
 end sub
-
-' Wall-time elapsed (ms) since the current window started; 0 when idle.
 
 ' Wall-time elapsed (ms) since the current window started; 0 when idle.
 function AutoElapsedMs() as integer
@@ -38,8 +34,6 @@ function AutoElapsedMs() as integer
 end function
 
 ' Ring fill fraction (0.0–1.0) for the profile at index i; reaches 1.0 at AUTO_TOTAL_MS.
-
-' Ring fill fraction (0.0–1.0) for the profile at index i; reaches 1.0 at AUTO_TOTAL_MS.
 function AutoProgressFor(i as integer) as float
     if m.autoArmedIndex <> i then return 0.0
     frac = AutoElapsedMs() / m.AUTO_TOTAL_MS
@@ -47,11 +41,7 @@ function AutoProgressFor(i as integer) as float
     return frac
 end function
 
-' True if this ProfileScreen is not the top screen in the ViewManager stack (i.e. a
-' leftover instance that should no longer run its auto-select loop).
-
-' True if this ProfileScreen is not the top screen in the ViewManager stack (i.e. a
-' leftover instance that should no longer run its auto-select loop).
+' True if this ProfileScreen is not the top screen in the ViewManager stack.
 function IsOrphaned() as boolean
     if m.vm = invalid then return false
     host = m.vm.findNode("screenHost")
@@ -62,6 +52,20 @@ function IsOrphaned() as boolean
     if active = invalid then return false
     return not active.isSameNode(m.top)
 end function
+
+
+' Push countdown copy onto the focused row when the second ticks down.
+sub RefreshAutoSelectHint(index as integer)
+    if m.focusArea <> "profiles" then return
+    if index < 0 or m.avatars = invalid or index >= m.avatars.Count() then return
+    if m.autoArmedIndex <> index then return
+    av = m.avatars[index]
+    if av = invalid then return
+    hint = FocusHint(index)
+    if av.hintText = hint then return
+    av.hintText = hint
+    ApplyProfileHintStyle(av, index, hint)
+end sub
 
 
 sub OnAutoTick()
@@ -93,6 +97,7 @@ sub OnAutoTick()
     ' Drive the ring from real elapsed wall-time, then select once the window completes.
     if m.avatars <> invalid and m.avatars.Count() > m.profileIndex then
         m.avatars[m.profileIndex].progress = AutoProgressFor(m.profileIndex)
+        RefreshAutoSelectHint(m.profileIndex)
     end if
 
     if AutoElapsedMs() >= m.AUTO_SELECT_MS then
@@ -100,6 +105,3 @@ sub OnAutoTick()
         SelectProfile(p)
     end if
 end sub
-
-' ── Selection ────────────────────────────────────────────────────────────────
-

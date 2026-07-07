@@ -144,8 +144,6 @@ sub HandleHeaderKey(key as string)
             if m.menuIndex < m.menuItems.Count() - 1 then
                 m.menuIndex = m.menuIndex + 1
                 m.header.focusedIndex = m.menuIndex
-            else
-                EnterHeroFromHeader()
             end if
         else if key = "right" then
             ExitHeaderToPrevious()
@@ -171,10 +169,6 @@ sub HandleHeaderKey(key as string)
         SelectHeaderItem()
     end if
 end sub
-
-' ── Hero banner focus zone (parity with the portal arrows / mute button) ─────
-' Vertical flow:  HEADER ↕ HERO (prev/next/mute) ↕ CONTINUE WATCHING.
-
 
 ' ── Hero banner focus zone (parity with the portal arrows / mute button) ─────
 ' Vertical flow:  HEADER ↕ HERO (prev/next/mute) ↕ CONTINUE WATCHING.

@@ -198,7 +198,8 @@ def render_arc(dash_len: float) -> Image.Image:
     cum, geo = path_lengths(pts)
     length = dash_len * (geo / PERIM) if PERIM > 0 else dash_len
     partial = truncate_path(pts, cum, length)
-    return draw_stroke(partial, (59, 130, 246, 255), STROKE, round_cap=True)
+    # White mask — runtime tint via Poster.blendColor (React stroke primary-500).
+    return draw_stroke(partial, (255, 255, 255, 255), STROKE, round_cap=True)
 
 
 def main() -> None:

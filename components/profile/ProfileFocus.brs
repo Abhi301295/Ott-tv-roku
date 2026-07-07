@@ -41,7 +41,8 @@ sub BuildAvatars()
             av.cardBottomColor = m.cNeutral800
             av.cardBackingColor = m.cBg
             av.borderColor = m.cPrimary700
-            av.nameColor = m.cNeutral50
+            ' userProfile.tsx: unfocused text-neutral-400; focus applied in ApplyProfileFocus.
+            av.nameColor = m.cNeutral400
             av.hintColor = m.cNeutral400
             av.observeField("layoutHeight", "OnAvatarLayoutChanged")
         else
@@ -70,21 +71,26 @@ sub ApplyProfileFocus()
             av.snapRest = (not focused and i <> prevIdx)
         end if
         if focused then
-            av.hintText = FocusHint(i)
-            if ProfileNeedsPin(m.profiles[i]) then
-                av.hintColor = m.cAmber400
-            else
-                av.hintColor = m.cNeutral400
-            end if
-        else
-            av.hintText = ""
-        end if
-        if focused then
             av.progress = AutoProgressFor(i)
         else
             av.progress = 0.0
         end if
+        if m.useSquareAvatars = true then
+            if focused then
+                av.nameColor = m.cPrimary500
+            else
+                av.nameColor = m.cNeutral400
+            end if
+        end if
+        ' focusedState before hintText — OnHintChanged gates on focusedState.
         av.focusedState = focused
+        if focused then
+            av.hintText = FocusHint(i)
+            ApplyProfileHintStyle(av, i, av.hintText)
+        else
+            av.hintText = ""
+            if av.hasField("hintBold") then av.hintBold = false
+        end if
     end for
 
     ' Logout button focus (bg-primary-600 when focused).
@@ -109,13 +115,13 @@ sub SyncAllAvatarFocusChrome()
     end for
 end sub
 
-' Locked profiles show a PIN hint; square avatars also show auto-select countdown text.
+' Locked profiles show a PIN hint; auto-select countdown when the timer is armed.
 function FocusHint(index as integer) as string
     p = m.profiles[index]
     if ProfileNeedsPin(p) then return CopyEnterPinHint()
-    if m.useSquareAvatars = true and m.autoArmedIndex = index then
+    if m.autoArmedIndex = index then
         frac = AutoProgressFor(index)
-        if frac > 0 and frac < 1.0 then
+        if frac >= 0 and frac < 1.0 then
             secs = Int((1.0 - frac) * 15 + 0.999)
             if secs < 1 then secs = 1
             return CopyAutoSelectingIn(secs)
@@ -123,6 +129,29 @@ function FocusHint(index as integer) as string
     end if
     return ""
 end function
+
+sub ApplyProfileHintStyle(av as object, index as integer, hint as string)
+    if av = invalid then return
+    if ProfileNeedsPin(m.profiles[index]) then
+        if m.useSquareAvatars = true then
+            av.hintColor = m.cNeutral400
+        else
+            av.hintColor = m.cAmber400
+        end if
+        if av.hasField("hintBold") then av.hintBold = false
+    else if hint <> "" then
+        if m.useSquareAvatars = true then
+            av.hintColor = m.cPrimary500
+            if av.hasField("hintBold") then av.hintBold = true
+        else
+            av.hintColor = m.cNeutral50
+            if av.hasField("hintBold") then av.hintBold = false
+        end if
+    else
+        av.hintColor = m.cNeutral400
+        if av.hasField("hintBold") then av.hintBold = false
+    end if
+end sub
 
 ' ── Key handling ─────────────────────────────────────────────────────────────
 

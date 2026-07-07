@@ -567,9 +567,6 @@ end sub
 
 ' ── Header (parity with ottHeader.tsx NetflixHeader) ─────────────────────────
 
-
-' ── Header (parity with ottHeader.tsx NetflixHeader) ─────────────────────────
-
 sub SetupHeader()
     if m.header = invalid then m.header = FindAppHeader(m.top)
     if m.header = invalid then return

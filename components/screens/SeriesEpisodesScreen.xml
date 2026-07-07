@@ -4,6 +4,7 @@
 <component name="SeriesEpisodesScreen" extends="Group">
   <interface>
     <field id="navState" type="assocarray" onChange="OnNavStateReady" />
+    <field id="stackResumed" type="boolean" value="false" alwaysNotify="true" onChange="OnStackResumed" />
     <field id="keyEvent" type="assocarray" alwaysNotify="true" />
     <field id="dispose" type="boolean" value="false" onChange="OnDispose" />
   </interface>
@@ -70,18 +71,35 @@
       <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
     </Label>
 
-    <!-- seriesEpisode.tsx loading branch — white/10 pulse placeholders on bg-black. -->
+    <!-- seriesEpisode.tsx + seriesRow.tsx loading — white/10 pulse placeholders.
+         Positions are applied in LayoutSeriesSkeleton() from SE_* geometry (same as live UI). -->
     <Group id="seriesSkeletonHost" visible="false">
-      <Skeleton id="seSkLogo" translation="[70, 84]" boxWidth="40" boxHeight="40" />
-      <Skeleton id="seSkTitle" translation="[60, 172]" boxWidth="450" boxHeight="40" />
-      <Skeleton id="seSkMeta" translation="[60, 222]" boxWidth="300" boxHeight="24" />
-      <Skeleton id="seSkTab0" translation="[52, 350]" boxWidth="420" boxHeight="32" />
-      <Skeleton id="seSkTab1" translation="[52, 430]" boxWidth="420" boxHeight="32" />
-      <Skeleton id="seSkTab2" translation="[52, 510]" boxWidth="420" boxHeight="32" />
-      <Skeleton id="seSkTab3" translation="[52, 590]" boxWidth="420" boxHeight="32" />
-      <Skeleton id="seSkTab4" translation="[52, 670]" boxWidth="420" boxHeight="32" />
-      <Skeleton id="seSkHeading" translation="[720, 120]" boxWidth="200" boxHeight="24" />
-      <Skeleton id="seSkSubtitle" translation="[720, 184]" boxWidth="240" boxHeight="24" />
+      <Skeleton id="seSkLogo" translation="[0, 0]" boxWidth="280" boxHeight="48" />
+      <Skeleton id="seSkTitle" translation="[0, 0]" boxWidth="450" boxHeight="50" />
+      <Skeleton id="seSkMeta" translation="[0, 0]" boxWidth="300" boxHeight="24" />
+      <Skeleton id="seSkTab0" translation="[0, 0]" boxWidth="560" boxHeight="64" />
+      <Skeleton id="seSkTab1" translation="[0, 0]" boxWidth="560" boxHeight="64" />
+      <Skeleton id="seSkTab2" translation="[0, 0]" boxWidth="560" boxHeight="64" />
+      <Skeleton id="seSkTab3" translation="[0, 0]" boxWidth="560" boxHeight="64" />
+      <Skeleton id="seSkTab4" translation="[0, 0]" boxWidth="560" boxHeight="64" />
+      <Skeleton id="seSkHeading" translation="[0, 0]" boxWidth="200" boxHeight="36" />
+      <Skeleton id="seSkSubtitle" translation="[0, 0]" boxWidth="240" boxHeight="22" />
+      <!-- seriesRow.tsx shimmerArray (3 rows) — mirrors RebuildEpisodeCards layout. -->
+      <Skeleton id="seSkEp0Thumb" translation="[0, 0]" boxWidth="320" boxHeight="180" />
+      <Skeleton id="seSkEp0Title" translation="[0, 0]" boxWidth="400" boxHeight="32" />
+      <Skeleton id="seSkEp0Desc1" translation="[0, 0]" boxWidth="560" boxHeight="22" />
+      <Skeleton id="seSkEp0Desc2" translation="[0, 0]" boxWidth="420" boxHeight="22" />
+      <Skeleton id="seSkEp0Meta" translation="[0, 0]" boxWidth="280" boxHeight="20" />
+      <Skeleton id="seSkEp1Thumb" translation="[0, 0]" boxWidth="320" boxHeight="180" />
+      <Skeleton id="seSkEp1Title" translation="[0, 0]" boxWidth="400" boxHeight="32" />
+      <Skeleton id="seSkEp1Desc1" translation="[0, 0]" boxWidth="560" boxHeight="22" />
+      <Skeleton id="seSkEp1Desc2" translation="[0, 0]" boxWidth="420" boxHeight="22" />
+      <Skeleton id="seSkEp1Meta" translation="[0, 0]" boxWidth="280" boxHeight="20" />
+      <Skeleton id="seSkEp2Thumb" translation="[0, 0]" boxWidth="320" boxHeight="180" />
+      <Skeleton id="seSkEp2Title" translation="[0, 0]" boxWidth="400" boxHeight="32" />
+      <Skeleton id="seSkEp2Desc1" translation="[0, 0]" boxWidth="560" boxHeight="22" />
+      <Skeleton id="seSkEp2Desc2" translation="[0, 0]" boxWidth="420" boxHeight="22" />
+      <Skeleton id="seSkEp2Meta" translation="[0, 0]" boxWidth="280" boxHeight="20" />
     </Group>
 
     <!-- bg-black veil while series detail loads (skeleton blocks, no spinner). -->

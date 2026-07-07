@@ -130,6 +130,9 @@
       </Group>
     </Group>
 
+    <!-- Masks any horizontal overscan so it never shows through the translucent sidebar. -->
+    <Rectangle id="sidebarOccluder" width="0" height="1080" color="0x0C111Aff" />
+
     <Timer id="nowTimer" duration="15" repeat="true" />
     <Timer id="initialFocusTimer" duration="0.1" repeat="false" />
     <Timer id="backdropSwapTimer" duration="0.15" repeat="false" />

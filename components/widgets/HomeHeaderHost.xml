@@ -12,6 +12,7 @@
     <field id="appName" type="string" value="" onChange="OnBrandingProxy" />
     <field id="avatarUri" type="string" value="" onChange="OnBrandingProxy" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeProxy" />
+    <field id="cPrimary700" type="string" value="0x80bbe9ff" onChange="OnThemeProxy" />
     <field id="cNeutral50" type="string" value="0xf8f1f7ff" onChange="OnThemeProxy" />
     <field id="cNeutral200" type="string" value="0xd4d4d4ff" onChange="OnThemeProxy" />
     <field id="cNeutral800" type="string" value="0x262626ff" onChange="OnThemeProxy" />

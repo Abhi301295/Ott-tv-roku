@@ -105,6 +105,26 @@ def main() -> None:
     rounded_mask(150, 150, 12).save(OUT / "sk_rounded_150_r12.png")
     box_glow(150, 150, 12).save(OUT / "sk_glow_rounded_150_r12.png")
 
+    # seriesEpisode.tsx / seriesRow.tsx — same rounded masks as detail page loaders.
+    # Tailwind `rounded` on pulse blocks ≈ 4px; detail text lines use r=3; thumb r=7.
+    def series_block(w: int, h: int, radius: int = 4) -> None:
+        rounded_mask(w, h, radius).save(OUT / f"sk_series_block_{w}x{h}.png")
+
+    def detail_line_wh(w: int, h: int, radius: int = 3) -> None:
+        rounded_mask(w, h, radius).save(OUT / f"sk_detail_line_{w}x{h}.png")
+
+    series_block(280, 48)
+    series_block(450, 50)
+    series_block(550, 60)
+    detail_line_wh(300, 24)
+    detail_line_wh(200, 36, 4)
+    detail_line_wh(240, 22)
+    detail_line_wh(400, 32, 4)
+    detail_line_wh(560, 22)
+    detail_line_wh(420, 22)
+    detail_line_wh(280, 20)
+    rounded_mask(320, 180, 7).save(OUT / "sk_episode_thumb.png")
+
 
 if __name__ == "__main__":
     main()

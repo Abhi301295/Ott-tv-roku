@@ -38,12 +38,15 @@ function ProfileUiSpec() as object
         animMs: 300
         animSteps: 18                 ' ~300ms @ 60fps
         initialsFont: 30             ' text-3xl = 1.875rem
-        nameFont: 16
-        hintFont: 12                 ' text-xs
+        nameFont: 18                 ' text-lg font-medium
+        hintFont: 12                 ' text-xs fw-800 (PIN hint)
+        hintAutoFont: 18              ' text-lg fw-900 auto-select countdown
+        hintMarginTop: 4              ' mt-1 between name and hint
         nameOffsetY: 170             ' card 150 + mb-5 20
-        hintOffsetY: 190             ' name + 16 + mt-1 4
-        rowGap: 16                   ' space-y-16 (var --m-16)
-        rowPitch: 206                ' layout slot: 150+20+20+16 (transform overflow OK)
+        hintOffsetY: 196             ' name + 18 + mt-1 4
+        rowGap: 16                   ' profile.tsx space-y-16 (--m-16)
+        rowItemMarginTop: 56          ' userProfile.tsx mt-14 (3.5rem @ 16px)
+        rowPitch: 206                ' unfocused slot: 150+20+18+16
         ' React flex row stretches full list width; text-center on hint centers in this span.
         hintRowWidth: 1760           ' 1920 - p-x-40*2 (profile list content width)
 
@@ -109,7 +112,7 @@ function ProfileSquareRowContentHeight(focused as boolean, showHint as boolean) 
     cardH = Int(s.cardSize * scale + 0.5)
     nameY = cardH + s.cardMarginBottom
     bottom = nameY + s.nameFont + 4
-    if showHint then bottom = bottom + s.hintFont + 4
+    if showHint then bottom = bottom + s.hintMarginTop + s.hintAutoFont + 4
     return bottom
 end function
 

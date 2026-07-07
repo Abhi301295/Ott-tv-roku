@@ -23,6 +23,8 @@ sub init()
     m.autoSelectTimer = m.top.findNode("autoSelectTimer")
     m.bg = m.top.findNode("bg")
     m.bgImage = m.top.findNode("bgImage")
+    m.bgBottomVignette = m.top.findNode("bgBottomVignette")
+    m.bgFocusScrim = m.top.findNode("bgFocusScrim")
     m.profileBgUri = "pkg:/images/ui/profile_default_bg_base.png"
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
@@ -165,16 +167,20 @@ sub ReflowProfileRows()
     padY = ProfileListTopY()
     m.listContentPadY = padY
     gap = 0
-    if m.useSquareAvatars = true and m.uiSpec <> invalid then gap = m.uiSpec.rowGap
+    rowLead = 0
+    if m.useSquareAvatars = true and m.uiSpec <> invalid then
+        gap = m.uiSpec.rowGap
+        rowLead = m.uiSpec.rowItemMarginTop
+    end if
 
     y = padY
     m.rowTops = []
     for i = 0 to m.avatars.Count() - 1
+        if i > 0 and (gap > 0 or rowLead > 0) then y = y + gap + rowLead
         m.rowTops.Push(y)
         m.avatars[i].translation = [0, y]
         h = ProfileAvatarRowHeight(i)
         y = y + h
-        if i < m.avatars.Count() - 1 and gap > 0 then y = y + gap
     end for
     m.listContentHeight = y
 end sub
@@ -249,15 +255,6 @@ sub ShowLoading(show as boolean)
         skBox = m.top.findNode(id)
         if skBox <> invalid then skBox.running = show
     end for
-    if ProfileUsesSquareAvatars() then
-        for each id in ["sk0b", "sk1b", "sk2b"]
-            skBox = m.top.findNode(id)
-            if skBox <> invalid then
-                skBox.running = false
-                skBox.visible = false
-            end if
-        end for
-    end if
     host = m.profilesScrollHost
     if host = invalid then host = m.profilesContainer
     if host <> invalid then host.visible = not show

@@ -62,7 +62,10 @@ sub OnSelectingChanged()
     end if
     if m.skA <> invalid then m.skA.running = show
     if show then
-        m.top.layoutHeight = m.spec.skRowHeight
+        keepHint = (m.top.focusedState = true and m.top.hintText <> "")
+        holdH = ProfileSquareRowContentHeight(m.top.focusedState = true, keepHint)
+        if holdH < m.spec.skRowHeight then holdH = m.spec.skRowHeight
+        m.top.layoutHeight = holdH
     else
         if m.hintLabel <> invalid then
             m.hintLabel.visible = (m.top.focusedState = true and m.top.hintText <> "")
@@ -118,21 +121,35 @@ sub ApplyLabelLayout()
     if m.nameLabel <> invalid then
         m.nameLabel.translation = [0, nameY]
         nameFont = m.nameLabel.findNode("font")
-        if nameFont <> invalid then nameFont.size = m.spec.nameFont
-        m.nameLabel.width = 320
-        m.nameLabel.horizAlign = "left"
-        m.nameLabel.height = m.spec.nameFont + 4
+        if nameFont <> invalid then
+            nameFont.size = m.spec.nameFont
+            nameFont.uri = "pkg:/fonts/Inter-Medium.ttf"
+        end if
+        ' userProfile.tsx: text-center w-full under the 150px card (scaled when focused).
+        m.nameLabel.width = cardH
+        m.nameLabel.horizAlign = "center"
+        m.nameLabel.height = m.spec.nameFont + 6
     end if
     showHint = false
     if m.hintLabel <> invalid then
-        hintW = m.spec.hintRowWidth
-        if hintW = invalid or hintW < 1 then hintW = 1760
-        m.hintLabel.translation = [0, nameY + m.spec.nameFont + 4]
+        ' userProfile.tsx: text-center w-full mt-1 under the name (same column as the card).
+        hintSize = m.spec.hintFont
+        hintH = hintSize + 4
+        hintUri = "pkg:/fonts/Inter-Bold.ttf"
+        if m.top.hintBold = true then
+            hintSize = m.spec.hintAutoFont
+            hintH = hintSize + 6
+            hintUri = "pkg:/fonts/Inter-Black.ttf"
+        end if
+        m.hintLabel.translation = [0, nameY + m.spec.nameFont + m.spec.hintMarginTop]
         hintFont = m.hintLabel.findNode("font")
-        if hintFont <> invalid then hintFont.size = m.spec.hintFont
-        m.hintLabel.width = hintW
+        if hintFont <> invalid then
+            hintFont.size = hintSize
+            hintFont.uri = hintUri
+        end if
+        m.hintLabel.width = cardH
         m.hintLabel.horizAlign = "center"
-        m.hintLabel.height = m.spec.hintFont + 4
+        m.hintLabel.height = hintH
         showHint = m.hintLabel.visible
     end if
     UpdateLayoutHeight(showHint)
@@ -174,6 +191,7 @@ sub OnHintChanged()
     txt = m.top.hintText
     m.hintLabel.text = txt
     m.hintLabel.visible = (m.top.focusedState and txt <> "")
+    if m.hintLabel.visible then m.hintLabel.color = m.top.hintColor
     ApplyLabelLayout()
 end sub
 

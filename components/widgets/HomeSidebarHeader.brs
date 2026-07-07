@@ -5,12 +5,8 @@ sub init()
     m.menuCol = m.top.findNode("menuCol")
     m.logoPoster = m.top.findNode("logoPoster")
     m.logoLabel = m.top.findNode("logoLabel")
-    m.avatarMask = m.top.findNode("avatarMask")
-    m.avatarImg = m.top.findNode("avatarImg")
     m.widthAnim = m.top.findNode("widthAnim")
     m.widthInterp = m.top.findNode("widthInterp")
-    m.avatarAnim = m.top.findNode("avatarAnim")
-    m.avatarInterp = m.top.findNode("avatarInterp")
     m.itemRows = []
     m.ITEM_H = 58
     m.ITEM_GAP = 34
@@ -66,16 +62,11 @@ function SidebarTargetWidth() as integer
     return w
 end function
 
-function SidebarAvatarX(expanded as boolean) as integer
-    if expanded then return 78
-    return Int((m.COLLAPSED - 64) / 2)
-end function
-
 sub ApplyWidth(animate as boolean)
     targetW = SidebarTargetWidth()
     expanded = m.top.headerActive
 
-    if m.bg <> invalid then m.bg.color = m.top.cNeutral800
+    if m.bg <> invalid then m.bg.color = "0xffffff1a"
 
     if animate and not m.skipWidthAnim and m.widthAnim <> invalid and m.widthInterp <> invalid then
         fromW = m.currentWidth
@@ -89,17 +80,6 @@ sub ApplyWidth(animate as boolean)
         m.bg.width = targetW
         m.currentWidth = targetW
         m.top.sidebarWidth = targetW
-    end if
-
-    if m.avatarMask <> invalid then
-        ax = SidebarAvatarX(expanded)
-        if animate and not m.skipWidthAnim and m.avatarAnim <> invalid and m.avatarInterp <> invalid then
-            fromT = m.avatarMask.translation
-            m.avatarInterp.keyValue = [fromT, [ax, 980]]
-            m.avatarAnim.control = "start"
-        else
-            m.avatarMask.translation = [ax, 980]
-        end if
     end if
 
     m.skipWidthAnim = false
@@ -253,12 +233,7 @@ sub ApplyFocus()
 
         if lbl <> invalid then lbl.visible = expanded
 
-        if showSel then
-            if lbl <> invalid then
-                lbl.color = m.top.cNeutral50
-                ApplySidebarFont(lbl, "bold", 20)
-            end if
-        else if lbl <> invalid then
+        if lbl <> invalid then
             if isFoc then
                 lbl.color = m.top.cPrimary700
                 ApplySidebarFont(lbl, "medium", 20)
@@ -280,25 +255,13 @@ sub ApplyFocus()
             end if
         end if
 
-        if bg <> invalid then
-            if not expanded then
-                bg.visible = false
-            else if showSel then
-                bg.visible = true
-                bg.color = m.top.cNeutral700
-            else if isFoc then
-                bg.visible = true
-                bg.color = m.top.cNeutral800
-            else
-                bg.visible = false
-            end if
-        end if
+        if bg <> invalid then bg.visible = false
     end for
 end sub
 
 sub OnThemeChanged()
     if m.logoLabel <> invalid then m.logoLabel.color = m.top.cNeutral50
-    if m.bg <> invalid then m.bg.color = m.top.cNeutral800
+    if m.bg <> invalid then m.bg.color = "0xffffff1a"
     ApplyFocus()
 end sub
 
@@ -350,12 +313,4 @@ sub OnLogoChanged()
 end sub
 
 sub OnAvatarChanged()
-    if m.avatarImg = invalid then return
-    uri = m.top.avatarUri
-    if uri <> invalid and uri <> "" then
-        m.avatarImg.uri = uri
-        m.avatarImg.visible = true
-    else
-        m.avatarImg.visible = false
-    end if
 end sub

@@ -88,7 +88,11 @@ sub ApplyProfileSelectingState()
             if m.profiles[i]._id = selId then active = true
         end if
         if av.hasField("selectingState") then av.selectingState = active
-        if active then RaiseSelectingAvatarZ(av)
+        if active then
+            if av.hasField("hintText") then av.hintText = ""
+            if av.hasField("progress") then av.progress = 0.0
+            RaiseSelectingAvatarZ(av)
+        end if
     end for
 end sub
 
