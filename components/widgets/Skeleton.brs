@@ -68,12 +68,15 @@ end sub
 ' Static placeholders (cards) keep the shimmer animation off: running ~20 of them
 ' while building rows starves the render thread. The shine overlay is parked so the
 ' base color reads as a plain neutral block. Screens that want the sweep set animate.
+' Do not restart a running anim on every layout/color tick — that freezes the shimmer
+' (profile selecting skeleton was restarted each size-anim frame).
 sub OnRunningChanged()
     if m.anim = invalid then return
     if m.baseRect <> invalid then m.baseRect.opacity = 1.0
     if m.basePoster <> invalid then m.basePoster.opacity = 1.0
     if m.top.running and m.top.animate then
-        m.anim.control = "start"
+        st = m.anim.state
+        if st <> "running" then m.anim.control = "start"
     else
         m.anim.control = "stop"
         if m.shineRect <> invalid then m.shineRect.opacity = 0.0

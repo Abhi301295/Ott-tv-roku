@@ -1,4 +1,4 @@
-' ProfileSelectFlow.brs — profile select API then navigate home (parity profile.tsx).
+' ProfileSelectFlow.brs — profile select API + home catalog prefetch navigate.
 
 
 ' ── Selection ────────────────────────────────────────────────────────────────
@@ -58,8 +58,8 @@ sub OnProfileSelectResponse()
 
     if ok then
         PersistSelectedProfile(profileId, avatar)
-        ProfileSelectLogNode("PROFILE_SELECT", "select ok -> home", m.top)
-        NavigateToHomeAfterSelect(profileId, avatar)
+        ProfileSelectLogNode("PROFILE_SELECT", "select ok -> prefetch + navigate", m.top)
+        BeginHomePrefetch(profileId, avatar)
         return
     end if
 
@@ -69,6 +69,58 @@ sub OnProfileSelectResponse()
     ApplyProfileSelectingState()
     ProfileSelectLogNode("PROFILE_SELECT_FAIL", "httpStatus=" + ProfileSelectFmt(api.httpStatus), m.top)
     ShowAlert(m.top, 2, MsgFailedSelectProfile())
+    ResetAutoSelect()
+    ApplyProfileFocus()
+end sub
+
+
+' ── Home catalog prefetch ─────────────────────────────────────────────────────
+' React navigates to Home as soon as select-profile succeeds (selecting shimmer ends).
+' CW + /contents/home start on ViewManager so they survive Profile dispose and fill
+' HomeBootCache while Home mounts (Home waits briefly if still in flight).
+
+sub BeginHomePrefetch(profileId as string, avatar as string)
+    m.pendingNavigateProfileId = profileId
+    m.pendingNavigateAvatar = avatar
+    m.prefetching = true
+    if m.vm <> invalid then
+        m.vm.callFunc("StartHomePrefetch", profileId)
+    else
+        HomeBootCacheClear()
+        HomeBootCacheBegin(profileId)
+    end if
+    FinishPrefetchNavigate()
+end sub
+
+
+sub FinishPrefetchNavigate()
+    if not m.prefetching then return
+    profileId = m.pendingNavigateProfileId
+    avatar = m.pendingNavigateAvatar
+    m.prefetching = false
+    m.selecting = false
+    m.pendingNavigateProfileId = ""
+    m.pendingNavigateAvatar = ""
+    SetValueByKey(SK_SelectedItem(), "Home", "app")
+    if m.vm <> invalid then
+        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
+    else
+        HomeBootCacheClear()
+        ShowAlert(m.top, 2, MsgFailedSelectProfile())
+        ResetAutoSelect()
+        ApplyProfileFocus()
+    end if
+end sub
+
+
+sub CancelHomePrefetch()
+    m.prefetching = false
+    m.selecting = false
+    if m.vm <> invalid then m.vm.callFunc("StopHomePrefetch", invalid)
+    HomeBootCacheClear()
+    m.pendingNavigateProfileId = ""
+    m.pendingNavigateAvatar = ""
+    ApplyProfileSelectingState()
     ResetAutoSelect()
     ApplyProfileFocus()
 end sub
@@ -87,10 +139,12 @@ sub ApplyProfileSelectingState()
         if selId <> "" and i < m.profiles.Count() then
             if m.profiles[i]._id = selId then active = true
         end if
-        if av.hasField("selectingState") then av.selectingState = active
+        if av.hasField("selectingState") and av.selectingState <> active then
+            av.selectingState = active
+        end if
         if active then
-            if av.hasField("hintText") then av.hintText = ""
-            if av.hasField("progress") then av.progress = 0.0
+            if av.hasField("hintText") and av.hintText <> "" then av.hintText = ""
+            if av.hasField("progress") and av.progress <> 0.0 then av.progress = 0.0
             RaiseSelectingAvatarZ(av)
         end if
     end for
@@ -99,28 +153,16 @@ end sub
 
 ' Later profile rows paint above earlier siblings; lift the selecting row so its glow halo
 ' is not covered (React netComponent focused chrome uses elevated z-index).
+' Only move when needed — removeChild+appendChild resets Skeleton Animation and freezes shimmer.
 sub RaiseSelectingAvatarZ(av as object)
     if av = invalid or m.profilesContainer = invalid then return
     parent = av.getParent()
     if parent = invalid then return
     if not parent.isSameNode(m.profilesContainer) then return
+    n = parent.getChildCount()
+    if n < 1 then return
+    last = parent.getChild(n - 1)
+    if last <> invalid and last.isSameNode(av) then return
     parent.removeChild(av)
     parent.appendChild(av)
-end sub
-
-
-' profile.tsx selectProfile → navigate(ROUTES.HOME, { replace: true }); home loader owns CW/hero.
-sub NavigateToHomeAfterSelect(profileId as string, avatar as string)
-    m.selecting = false
-    m.pendingNavigateProfileId = ""
-    m.pendingNavigateAvatar = ""
-    ProfileTransitionHide(m.vm)
-    SetValueByKey(SK_SelectedItem(), "Home", "app")
-    if m.vm <> invalid then
-        m.vm.callFunc("NavigateReplace", RouteHome(), { selectProfileId: profileId, selectAvatar: avatar })
-    else
-        ShowAlert(m.top, 2, MsgFailedSelectProfile())
-        ResetAutoSelect()
-        ApplyProfileFocus()
-    end if
 end sub

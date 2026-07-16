@@ -41,6 +41,7 @@
     <function name="ResumeBuild" />
     <function name="ForceReveal" />
     <function name="BuildCardsNow" />
+    <function name="ReleaseBootThumbHolds" />
     <!-- Hard stop for screen dispose — kills row timers so a removed Home cannot keep
          building cards on the single render thread. -->
     <function name="AbortBuild" />

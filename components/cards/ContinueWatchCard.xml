@@ -6,6 +6,9 @@
     <field id="progress" type="float" value="0.0" onChange="OnProgressChanged" />
     <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="loaded" type="boolean" value="false" alwaysNotify="true" />
+    <!-- Boot: keep skeleton+progress until Home drops the page loader (React Slow-3G parity). -->
+    <field id="holdThumbLoad" type="boolean" value="false" />
+    <function name="ReleaseThumbLoad" />
     <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
     <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
     <field id="cPrimary700" type="string" value="0x04478bff" onChange="OnThemeChanged" />

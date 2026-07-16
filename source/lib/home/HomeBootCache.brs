@@ -79,6 +79,15 @@ function HomeBootCacheIsReady() as boolean
     return entry.cwDone = true and entry.catDone = true
 end function
 
+' Profile started prefetch then navigated; Home waits instead of double-fetching.
+function HomeBootCacheInFlight(profileId as string) as boolean
+    if profileId = "" then return false
+    entry = HomeBootCacheEntry()
+    if entry = invalid then return false
+    if entry.profileId <> profileId then return false
+    return not HomeBootCacheIsReady()
+end function
+
 function HomeBootCacheHasUsableData(profileId as string) as boolean
     entry = HomeBootCacheEntry()
     if entry = invalid then return false

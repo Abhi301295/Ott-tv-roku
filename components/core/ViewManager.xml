@@ -21,6 +21,9 @@
     <function name="MarkHomeCatalogDirty" />
     <function name="IsHomeCatalogDirty" />
     <function name="ClearHomeCatalogDirty" />
+    <!-- Profile select → start CW+/contents/home prefetch, then navigate immediately. -->
+    <function name="StartHomePrefetch" />
+    <function name="StopHomePrefetch" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
@@ -36,6 +39,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderMenu.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeaderSidebarMenu.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/Navigation.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/shell/AppShell.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/ScreenLifecycle.brs" />
