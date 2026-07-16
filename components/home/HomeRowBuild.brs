@@ -283,6 +283,7 @@ sub BuildContentRowsTurbo()
     MountRemainingRowShells()
     ' React: Spinner off when catalogue data resolves — skeleton cards already mounted.
     TryPrepareHomeReveal()
+    WarmWelcomeRowsWindow()
     ApplyHomeFocus()
     MaybeLandContentFocus()
 end sub
@@ -419,6 +420,7 @@ sub OnRowBuildTick()
         m.rowBuildIndex = 1
         MountRemainingRowShells()
         TryPrepareHomeReveal()
+        WarmWelcomeRowsWindow()
         return
     end if
 
@@ -461,13 +463,17 @@ sub WarmWelcomeRow(row as object)
     if row = invalid then return
     if row.hasField("ottRowReveal") then row.ottRowReveal = true
     row.callFunc("Materialize", invalid)
-    row.callFunc("BuildCardsNow", 6)
+    ' Keep one real card ready for the first CW→row focus move. Remaining slots stay
+    ' as skeletons and continue only after navigation becomes idle.
+    row.callFunc("BuildCardsNow", 1)
+    row.callFunc("PauseBuild", invalid)
 end sub
 
-' Pre-build rows 1–2 after the page loader drops so horizontal nav feels instant.
+' Start the next row progressively after shells mount so CW→row navigation is ready
+' without synchronously creating card nodes on the SceneGraph event thread.
 sub WarmWelcomeRowsWindow()
     if m.rowWidgets = invalid then return
-    hi = 2
+    hi = 1
     if hi >= m.rowWidgets.Count() then hi = m.rowWidgets.Count() - 1
     for i = 1 to hi
         WarmWelcomeRow(m.rowWidgets[i])

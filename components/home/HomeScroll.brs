@@ -21,7 +21,7 @@ sub MaterializeNearbyRows()
         if row <> invalid then
             if row.hasField("ottRowReveal") then row.ottRowReveal = true
             row.callFunc("Materialize", invalid)
-            row.callFunc("BuildCardsNow", 6)
+            if i <> m.rowIndex then row.callFunc("PauseBuild", invalid)
         end if
     end for
 end sub
@@ -34,11 +34,8 @@ sub UpdateRowsScrim()
     if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.opacity = 0.0
 end sub
 
-' Smooth row pinning (parity with netflixContent.tsx 400ms translate). User keys snap
-' instantly so the render thread never waits on animation + card materialize together.
-
-' Smooth row pinning (parity with netflixContent.tsx 400ms translate). User keys snap
-' instantly so the render thread never waits on animation + card materialize together.
+' Smooth row pinning (parity with netflixContent.tsx). User keys snap instantly so
+' row translation paints before deferred card construction resumes.
 sub AnimateRowsHost(targetY as integer)
     if m.rowsHost = invalid then return
     offX = 0
@@ -78,14 +75,12 @@ sub OnRowPrefetchTimer()
     RunRowPrefetchPass()
 end sub
 
-' Focused row is primed even during key repeat; neighbor materialize waits for idle.
-
-' Focused row is primed even during key repeat; neighbor materialize waits for idle.
+' Card construction resumes after key idle so focus and row translation paint first.
 sub RunRowPrefetchPass()
     if not m.rowsRevealed then return
     if m.focusZone <> "rows" then return
-    PrimeFocusedRow()
     if m.interacting then return
+    PrimeFocusedRow()
     MaterializeNearbyRows()
     if ThemeIsOttHome() then ResumeFocusedRowBuild()
     FlushPendingHeroUpdate()
@@ -121,7 +116,6 @@ sub PrimeFocusedRow()
     if row = invalid then return
     if row.hasField("ottRowReveal") then row.ottRowReveal = true
     row.callFunc("Materialize", invalid)
-    row.callFunc("BuildCardsNow", 6)
     row.callFunc("ResumeBuild", invalid)
     row.callFunc("ForceReveal", invalid)
 end sub
@@ -131,9 +125,9 @@ end sub
 ' Pause progressive row/card building the instant the user presses a key, so creating
 ' card nodes never steals render-thread time from a slide change or navigation. The idle
 ' timer is reset on every key, so building only resumes once the user pauses (0.25s).
-sub BeginInteraction(primeRowIdx = -1 as integer)
+sub BeginInteraction()
     m.interacting = true
-    PauseRowBuilding(primeRowIdx)
+    PauseRowBuilding()
     SyncHeroAutoAdvanceHold()
     if m.interactIdle <> invalid then
         m.interactIdle.control = "stop"
@@ -150,24 +144,20 @@ sub OnInteractIdle()
 end sub
 
 
-sub PauseRowBuilding(exceptIdx = -1 as integer)
+sub PauseRowBuilding()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
     if m.rowWidgets = invalid then return
-    for i = 0 to m.rowWidgets.Count() - 1
-        row = m.rowWidgets[i]
-        if row <> invalid and i <> exceptIdx then row.callFunc("PauseBuild", invalid)
+    for each row in m.rowWidgets
+        if row <> invalid then row.callFunc("PauseBuild", invalid)
     end for
 end sub
 
 
 sub ResumeRowBuilding()
-    ' Resume the row orchestration only if rows are still pending.
+    ' Row shells may continue mounting, but card timers resume only through
+    ' PrimeFocusedRow. Restarting every neighbor here blocks the next keypress.
     if m.rowsBuilt and m.rowBuildTimer <> invalid and m.rowBuildIndex < m.contentRowCats.Count() then
         m.rowBuildTimer.control = "start"
     end if
-    if m.rowWidgets = invalid then return
-    for each row in m.rowWidgets
-        if row <> invalid then row.callFunc("ResumeBuild", invalid)
-    end for
 end sub
 
