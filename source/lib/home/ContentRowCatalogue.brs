@@ -45,11 +45,17 @@ function CRC_CreateShellRow(rowsHost as object, cat as object, y as integer, the
     return row
 end function
 
-' First catalogue row — categoryData populates cards immediately (row 0 reveal path).
-function CRC_CreateDataRow(rowsHost as object, cat as object, y as integer, theme as object) as object
+' First catalogue row — optional bootPaintCount must be set BEFORE categoryData
+' so StartCardBuild can show skeleton cards (React CW placeholders).
+function CRC_CreateDataRow(rowsHost as object, cat as object, y as integer, theme as object, bootPaintCount = 0 as integer) as object
     if rowsHost = invalid or cat = invalid then return invalid
     row = rowsHost.createChild("ContentRow")
     CRC_ApplyRowTheme(row, theme)
+    if bootPaintCount > 0 then
+        if row.hasField("requireFullRowPaint") then row.requireFullRowPaint = true
+        if row.hasField("bootPaintCardCount") then row.bootPaintCardCount = bootPaintCount
+        if row.hasField("ottRowReveal") then row.ottRowReveal = true
+    end if
     row.categoryData = cat
     row.translation = [0, y]
     return row

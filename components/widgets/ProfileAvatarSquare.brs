@@ -52,6 +52,7 @@ sub OnSelectingChanged()
     if m.cardStack <> invalid then m.cardStack.visible = not show
     if m.nameLabel <> invalid then m.nameLabel.visible = not show
     if m.hintLabel <> invalid then m.hintLabel.visible = false
+    if show then SnapSelectingFocusScale()
     if m.selectingGroup <> invalid then
         m.selectingGroup.visible = show
         if show then
@@ -74,6 +75,21 @@ sub OnSelectingChanged()
         if m.hintLabel <> invalid then showHint = m.hintLabel.visible
         UpdateLayoutHeight(showHint)
     end if
+end sub
+
+sub SnapSelectingFocusScale()
+    if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.control = "stop"
+    scale = m.FOCUS_SCALE
+    x = m.FOCUS_OFFSET_X
+    if m.top.focusedState <> true then
+        scale = m.REST_SCALE
+        x = m.REST_OFFSET_X
+    end if
+    m.visualScale = scale
+    m.visualOffsetX = x
+    m.lastScale = scale
+    m.lastOffsetX = x
+    ApplyScales(scale, x)
 end sub
 
 sub SyncSelectingSkeletonScale()
@@ -219,6 +235,7 @@ sub OnFocusChanged()
 
     OnHintChanged()
     ApplyLabelLayout()
+    if m.top.selectingState = true then return
     AnimateScale(focused)
     ProfileUiLogRow(m.top.rowIndex, focused, progress, m.visualScale, 1.0, m.lastOffsetX)
 end sub
@@ -348,6 +365,12 @@ sub StartSquareSizeAnimation(fromScale as float, toScale as float, fromX as floa
 end sub
 
 sub OnSizeAnimTick()
+    if m.top.selectingState = true then
+        if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.control = "stop"
+        SnapSelectingFocusScale()
+        SyncSelectingSkeletonScale()
+        return
+    end if
     m.animStep = m.animStep + 1
     steps = m.SIZE_ANIM_STEPS
     if m.animStepCount <> invalid and m.animStepCount > 0 then steps = m.animStepCount
@@ -375,7 +398,6 @@ sub ApplyScales(scale as float, offsetX as float)
         m.cardScaler.scale = [1.0, 1.0]
         m.cardScaler.translation = [offsetX, ScaleOffsetY(scale)]
     end if
-    if m.top.selectingState = true then SyncSelectingSkeletonScale()
     ApplyLabelLayout()
 end sub
 

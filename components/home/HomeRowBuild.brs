@@ -9,7 +9,15 @@ function WelcomeDismissReadyForRow0() as boolean
     return cat.type = HC_TypeContinueWatching()
 end function
 
-' Page loader drops only after hero poster (when shown) and row-0 boot cards are painted.
+' Hero catalogue data is ready once boot fetches finish and MaybeBuildHero has run
+' (banner items extracted from categories). Poster paint continues after loader off.
+function HomeHeroDataReady() as boolean
+    if RowsBootLoading() then return false
+    if not m.heroBuilt then return false
+    return true
+end function
+
+' Hero poster paint — tracked for logs / trailer; does not gate the page loader.
 function HomeHeroPaintComplete() as boolean
     if m.hero = invalid then return true
     if m.hero.visible <> true then return true
@@ -17,10 +25,13 @@ function HomeHeroPaintComplete() as boolean
     return false
 end function
 
+' Page loader may drop once row widgets exist for the boot catalogue.
+' Poster/card CDN paint continues after reveal (React Spinner parity).
 function HomeBootPaintComplete() as boolean
     if not m.rowsBuilt then return false
-    if not HomeHeroPaintComplete() then return false
-    return HomeFirstRowPaintComplete()
+    if m.contentRowCats = invalid or m.contentRowCats.Count() = 0 then return true
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return false
+    return m.rowWidgets[0] <> invalid
 end function
 
 sub ConfigureHomeRowPaintGate(row as object, bootCardCount as integer)
@@ -31,16 +42,12 @@ end sub
 
 sub TryPrepareHomeReveal()
     if m.rowsRevealed then return
-    if not WelcomeDismissReadyForRow0() then
-        HomeLoaderLogBoot(m.bootSpan, "reveal blocked", "waiting for CW row | " + HomeLoaderGateSnapshot())
+    if not HomeHeroDataReady() then
+        HomeBootLog(m.bootSpan, "reveal waiting", "heroData=" + CwPerfBool(HomeHeroDataReady()) + " heroBuilt=" + CwPerfBool(m.heroBuilt) + " bootLoading=" + CwPerfBool(RowsBootLoading()))
+        HomeLoaderLogBoot(m.bootSpan, "reveal waiting", "hero data gate | " + HomeLoaderGateSnapshot())
         return
     end if
-    if not HomeBootPaintComplete() then
-        HomeBootLog(m.bootSpan, "reveal waiting", "hero=" + CwPerfBool(HomeHeroPaintComplete()) + " row0=" + CwPerfBool(HomeFirstRowPaintComplete()))
-        HomeLoaderLogBoot(m.bootSpan, "reveal waiting", HomeLoaderGateSnapshot())
-        return
-    end if
-    HomeLoaderLogBoot(m.bootSpan, "reveal GO", HomeLoaderGateSnapshot())
+    HomeLoaderLogBoot(m.bootSpan, "reveal GO", "hero data gate | " + HomeLoaderGateSnapshot())
     PrepareFirstRowReveal()
 end sub
 
@@ -73,6 +80,7 @@ function HomeLoaderGateSnapshot() as string
     detail = detail + " continueLoading=" + CwPerfBool(m.continueLoading)
     detail = detail + " rowsBuilt=" + CwPerfBool(m.rowsBuilt)
     detail = detail + " rowsDataReady=" + CwPerfBool(m.rowsDataReady)
+    detail = detail + " heroDataReady=" + CwPerfBool(HomeHeroDataReady())
     detail = detail + " heroBuilt=" + CwPerfBool(m.heroBuilt)
     detail = detail + " heroVisible=" + CwPerfBool(heroVis)
     detail = detail + " heroPosterReady=" + heroPoster
@@ -86,14 +94,12 @@ end function
 
 sub OnRowsLoaderTimeout()
     HomeLoaderLogBoot(m.bootSpan, "rows loader timeout", HomeLoaderGateSnapshot())
-    print "[HOME] home loader timeout -> force first row reveal"
+    print "[HOME] home loader timeout -> force reveal (hero data gate)"
     HomeBootLog(m.bootSpan, "loader timeout", "force reveal")
     row0 = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
     if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
-    painted = false
-    if row0 <> invalid and row0.hasField("paintedReady") then painted = row0.paintedReady
-    if painted and WelcomeDismissReadyForRow0() then
+    if HomeHeroDataReady() then
         TryPrepareHomeReveal()
         return
     end if
@@ -116,13 +122,11 @@ sub OnRowsForceHideTimer()
     row0 = invalid
     if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then row0 = m.rowWidgets[0]
     if row0 <> invalid then row0.callFunc("ForceReveal", invalid)
-    painted = false
-    if row0 <> invalid and row0.hasField("paintedReady") then painted = row0.paintedReady
-    if painted and WelcomeDismissReadyForRow0() and m.homeLoader <> invalid and m.homeLoader.running = true then
-        CwPerfInstant("force-hide", "paintedReady=true -> reveal")
+    if HomeHeroDataReady() and m.homeLoader <> invalid and m.homeLoader.running = true then
+        CwPerfInstant("force-hide", "hero data gate -> reveal")
         TryPrepareHomeReveal()
     else
-        CwPerfInstant("force-hide skipped", "paintedReady=" + CwPerfBool(painted) + " loader=" + CwPerfBool(m.homeLoader <> invalid and m.homeLoader.running = true))
+        CwPerfInstant("force-hide skipped", "heroData=" + CwPerfBool(HomeHeroDataReady()) + " loader=" + CwPerfBool(m.homeLoader <> invalid and m.homeLoader.running = true))
     end if
 end sub
 
@@ -172,13 +176,13 @@ sub BuildContentRows()
     m.rowContentHeight = 0
     m.rowIndex = 0
     m.cardIndex = 0
-    m.rowsHost.visible = (m.contentRowCats.Count() > 0)
+    m.rowsHost.visible = false
     m.rowBuildSpan = CreateObject("roTimespan")
     m.cwRowBuildSpan = CreateObject("roTimespan")
     m.rowBuildCostMs = 0
     CwPerfMark(m.cwRowBuildSpan, "BuildContentRows start", "rows=" + Str(m.contentRowCats.Count()))
     HomeBootLog(m.bootSpan, "BuildContentRows", "rows=" + Str(m.contentRowCats.Count()))
-    BrowseEnsureLoaderRunning(m)
+    if not m.rowsRevealed then BrowseEnsureLoaderRunning(m)
 
     if m.contentRowCats.Count() = 0 then
         HomeBootLog(m.bootSpan, "BuildContentRows", "no rows — keep loader until refetch/reveal")
@@ -235,7 +239,7 @@ sub OnFirstRowBuilt()
     TryPrepareHomeReveal()
 end sub
 
-' Turbo path: row 0 card nodes build one-per-tick (ContentRow cardTimer) so loader keeps spinning.
+' Turbo path: mount row 0, drop page loader (React data gate), cards fill in after.
 sub BuildContentRowsTurbo()
     theme = HomeRowTheme()
     m.rowBuildCostMs = 0
@@ -245,12 +249,11 @@ sub BuildContentRowsTurbo()
         rowSpan = CreateObject("roTimespan")
         catName = ""
         if cat <> invalid and cat.name <> invalid then catName = cat.name
-        row = CRC_CreateDataRow(m.rowsHost, cat, 0, theme)
+        row = CRC_CreateDataRow(m.rowsHost, cat, 0, theme, 6)
         if row <> invalid then
             row.cardFocusIndex = -1
             row.ottRowReveal = true
             row.rowPeekVisible = true
-            ConfigureHomeRowPaintGate(row, 6)
             if ThemeIsOttHome() then
                 m.rowBuildY = CRC_AppendRowRecord(m, row, 0, cat)
             else
@@ -258,8 +261,12 @@ sub BuildContentRowsTurbo()
                 m.rowBuildY = m.layoutRowPitch
             end if
             ReleaseHeroTrailerBoot()
-            HomeLoaderLogBoot(m.bootSpan, "row0 progressive build", "plan=" + Str(row.cardCount) + " window=6")
+            HomeLoaderLogBoot(m.bootSpan, "row0 skeleton window", "plan=" + Str(row.cardCount) + " window=6")
             SetupHomeRowPaintWatch(row)
+            ' Sync-mount a couple CW skeleton+progress cards (React placeholders). More than
+            ' ~2 ContinueWatchCard nodes stalls the render thread for seconds on-device/sim.
+            row.callFunc("BuildCardsNow", 2)
+            RevealRowsBuiltAfterHeroData()
             rowMs = rowSpan.TotalMilliseconds()
             m.rowBuildCostMs = rowMs
             print "[PERF] turbo build row 0 '"; catName; "' cards="; row.cardCount; " "; rowMs; "ms"
@@ -271,18 +278,64 @@ sub BuildContentRowsTurbo()
     if m.rowBuildSpan <> invalid then wall = m.rowBuildSpan.TotalMilliseconds()
     print "[PERF] turbo row0 ready wall="; wall; "ms render="; m.rowBuildCostMs; "ms"
     HomeBootLog(m.bootSpan, "turbo row0 ready", "render=" + Str(m.rowBuildCostMs) + "ms wall=" + Str(wall) + "ms")
+    ' Shells are cheap (title + plan only). Mount them before reveal so Down from CW
+    ' has a real next row — progressive shell ticks left LastRowIndex at 0 after loader off.
+    MountRemainingRowShells()
+    ' React: Spinner off when catalogue data resolves — skeleton cards already mounted.
+    TryPrepareHomeReveal()
+    ApplyHomeFocus()
+    MaybeLandContentFocus()
+end sub
 
-    if m.rowBuildIndex < m.contentRowCats.Count() then
-        if m.rowBuildTimer <> invalid then
-            m.rowBuildTimer.duration = 0.001
-            m.rowBuildTimer.control = "start"
-        end if
-    else
-        m.rowBuildIndex = m.contentRowCats.Count()
-        m.rowContentHeight = m.rowBuildY
-        ApplyHomeFocus()
-        MaybeLandContentFocus()
+
+' Create remaining catalogue rows as shells (no card nodes) so vertical nav targets exist
+' as soon as row 0 is visible. Cards materialize via WarmWelcomeRowsWindow / PrimeFocusedRow.
+sub MountRemainingRowShells()
+    if m.contentRowCats = invalid then return
+    if m.rowsHost = invalid then return
+    if m.rowWidgets = invalid then m.rowWidgets = []
+    startIdx = m.rowWidgets.Count()
+    catCount = m.contentRowCats.Count()
+    if startIdx < 1 then return
+    if startIdx >= catCount then
+        m.rowBuildIndex = catCount
+        if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+        return
     end if
+
+    theme = HomeRowTheme()
+    ' Prefer layout cursor; fall back to last row slot if Y was not advanced.
+    y = m.rowBuildY
+    if y = invalid then y = 0
+    if ThemeIsOttHome() and m.rowTops <> invalid and m.rowTops.Count() > 0 then
+        last = m.rowTops.Count() - 1
+        if last >= 0 and last < m.contentRowCats.Count() then
+            y = m.rowTops[last] + CRC_RowSlotHeight(m.contentRowCats[last])
+        end if
+    else if startIdx > 0 then
+        y = startIdx * m.layoutRowPitch
+    end if
+
+    for i = startIdx to catCount - 1
+        cat = m.contentRowCats[i]
+        if cat = invalid then continue for
+        row = CRC_CreateShellRow(m.rowsHost, cat, y, theme)
+        if row = invalid then continue for
+        row.cardFocusIndex = -1
+        row.ottRowReveal = true
+        if ThemeIsOttHome() then
+            y = CRC_AppendRowRecord(m, row, y, cat)
+        else
+            m.rowWidgets.Push(row)
+            y = y + m.layoutRowPitch
+        end if
+    end for
+
+    m.rowBuildY = y
+    m.rowContentHeight = y
+    m.rowBuildIndex = catCount
+    if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+    HomeBootLog(m.bootSpan, "row shells mounted", "widgets=" + Str(m.rowWidgets.Count()) + " cats=" + Str(catCount))
 end sub
 
 
@@ -331,15 +384,11 @@ sub OnRowBuildTick()
     theme = HomeRowTheme()
     y = m.rowBuildY
     if m.rowBuildIndex = 0 then
-        row = CRC_CreateDataRow(m.rowsHost, cat, y, theme)
+        row = CRC_CreateDataRow(m.rowsHost, cat, y, theme, 6)
         if row <> invalid then
             row.cardFocusIndex = -1
-            if cat <> invalid and cat.type <> HC_TypeContinueWatching() then
-                row.ottRowReveal = true
-            else
-                row.ottRowReveal = false
-            end if
-            ConfigureHomeRowPaintGate(row, 6)
+            row.ottRowReveal = true
+            row.rowPeekVisible = true
         end if
     else
         row = CRC_CreateShellRow(m.rowsHost, cat, y, theme)
@@ -363,9 +412,14 @@ sub OnRowBuildTick()
 
     addedIdx = m.rowWidgets.Count() - 1
 
-    ' Row 0 — categoryData starts ContentRow cardTimer (one card/tick); do not sync-burst.
     if m.rowBuildIndex = 0 then
         SetupHomeRowPaintWatch(row)
+        if row <> invalid then row.callFunc("BuildCardsNow", 2)
+        RevealRowsBuiltAfterHeroData()
+        m.rowBuildIndex = 1
+        MountRemainingRowShells()
+        TryPrepareHomeReveal()
+        return
     end if
 
     m.rowBuildIndex = m.rowBuildIndex + 1
@@ -390,6 +444,16 @@ sub OnRowBuildTick()
             MaybeLandContentFocus()
         end if
     end if
+end sub
+
+
+sub RevealRowsBuiltAfterHeroData()
+    if not m.rowsRevealed then return
+    EnsureFirstRowVisibleUnderLoader()
+    ArmCwThumbRelease()
+    UpdateRowsScrim()
+    ApplyHomeFocus()
+    MaybeLandContentFocus()
 end sub
 
 
@@ -468,26 +532,51 @@ function HomeFirstRowPaintComplete() as boolean
     return true
 end function
 
-' Drop the page loader only after hero poster and row 0 are painted underneath the veil.
+' Drop the page loader once hero catalogue data is ready; rows/posters keep loading after.
 sub PrepareFirstRowReveal()
     if m.rowsRevealed then return
     HomeLoaderLogBoot(m.bootSpan, "PrepareFirstRowReveal enter", HomeLoaderGateSnapshot())
-    if not HomeBootPaintComplete() then
-        HomeBootLog(m.bootSpan, "reveal deferred", "hero=" + CwPerfBool(HomeHeroPaintComplete()) + " row0=" + CwPerfBool(HomeFirstRowPaintComplete()))
+    if not HomeHeroDataReady() then
+        HomeBootLog(m.bootSpan, "reveal deferred", "heroData=" + CwPerfBool(HomeHeroDataReady()) + " heroBuilt=" + CwPerfBool(m.heroBuilt))
         return
     end if
     m.rowsRevealed = true
-    HomeLoaderLogBoot(m.bootSpan, "rows revealed — loader OFF", HomeLoaderGateSnapshot())
-    HomeBootLog(m.bootSpan, "rows revealed", "loader off")
-    LogCwRowState("cards painted -> hide loader")
-    EnsureFirstRowVisibleUnderLoader()
+    HomeLoaderLogBoot(m.bootSpan, "home revealed — loader OFF", HomeLoaderGateSnapshot())
+    HomeBootLog(m.bootSpan, "home revealed", "loader off (hero data gate)")
+    LogCwRowState("hero data ready -> hide loader")
     ShowHomeLoader(false)
+    EnsureFirstRowVisibleUnderLoader()
+    if m.rowWidgets <> invalid and m.rowWidgets.Count() > 0 then ArmCwThumbRelease()
     UpdateRowsScrim()
     LogCwRowState("loader hidden")
     ApplyHomeFocus()
     MaybeLandContentFocus()
     WarmWelcomeRowsWindow()
     LogCwRowState("post-focus zone=" + m.focusZone)
+end sub
+
+sub ArmCwThumbRelease()
+    if m.cwThumbReleaseTimer = invalid then
+        m.cwThumbReleaseTimer = CreateObject("roSGNode", "Timer")
+        m.cwThumbReleaseTimer.duration = 0.4
+        m.cwThumbReleaseTimer.repeat = false
+        m.top.appendChild(m.cwThumbReleaseTimer)
+        m.cwThumbReleaseTimer.observeField("fire", "OnCwThumbRelease")
+    end if
+    m.cwThumbReleaseTimer.control = "stop"
+    m.cwThumbReleaseTimer.control = "start"
+end sub
+
+sub OnCwThumbRelease()
+    if m.top.dispose = true then return
+    ReleaseRow0BootThumbs()
+end sub
+
+sub ReleaseRow0BootThumbs()
+    if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+    row0 = m.rowWidgets[0]
+    if row0 = invalid then return
+    row0.callFunc("ReleaseBootThumbHolds", invalid)
 end sub
 
 

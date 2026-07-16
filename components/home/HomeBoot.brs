@@ -257,9 +257,17 @@ sub BootHomeContent()
     HomeLoaderLogBoot(m.bootSpan, "content boot start", HomeLoaderGateSnapshot())
     ' Prefetch may finish after BeginHomeBootWork when select-profile ran in parallel.
     if not m.categoriesPrefetched then ConsumeHomeBootCacheIfReady()
+    if m.categoriesPrefetched <> true then
+        pid = GetProfileId()
+        if pid = "" and m.pendingSelectId <> "" then pid = m.pendingSelectId
+        if HomeBootCacheInFlight(pid) then
+            HomeBootLog(m.bootSpan, "content boot", "waiting VM prefetch")
+            ArmHomePrefetchWait()
+            return
+        end if
+    end if
     m.contentBootStarted = true
     if m.categoriesPrefetched = true then
-        print "[HOME_BOOT_DBG] content_boot prefetch_hit skip_fetch=true"
         HomeBootLog(m.bootSpan, "content boot", "prefetch hit skip CW+categories")
         if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "stop"
         m.continueLoading = false
@@ -269,7 +277,6 @@ sub BootHomeContent()
         MaybeBuildRows()
         return
     end if
-    print "[HOME_BOOT_DBG] content_boot prefetch_hit skip_fetch=false fetch_cw_and_home=true"
     HomeBootLog(m.bootSpan, "content boot", "fetch CW + categories parallel")
     ' The profile was just selected on the previous screen, so the active profile
     ' identity is already persisted — only re-fetch profiles if it is somehow missing
@@ -285,6 +292,50 @@ sub BootHomeContent()
     FetchHomeCategories(m.page)
     FetchLatestVersion()
     if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "start"
+end sub
+
+
+sub ArmHomePrefetchWait()
+    if m.homePrefetchWaitClock = invalid then m.homePrefetchWaitClock = CreateObject("roTimespan")
+    m.homePrefetchWaitStartMs = m.homePrefetchWaitClock.TotalMilliseconds()
+    if m.homePrefetchWaitTimer = invalid then
+        m.homePrefetchWaitTimer = CreateObject("roSGNode", "Timer")
+        m.homePrefetchWaitTimer.duration = 0.1
+        m.homePrefetchWaitTimer.repeat = true
+        m.top.appendChild(m.homePrefetchWaitTimer)
+        m.homePrefetchWaitTimer.observeField("fire", "OnHomePrefetchWaitTick")
+    end if
+    m.homePrefetchWaitTimer.control = "stop"
+    m.homePrefetchWaitTimer.control = "start"
+end sub
+
+
+sub OnHomePrefetchWaitTick()
+    if m.top.dispose = true then
+        if m.homePrefetchWaitTimer <> invalid then m.homePrefetchWaitTimer.control = "stop"
+        return
+    end if
+    if m.contentBootStarted then
+        if m.homePrefetchWaitTimer <> invalid then m.homePrefetchWaitTimer.control = "stop"
+        return
+    end if
+    ConsumeHomeBootCacheIfReady()
+    if m.categoriesPrefetched = true then
+        if m.homePrefetchWaitTimer <> invalid then m.homePrefetchWaitTimer.control = "stop"
+        BootHomeContent()
+        return
+    end if
+    pid = GetProfileId()
+    if pid = "" and m.pendingSelectId <> "" then pid = m.pendingSelectId
+    elapsed = 0
+    if m.homePrefetchWaitClock <> invalid then
+        elapsed = m.homePrefetchWaitClock.TotalMilliseconds() - m.homePrefetchWaitStartMs
+    end if
+    if elapsed >= HC_PrefetchMaxMs() or not HomeBootCacheInFlight(pid) then
+        if m.homePrefetchWaitTimer <> invalid then m.homePrefetchWaitTimer.control = "stop"
+        if HomeBootCacheInFlight(pid) then HomeBootCacheForceComplete()
+        BootHomeContent()
+    end if
 end sub
 
 
@@ -642,15 +693,17 @@ sub MaybeBuildHero()
         UpdateHeroBanner()
         ' No hero means no trailer to wait for: let the rows build right away.
         m.rowGateElapsed = true
+        TryPrepareHomeReveal()
         MaybeStartRowBuild()
         return
     end if
     m.skeletonTimeout.control = "start"
     UpdateHeroBanner()
+    TryPrepareHomeReveal()
 end sub
 
 ' ── Rows / Continue Watching (waits for BOTH categories and CW) ───────────────
-' Page loader stays up until row 0 is revealed (parity with React Spinner until rows).
+' Page loader drops when hero catalogue data is ready (CW + categories resolved).
 sub MaybeBuildRows()
     if m.rowsBuilt then return
     if RowsBootLoading() then
@@ -662,7 +715,8 @@ sub MaybeBuildRows()
     m.rowsDataReady = true
     HomeLoaderLogBoot(m.bootSpan, "rows data ready", "cats=" + Str(FilterContentRows(m.categories).Count()) + " | " + HomeLoaderGateSnapshot())
     HomeBootLog(m.bootSpan, "rows data ready", "cats=" + Str(FilterContentRows(m.categories).Count()))
-    print "[HOME] MaybeBuildRows -> data ready, waiting for hero trailer / gate"
+    print "[HOME] MaybeBuildRows -> data ready"
+    TryPrepareHomeReveal()
     MaybeStartRowBuild()
 end sub
 
@@ -729,7 +783,7 @@ end sub
 ' Safety net: never drop the page loader while first paint is still in flight.
 sub OnHomeLoaderTimeout()
     HomeLoaderLogBoot(m.bootSpan, "loader safety timeout", "bootActive=" + CwPerfBool(HomeLoaderBootActive()) + " | " + HomeLoaderGateSnapshot())
-    if not m.rowsRevealed and m.rowsBuilt and WelcomeDismissReadyForRow0() then
+    if not m.rowsRevealed and HomeHeroDataReady() then
         TryPrepareHomeReveal()
         if m.rowsRevealed then return
     end if
@@ -746,10 +800,9 @@ end sub
 function HomeLoaderBootActive() as boolean
     if not m.bootStarted then return false
     if m.selectInFlight then return true
-    if not m.rowsRevealed then return true
+    if m.rowsRevealed then return false
     if AnyBootLoading() then return true
-    if not m.rowsBuilt then return true
-    if m.rowBuildTimer <> invalid and m.rowBuildTimer.control = "start" then return true
+    if not m.heroBuilt then return true
     return false
 end function
 

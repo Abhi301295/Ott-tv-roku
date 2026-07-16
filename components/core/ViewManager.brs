@@ -8,6 +8,14 @@ sub init()
     m.top.overlayOpen = false
     m.homeBootCache = invalid
     m.homeCatalogDirty = false
+    m.holdHttpDrain = false
+    m.prefetchCwTask = invalid
+    m.prefetchCatTask = invalid
+    m.prefetchCwRetriesLeft = 0
+    m.prefetchCatRetriesLeft = 0
+    m.prefetchCwRetryTimer = invalid
+    m.prefetchCatRetryTimer = invalid
+    ' HomeBootCache helpers on screens resolve via FindViewManager; prefetch uses m.homeBootCache.
     m.top.observeField("overlayDismiss", "OnOverlayDismissChanged")
 end sub
 
@@ -48,8 +56,10 @@ end function
 ' Tear down every screen in the stack and show a fresh route (logout / session reset).
 function NavigateClearAndReplace(route as string, state = {} as object) as void
     ProfileTransitionHide(m.top)
+    StopVmHomePrefetch()
     ClearHomeBootCacheEntry()
     m.homeCatalogDirty = false
+    m.holdHttpDrain = false
     depth = m.stack.Count()
     ProfileSelectLog("NAV_CLEAR", "route=" + route + " stackDepth=" + ProfileSelectFmt(depth))
     while m.stack.Count() > 0
@@ -134,10 +144,13 @@ end function
 ' Replace navigation: pause the outgoing screen, dispose it, and drop any HTTP jobs
 ' still waiting in the pool queue so Movies (or any new route) is not starved by Home
 ' boot fetches the user abandoned mid-load.
+' holdHttpDrain: profile→home prefetch was just submitted; leave the queue alone so
+' CW + /contents/home are not dropped before workers pick them up.
 sub TeardownReplacedScreen(screen as object)
     if screen = invalid then return
     ScreenDestroy(screen)
-    DrainHttpQueueForNavigation()
+    if m.holdHttpDrain <> true then DrainHttpQueueForNavigation()
+    m.holdHttpDrain = false
     m.screenHost.removeChild(screen)
 end sub
 
@@ -146,4 +159,157 @@ sub OnOverlayDismissChanged()
         m.top.overlayDismiss = false
         m.top.overlayOpen = false
     end if
+end sub
+
+
+' ── Profile → Home catalog prefetch (survives ProfileScreen dispose) ──────────
+' React navigates home as soon as select-profile succeeds. Prefetch runs here so
+' Home can consume HomeBootCache without holding the selecting shimmer on Profile.
+
+function StartHomePrefetch(profileId as string) as void
+    StopVmHomePrefetch()
+    m.homeBootCache = {
+        profileId: profileId
+        cwDone: false
+        catDone: false
+        cwApi: invalid
+        catApi: invalid
+    }
+    m.holdHttpDrain = true
+    m.prefetchCwRetriesLeft = HC_PrefetchMaxRetries()
+    m.prefetchCatRetriesLeft = HC_PrefetchMaxRetries()
+    StartVmPrefetchCwFetch()
+    StartVmPrefetchCatFetch()
+end function
+
+
+sub StopVmHomePrefetch()
+    if m.prefetchCwRetryTimer <> invalid then m.prefetchCwRetryTimer.control = "stop"
+    if m.prefetchCatRetryTimer <> invalid then m.prefetchCatRetryTimer.control = "stop"
+    if m.prefetchCwTask <> invalid then m.prefetchCwTask.unobserveField("apiResult")
+    if m.prefetchCatTask <> invalid then m.prefetchCatTask.unobserveField("apiResult")
+    m.prefetchCwTask = invalid
+    m.prefetchCatTask = invalid
+end sub
+
+
+function StopHomePrefetch(dummy = invalid as dynamic) as void
+    m.holdHttpDrain = false
+    StopVmHomePrefetch()
+end function
+
+
+sub StartVmPrefetchCwFetch()
+    if m.prefetchCwTask <> invalid then m.prefetchCwTask.unobserveField("apiResult")
+    m.prefetchCwTask = ApiGet(Endpoints().HOME.CONTINUE_WATCHING)
+    m.prefetchCwTask.observeField("apiResult", "OnVmPrefetchCw")
+    StartHttpTask(m.prefetchCwTask)
+end sub
+
+
+sub StartVmPrefetchCatFetch()
+    if m.prefetchCatTask <> invalid then m.prefetchCatTask.unobserveField("apiResult")
+    m.prefetchCatTask = ApiGet(Endpoints().HOME.CATEGORY_LIST)
+    m.prefetchCatTask.observeField("apiResult", "OnVmPrefetchCat")
+    StartHttpTask(m.prefetchCatTask)
+end sub
+
+
+sub VmPrefetchSetCw(api as object)
+    entry = m.homeBootCache
+    if entry = invalid then return
+    m.homeBootCache = {
+        profileId: entry.profileId
+        cwDone: true
+        catDone: entry.catDone = true
+        cwApi: api
+        catApi: entry.catApi
+    }
+end sub
+
+
+sub VmPrefetchSetCat(api as object)
+    entry = m.homeBootCache
+    if entry = invalid then return
+    m.homeBootCache = {
+        profileId: entry.profileId
+        cwDone: entry.cwDone = true
+        catDone: true
+        cwApi: entry.cwApi
+        catApi: api
+    }
+end sub
+
+
+sub OnVmPrefetchCw()
+    if m.prefetchCwTask = invalid then return
+    api = m.prefetchCwTask.apiResult
+    if api = invalid then return
+    ok = false
+    if api.ok = true then ok = true
+    if ok then
+        VmPrefetchSetCw(api)
+        return
+    end if
+    if m.prefetchCwRetriesLeft > 0 then
+        m.prefetchCwRetriesLeft = m.prefetchCwRetriesLeft - 1
+        ScheduleVmPrefetchCwRetry()
+        return
+    end if
+    VmPrefetchSetCw(api)
+end sub
+
+
+sub OnVmPrefetchCat()
+    if m.prefetchCatTask = invalid then return
+    api = m.prefetchCatTask.apiResult
+    if api = invalid then return
+    ok = false
+    if api.ok = true then ok = true
+    if ok then
+        VmPrefetchSetCat(api)
+        return
+    end if
+    if m.prefetchCatRetriesLeft > 0 then
+        m.prefetchCatRetriesLeft = m.prefetchCatRetriesLeft - 1
+        ScheduleVmPrefetchCatRetry()
+        return
+    end if
+    VmPrefetchSetCat(api)
+end sub
+
+
+sub ScheduleVmPrefetchCwRetry()
+    if m.prefetchCwRetryTimer = invalid then
+        m.prefetchCwRetryTimer = CreateObject("roSGNode", "Timer")
+        m.prefetchCwRetryTimer.duration = HC_PrefetchRetryDelaySec()
+        m.prefetchCwRetryTimer.repeat = false
+        m.top.appendChild(m.prefetchCwRetryTimer)
+        m.prefetchCwRetryTimer.observeField("fire", "OnVmPrefetchCwRetry")
+    end if
+    m.prefetchCwRetryTimer.control = "stop"
+    m.prefetchCwRetryTimer.control = "start"
+end sub
+
+
+sub ScheduleVmPrefetchCatRetry()
+    if m.prefetchCatRetryTimer = invalid then
+        m.prefetchCatRetryTimer = CreateObject("roSGNode", "Timer")
+        m.prefetchCatRetryTimer.duration = HC_PrefetchRetryDelaySec()
+        m.prefetchCatRetryTimer.repeat = false
+        m.top.appendChild(m.prefetchCatRetryTimer)
+        m.prefetchCatRetryTimer.observeField("fire", "OnVmPrefetchCatRetry")
+    end if
+    m.prefetchCatRetryTimer.control = "stop"
+    m.prefetchCatRetryTimer.control = "start"
+end sub
+
+
+sub OnVmPrefetchCwRetry()
+    StartVmPrefetchCwFetch()
+end sub
+
+
+sub OnVmPrefetchCatRetry()
+    StartVmPrefetchCatFetch()
 end sub

@@ -38,6 +38,7 @@ sub init()
     m.selectedProfile = invalid
     m.popup = ""               ' "" | "confirm" | "otp"
     m.selecting = false
+    m.prefetching = false
     m.loggingOut = false
     m.AUTO_TOTAL_MS = 15000      ' progress ring reaches 100% at 15s (parity with React)
     m.AUTO_SELECT_MS = 15500     ' auto-select fires after 15s + a 500ms buffer
@@ -106,9 +107,6 @@ end sub
 
 ' Tear down timers/tasks when ViewManager removes this screen (prevents orphaned
 ' auto-select ticks and late apiResult handlers after logout/navigation).
-
-' Tear down timers/tasks when ViewManager removes this screen (prevents orphaned
-' auto-select ticks and late apiResult handlers after logout/navigation).
 sub OnDispose()
     if not m.top.dispose then return
     ProfileSelectLogNode("PROFILE_DISPOSE", "stopping timers + tasks", m.top)
@@ -126,6 +124,7 @@ sub OnDispose()
     m.verifyTask = invalid
     m.refreshTask = invalid
     m.selecting = false
+    m.prefetching = false
     m.loggingOut = false
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")

@@ -99,6 +99,9 @@ sub init()
     m.bootStarted = false
     m.homeNavReady = false
     m.contentBootStarted = false
+    m.homePrefetchWaitTimer = invalid
+    m.homePrefetchWaitClock = invalid
+    m.homePrefetchWaitStartMs = -1
     m.selectInFlight = false
     m.selectAwaitingApiResult = false
     m.selectRetriesLeft = 0
@@ -209,6 +212,7 @@ sub OnDispose()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
     if m.rowBuildGate <> invalid then m.rowBuildGate.control = "stop"
     if m.continueBootTimeout <> invalid then m.continueBootTimeout.control = "stop"
+    if m.homePrefetchWaitTimer <> invalid then m.homePrefetchWaitTimer.control = "stop"
     if m.skeletonTimeout <> invalid then m.skeletonTimeout.control = "stop"
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     DetachFirstRowWatch()

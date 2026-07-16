@@ -516,6 +516,11 @@ sub OnKey()
     if not ev.press then return
 
     key = ev.key
+    ' Ensure catalogue shells exist before computing the destination row (turbo used to
+    ' reveal with only CW mounted, so Down computed last=0 and paused every build).
+    if m.focusZone = "rows" and m.rowWidgets <> invalid and m.contentRowCats <> invalid then
+        if m.rowWidgets.Count() < m.contentRowCats.Count() then MountRemainingRowShells()
+    end if
     navRowIdx = -1
     if m.focusZone = "rows" and not AnyBootLoading() then
         if key = "down" and m.rowIndex < LastRowIndex() then

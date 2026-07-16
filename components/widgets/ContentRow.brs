@@ -44,6 +44,8 @@ sub init()
     m.cwPerfSpan = invalid
     m.paintPollCount = 0
     m.paintStableCount = 0
+    m.bootThumbsReleased = false
+    m.pendingSkelSlots = []
 end sub
 
 sub OnCategoryChanged()
@@ -176,6 +178,7 @@ function AbortBuild(dummy = invalid as dynamic) as boolean
     if m.cardTimer <> invalid then m.cardTimer.control = "stop"
     if m.revealTimer <> invalid then m.revealTimer.control = "stop"
     if m.paintTimer <> invalid then m.paintTimer.control = "stop"
+    ClearPendingSkeletonSlots()
     m.buildActive = false
     return true
 end function
@@ -230,6 +233,7 @@ sub StartCardBuild(cat as object)
     m.cwPerfSpan = CreateObject("roTimespan")
     m.paintPollCount = 0
     m.paintStableCount = 0
+    m.bootThumbsReleased = false
     CwPerfMark(m.cwPerfSpan, "row StartCardBuild", "cards=" + Str(plan.Count()))
     if m.top.bootPaintCardCount > 0 then
         HomeLoaderLog("row StartCardBuild", "plan=" + Str(plan.Count()) + " bootWindow=" + Str(m.top.bootPaintCardCount) + " progressive=1card/tick")
@@ -246,17 +250,38 @@ sub StartCardBuild(cat as object)
     m.buildActive = true
     if m.revealTimer <> invalid then m.revealTimer.control = "stop"
 
-    if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
+    ' Boot / peek rows show skeleton cards while thumbs load (React continueWatchCard).
+    ' Other rows keep the strip hidden until media is ready.
+    if RowShowsSkeletonFirst() then
+        if m.cardsHost <> invalid then m.cardsHost.opacity = 1.0
+        if m.rowTitle <> invalid then m.rowTitle.opacity = 1.0
+    else if m.cardsHost <> invalid then
+        m.cardsHost.opacity = 0.0
+    end if
     m.top.built = false
 
     if m.buildPlan.Count() > 0 then
-        m.cardTimer.control = "start"
+        ' Shimmer slots for every plan item not yet a real card (React mounts all CW cards at once).
+        EnsurePendingSkeletonSlots()
+        if m.top.bootPaintCardCount > 0 then
+            ' Home calls BuildCardsNow next — keep the progressive timer off so it cannot
+            ' race ahead and replace skeleton slots before the sync window runs.
+            if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+        else
+            m.cardTimer.control = "start"
+        end if
     else
         m.buildComplete = true
         m.buildActive = false
         RevealNow()
     end if
 end sub
+
+function RowShowsSkeletonFirst() as boolean
+    if m.top.bootPaintCardCount > 0 then return true
+    if m.top.ottRowReveal = true then return true
+    return false
+end function
 
 ' Only count cards that intersect the first-screen strip toward the reveal gate.
 sub TrackCardMediaLoad(card as object, compName as string)
@@ -335,6 +360,8 @@ sub AppendNextCardFromPlan()
     if m.buildPlan = invalid then return
     if m.buildIdx >= m.buildPlan.Count() then return
 
+    PopPendingSkeletonSlot()
+
     plan = m.buildPlan[m.buildIdx]
     gap = HC_CardGap()
 
@@ -374,6 +401,7 @@ sub FinishCardBuildIfDone()
     if m.buildIdx < m.buildPlan.Count() then return
     m.cardTimer.control = "stop"
     if m.cardTimer <> invalid then m.cardTimer.duration = 0.01
+    ClearPendingSkeletonSlots()
     OnCardFocusChanged()
     m.buildComplete = true
     m.buildActive = false
@@ -389,18 +417,8 @@ sub RevealStripNow()
     if m.cardsHost <> invalid then m.cardsHost.opacity = 1.0
 end sub
 
-' Sync-build cards for focus prefetch — boot row 0 uses cardTimer (one card/tick) so the
-' home page loader keeps spinning on the render thread.
+' Sync-build cards. Boot window mounts skeleton cards immediately (React CW placeholders).
 function BuildCardsNow(maxCards as dynamic) as boolean
-    if m.top.bootPaintCardCount > 0 and m.buildActive then
-        if m.cardTimer <> invalid and m.cardTimer.control <> "start" then
-            m.cardTimer.control = "start"
-        end if
-        MaybeBootPaintProgress()
-        HomeLoaderLog("row0 BuildCardsNow defer", "progressive cards=" + Str(m.cards.Count()) + " plan=" + Str(m.buildPlan.Count()))
-        return true
-    end if
-
     limit = 6
     if maxCards <> invalid then
         if Type(maxCards) = "roInt" or Type(maxCards) = "Integer" then limit = maxCards
@@ -412,15 +430,35 @@ function BuildCardsNow(maxCards as dynamic) as boolean
 
     if m.cardTimer <> invalid then m.cardTimer.control = "stop"
 
+    ' First-screen boot cards: create nodes now so skeleton + progress show under the data gate.
+    if m.top.bootPaintCardCount > 0 then
+        target = m.top.bootPaintCardCount
+        if m.buildPlan.Count() < target then target = m.buildPlan.Count()
+        if limit < target then target = limit
+        while m.cards.Count() < target and m.buildIdx < m.buildPlan.Count()
+            AppendNextCardFromPlan()
+        end while
+        RevealStripNow()
+        EnsurePendingSkeletonSlots()
+        HomeLoaderLog("row0 skeleton window", "cards=" + Str(m.cards.Count()) + " idx=" + Str(m.buildIdx) + "/" + Str(m.buildPlan.Count()))
+        if m.buildIdx >= m.buildPlan.Count() then
+            FinishCardBuildIfDone()
+        else if m.cardTimer <> invalid then
+            m.cardTimer.duration = 0.01
+            m.cardTimer.control = "start"
+        end if
+        return true
+    end if
+
     n = 0
     while n < limit and m.buildIdx < m.buildPlan.Count()
         AppendNextCardFromPlan()
         n = n + 1
     end while
 
-    if m.top.ottRowReveal = true and m.cards.Count() > 0 then RevealStripNow()
-    if m.top.bootPaintCardCount > 0 then
-        HomeLoaderLog("row0 BuildCardsNow done", "cards=" + Str(m.cards.Count()) + " idx=" + Str(m.buildIdx) + "/" + Str(m.buildPlan.Count()))
+    if m.top.ottRowReveal = true and m.cards.Count() > 0 then
+        RevealStripNow()
+        EnsurePendingSkeletonSlots()
     end if
     if m.buildIdx >= m.buildPlan.Count() then
         FinishCardBuildIfDone()
@@ -431,11 +469,87 @@ function BuildCardsNow(maxCards as dynamic) as boolean
     return true
 end function
 
-' Reveal only when every card node exists AND its media is loaded, so the
-' shimmer stays up continuously and the real strip swaps in instantly.
-' Genre / OTT catalogue: reveal once nodes exist — card skeletons cover thumb fetch.
+' Lightweight shimmer slots for plan items not yet built as real cards (CW progressive mount).
+sub ClearPendingSkeletonSlots()
+    if m.pendingSkelSlots = invalid then
+        m.pendingSkelSlots = []
+        return
+    end if
+    for each slot in m.pendingSkelSlots
+        if slot = invalid then continue for
+        parent = slot.getParent()
+        if parent <> invalid then parent.removeChild(slot)
+    end for
+    m.pendingSkelSlots = []
+end sub
+
+sub PopPendingSkeletonSlot()
+    if m.pendingSkelSlots = invalid or m.pendingSkelSlots.Count() = 0 then return
+    slot = m.pendingSkelSlots[0]
+    m.pendingSkelSlots.Delete(0)
+    if slot = invalid then return
+    parent = slot.getParent()
+    if parent <> invalid then parent.removeChild(slot)
+end sub
+
+sub EnsurePendingSkeletonSlots()
+    if not RowShowsSkeletonFirst() then return
+    if m.buildPlan = invalid or m.cardsHost = invalid then return
+    ClearPendingSkeletonSlots()
+    if m.buildIdx >= m.buildPlan.Count() then return
+
+    gap = HC_CardGap()
+    x = m.buildX
+    skColors = CardHomeCardSkeletonColors()
+    for i = m.buildIdx to m.buildPlan.Count() - 1
+        plan = m.buildPlan[i]
+        if plan = invalid then continue for
+        w = 256
+        h = 286
+        isCw = false
+        if plan.kind = "seeAll" then
+            w = CardComponentWidth("SeeAllCard", m.seeAllOrientation)
+            h = HC_CardHeight("SeeAllCard")
+        else if plan.comp <> invalid then
+            w = CardComponentWidth(plan.comp)
+            h = HC_CardHeight(plan.comp)
+            if plan.comp = "ContinueWatchCard" then isCw = true
+        end if
+
+        slot = m.cardsHost.createChild("Group")
+        slot.translation = [x, 0]
+        bg = slot.createChild("Rectangle")
+        bg.translation = [3, 3]
+        bg.width = w - 6
+        if bg.width < 1 then bg.width = w
+        bg.height = h
+        bg.color = CardWhite10Color()
+        sk = slot.createChild("Skeleton")
+        sk.translation = [3, 3]
+        sk.boxWidth = bg.width
+        sk.boxHeight = h
+        CardApplySkeleton(sk, skColors.base, skColors.highlight)
+        if sk.hasField("running") then sk.running = true
+        if isCw then
+            track = slot.createChild("Rectangle")
+            track.translation = [3, 3 + h - 8]
+            track.width = bg.width
+            track.height = 8
+            track.color = CardWhite10Color()
+        end if
+        m.pendingSkelSlots.Push(slot)
+        x = x + w + gap
+    end for
+end sub
+
+' Show the strip once card nodes exist. Boot/peek rows keep skeletons visible while
+' thumbs load (React continueWatchCard). Other rows wait for media so painted cards swap in.
 sub MaybeReveal()
     if not m.buildComplete then return
+    if RowShowsSkeletonFirst() then
+        RevealNow()
+        return
+    end if
     if m.pendingMediaLoads > 0 then return
     RevealNow()
 end sub
@@ -609,8 +723,13 @@ sub ConfigureCard(card as object, compName as string, item as object, cardType a
     CardInjectTheme(card, m.top.cPrimary500, m.top.cPrimary600, m.top.cPrimary700, m.top.cNeutral50, m.top.cNeutral800, m.top.cNeutral700)
 
     if compName = "ContinueWatchCard" then
-        card.thumbnailUri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
+        ' Hold poster fetch until Home drops the page loader so CW skeleton+progress is visible.
+        ' Only cards created before the first ReleaseBootThumbHolds stay held; later cards load immediately.
+        if m.top.bootPaintCardCount > 0 and m.bootThumbsReleased <> true then
+            card.holdThumbLoad = true
+        end if
         card.progress = GetContinueProgressPercent(item)
+        card.thumbnailUri = GetCardImgByType(HC_CardTypeHorizontal(), item.thumbnails)
     else if compName = "NumberedVerticalCard" then
         ' PARITY: contentRow.tsx selects the TOP_CONTENTS thumbnail with the category's own
         ' cardType (getCardImgByType(cardType, thumbnails)) — NOT a hardcoded VERTICAL. Using
@@ -629,6 +748,21 @@ sub ConfigureCard(card as object, compName as string, item as object, cardType a
         card.thumbnailUri = GetCardImgByType(cardType, item.thumbnails)
     end if
 end sub
+
+' After page loader hides — start CW poster fetches (skeleton was held during boot).
+function ReleaseBootThumbHolds(dummy = invalid as dynamic) as boolean
+    m.bootThumbsReleased = true
+    n = 0
+    for each card in m.cards
+        if card = invalid then continue for
+        if card.hasField("holdThumbLoad") <> true then continue for
+        if card.holdThumbLoad <> true then continue for
+        card.callFunc("ReleaseThumbLoad", invalid)
+        n = n + 1
+    end for
+    HomeLoaderLog("row ReleaseBootThumbHolds", "released=" + Str(n) + " cards=" + Str(m.cards.Count()))
+    return true
+end function
 
 sub ApplyRowTheme()
     m.rowTitle.color = m.top.cNeutral50
@@ -696,6 +830,7 @@ sub ClearCards()
     for each card in m.cards
         CardDetachMediaObservers(card)
     end for
+    ClearPendingSkeletonSlots()
     if m.cardsHost <> invalid then m.cardsHost.opacity = 0.0
     if m.rowTitle <> invalid then m.rowTitle.opacity = 0.0
     m.top.built = false

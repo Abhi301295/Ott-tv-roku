@@ -19,6 +19,7 @@ sub init()
     end for
     m.dataApplied = false
     m.reported = false
+    m.pendingThumbUri = ""
     m.thumb.observeField("loadStatus", "OnThumbLoad")
     ApplyAll()
 end sub
@@ -63,21 +64,36 @@ sub ReportLoaded()
     m.top.loaded = true
 end sub
 
+function ReleaseThumbLoad(dummy = invalid as dynamic) as boolean
+    m.top.holdThumbLoad = false
+    uri = m.pendingThumbUri
+    if uri = "" then uri = m.top.thumbnailUri
+    if uri = "" then
+        ShowSkeletonOnly()
+        return true
+    end if
+    m.pendingThumbUri = ""
+    ' Re-apply so the poster fetch starts after the page loader is gone.
+    if m.top.thumbnailUri = uri then
+        StartThumbFetch(uri)
+    else
+        m.top.thumbnailUri = uri
+    end if
+    return true
+end function
+
 sub ApplyAll()
     uri = m.top.thumbnailUri
+    if m.top.holdThumbLoad = true then
+        if uri <> invalid and uri <> "" then m.pendingThumbUri = uri
+        ShowSkeletonOnly()
+        ApplyProgressFill()
+        ApplyFocusVisual()
+        return
+    end if
+
     if uri <> invalid and uri <> "" then
-        CardHideThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo)
-        m.thumb.uri = uri
-        m.thumb.visible = true
-        status = m.thumb.loadStatus
-        ready = (status = "ready" or status = "failed")
-        if ready then
-            CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 540, 286)
-            ReportLoaded()
-        else
-            m.skeleton.visible = true
-            m.skeleton.running = true
-        end if
+        StartThumbFetch(uri)
     else
         CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 540, 286)
         if m.dataApplied then ReportLoaded()
@@ -99,6 +115,49 @@ sub ApplyAll()
     ApplyProgressFill()
 
     ApplyFocusVisual()
+end sub
+
+sub StartThumbFetch(uri as string)
+    m.thumb.uri = uri
+    status = m.thumb.loadStatus
+    ready = (status = "ready" or status = "failed")
+    if ready then
+        CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, 540, 286)
+        ReportLoaded()
+    else
+        ' React continueWatchCard: shimmer + progress while img loads (img hidden until onLoad).
+        if m.thumb <> invalid then m.thumb.visible = false
+        if m.skeleton <> invalid then
+            m.skeleton.visible = true
+            m.skeleton.running = true
+        end if
+        if m.thumbFallback <> invalid then m.thumbFallback.visible = false
+        if m.thumbFallbackLogo <> invalid then m.thumbFallbackLogo.visible = false
+    end if
+    skColors = CardHomeCardSkeletonColors()
+    if m.skeleton <> invalid and m.skeleton.visible = true then
+        CardApplySkeleton(m.skeleton, skColors.base, skColors.highlight)
+    end if
+    if m.cardBg <> invalid then m.cardBg.color = CardWhite10Color()
+end sub
+
+sub ShowSkeletonOnly()
+    if m.thumb <> invalid then
+        m.thumb.visible = false
+        m.thumb.uri = ""
+    end if
+    if m.skeleton <> invalid then
+        m.skeleton.visible = true
+        m.skeleton.running = true
+        skColors = CardHomeCardSkeletonColors()
+        CardApplySkeleton(m.skeleton, skColors.base, skColors.highlight)
+    end if
+    if m.thumbFallback <> invalid then
+        m.thumbFallback.visible = true
+        m.thumbFallback.color = CardWhite10Color()
+    end if
+    if m.thumbFallbackLogo <> invalid then m.thumbFallbackLogo.visible = false
+    if m.progressTrack <> invalid then m.progressTrack.color = CardCwProgressTrackColor()
 end sub
 
 sub ApplyFocusVisual()
@@ -131,7 +190,7 @@ sub ApplyProgressFill()
     for i = 0 to n - 1
         seg = m.fillSegs[i]
         if seg <> invalid then
-            ' t at the slice midpoint gives a smooth ramp across the whole bar.
+            ' t at the slice midpoint gives a smooth ramp across the whole fill.
             t = 0.0
             if n > 1 then t = (i + 0.5) / n
             r = Int(c0[0] + (c1[0] - c0[0]) * t)

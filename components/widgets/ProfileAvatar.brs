@@ -61,6 +61,10 @@ sub OnSelectingChanged()
             m.hintLabel.visible = (m.top.focusedState = true and m.top.hintText <> "")
         end if
     end if
+    if show then
+        ' Freeze focus scale so size-anim ticks cannot keep restarting the skeleton shimmer.
+        SnapSelectingFocusScale()
+    end if
     if m.selectingGroup <> invalid then
         m.selectingGroup.visible = show
         if show then
@@ -78,6 +82,27 @@ sub OnSelectingChanged()
         HideAvatarForSelecting()
     else
         ShowAvatarAfterSelecting()
+    end if
+end sub
+
+' Selecting skeleton is static-size; stop focus scale animation so layout churn does not
+' restart ProfileSkeletonBox shimmer while select/prefetch runs.
+sub SnapSelectingFocusScale()
+    if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.control = "stop"
+    scale = m.FOCUS_SCALE
+    x = m.FOCUS_OFFSET_X
+    if m.top.focusedState <> true then
+        scale = m.REST_SCALE
+        x = m.REST_OFFSET_X
+    end if
+    m.visualScale = scale
+    m.visualOffsetX = x
+    m.lastScale = scale
+    m.lastOffsetX = x
+    ApplyAvatarSize(scale)
+    if m.scaler <> invalid then
+        m.scaler.scale = [1.0, 1.0]
+        m.scaler.translation = [x, SizeOffsetY(scale)]
     end if
 end sub
 
@@ -203,6 +228,8 @@ end sub
 sub OnFocusChanged()
     if m.ring = invalid then return
     ApplyFocusChrome()
+    ' Selecting skeleton owns layout — do not keep animating focus scale under it.
+    if m.top.selectingState = true then return
     AnimateScale(m.top.focusedState = true)
 end sub
 
@@ -323,6 +350,12 @@ sub StartSizeAnimation(fromScale as float, toScale as float, fromX as float, toX
 end sub
 
 sub OnSizeAnimTick()
+    if m.top.selectingState = true then
+        if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.control = "stop"
+        SnapSelectingFocusScale()
+        SyncSelectingSkeletonScale()
+        return
+    end if
     m.animStep = m.animStep + 1
     steps = m.SIZE_ANIM_STEPS
     if m.animStepCount <> invalid and m.animStepCount > 0 then steps = m.animStepCount
@@ -340,7 +373,6 @@ sub OnSizeAnimTick()
     ApplyAvatarSize(scale)
     m.scaler.scale = [1.0, 1.0]
     m.scaler.translation = [x, SizeOffsetY(scale)]
-    if m.top.selectingState = true then SyncSelectingSkeletonScale()
 
     if t >= 1.0 and m.sizeAnimTimer <> invalid then
         m.sizeAnimTimer.control = "stop"
@@ -393,7 +425,6 @@ sub ApplyAvatarSize(scale as float)
         m.lockBadge.height = 28 * scale
     end if
     ApplyEditBadgeLayout(scale)
-    if m.top.selectingState = true then SyncSelectingSkeletonScale()
 end sub
 
 ' netComponent.tsx: absolute -bottom-1 -left-1, w-12 h-12 badge, w-6 h-6 icon.
