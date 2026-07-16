@@ -442,12 +442,7 @@ sub ApplyRowFocusState(i as integer)
     row = m.rowWidgets[i]
     if row = invalid then return
     row.rowFocused = (m.focusZone = "rows" and i = m.rowIndex)
-    ' Netflix netflixContent.tsx dims rows below focus to 0.4; OTT content.tsx does not.
-    if ThemeIsOttHome() then
-        row.rowDimmed = false
-    else
-        row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
-    end if
+    row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
     peek = false
     if i = 0 and not m.rowsRevealed then
         peek = true

@@ -13,6 +13,13 @@ function DefaultFeatures() as object
         epgManagement: false
         geoBlockingEnabled: true
         subscriptionEnabled: true
+        profileAutoLogin: true
+        enableSideBarMenu: true
+        displayTitle: false
+        isBingeWatch: true
+        enableTrailerOnBanner: true
+        enableHomeBanner: false
+        enableCardFocus: false
     }
 end function
 
@@ -180,4 +187,45 @@ function CoerceFeatureFlag(value as dynamic) as boolean
         return (s = "true" or s = "1" or s = "yes")
     end if
     return false
+end function
+
+function ResolvedBusinessFeatures() as object
+    if m.global <> invalid and m.global.businessResolved <> invalid and m.global.businessResolved.features <> invalid then
+        return m.global.businessResolved.features
+    end if
+    return DefaultFeatures()
+end function
+
+function FeatureFlagEnabled(name as string, defaultValue as boolean) as boolean
+    features = ResolvedBusinessFeatures()
+    if features[name] = invalid then return defaultValue
+    return CoerceFeatureFlag(features[name])
+end function
+
+function ProfileAutoLoginEnabled() as boolean
+    return FeatureFlagEnabled("profileAutoLogin", DefaultFeatures().profileAutoLogin)
+end function
+
+function FeatureEnableSideBarMenu() as boolean
+    return FeatureFlagEnabled("enableSideBarMenu", DefaultFeatures().enableSideBarMenu)
+end function
+
+function FeatureEnableHomeBanner() as boolean
+    return FeatureFlagEnabled("enableHomeBanner", DefaultFeatures().enableHomeBanner)
+end function
+
+function FeatureEnableCardFocus() as boolean
+    return FeatureFlagEnabled("enableCardFocus", DefaultFeatures().enableCardFocus)
+end function
+
+function FeatureEnableTrailerOnBanner() as boolean
+    return FeatureFlagEnabled("enableTrailerOnBanner", DefaultFeatures().enableTrailerOnBanner)
+end function
+
+function FeatureDisplayTitle() as boolean
+    return FeatureFlagEnabled("displayTitle", DefaultFeatures().displayTitle)
+end function
+
+function FeatureIsBingeWatch() as boolean
+    return FeatureFlagEnabled("isBingeWatch", DefaultFeatures().isBingeWatch)
 end function

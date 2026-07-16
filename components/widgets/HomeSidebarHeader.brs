@@ -123,8 +123,9 @@ sub BuildMenu()
         icon.loadWidth = m.ICON_SRC
         icon.loadHeight = m.ICON_SRC
         icon.loadDisplayMode = "scaleToFit"
-        if it.icon <> invalid then icon.uri = it.icon
+        if icon <> invalid then icon.uri = it.icon
         icon.blendColor = "0xffffffff"
+        ApplySidebarProfileIcon(icon, it)
 
         lbl = row.createChild("Label")
         lbl.id = "label"
@@ -136,7 +137,7 @@ sub BuildMenu()
         lbl.vertAlign = "center"
         lbl.color = m.top.cNeutral100
         lbl.visible = false
-        if it.text <> invalid then lbl.text = it.text
+        if it.text <> invalid then lbl.text = SidebarMenuLabel(it)
         ApplySidebarFont(lbl, "regular", 20)
 
         m.itemRows.Push({ row: row, bg: bg, icon: icon, label: lbl, item: it })
@@ -244,6 +245,9 @@ sub ApplyFocus()
         end if
 
         if it <> invalid then
+            if lbl <> invalid and expanded and it.text = "Profile" then
+                lbl.text = SidebarMenuLabel(it)
+            end if
             if showSel or isFoc then
                 uri = it.iconActive
                 if uri = invalid or uri = "" then uri = it.icon
@@ -257,6 +261,28 @@ sub ApplyFocus()
 
         if bg <> invalid then bg.visible = false
     end for
+end sub
+
+function SidebarMenuLabel(it as object) as string
+    if it = invalid or it.text = invalid then return ""
+    if it.text <> "Profile" then return it.text
+    nm = GetProfileName()
+    if nm = "" then return "User"
+    return nm
+end function
+
+sub ApplySidebarProfileIcon(icon as object, it as object)
+    if icon = invalid or it = invalid or it.text <> "Profile" then return
+    av = RegistryRead(SK_Avatar(), "app")
+    if av = "" and m.top.avatarUri <> invalid then av = m.top.avatarUri
+    if av <> "" then
+        icon.uri = av
+        icon.loadDisplayMode = "scaleToZoom"
+    end if
+end sub
+
+sub OnAvatarChanged()
+    BuildMenu()
 end sub
 
 sub OnThemeChanged()
@@ -310,7 +336,4 @@ sub OnLogoChanged()
             end if
         end if
     end if
-end sub
-
-sub OnAvatarChanged()
 end sub

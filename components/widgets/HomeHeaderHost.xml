@@ -20,6 +20,7 @@
     <field id="scrimOpacity" type="float" value="0.0" onChange="OnScrimProxy" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/HomeHeaderHost.brs" />
 

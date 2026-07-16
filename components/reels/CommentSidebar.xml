@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Comment drawer parity with features/reels/components/CommentSidebar.tsx -->
+<component name="ReelsCommentDrawer" extends="Group">
+  <interface>
+    <field id="reelId" type="string" value="" onChange="OnReelChanged" />
+    <field id="totalComments" type="integer" value="0" onChange="OnReelChanged" />
+    <field id="isOpen" type="boolean" value="false" alwaysNotify="true" onChange="OnOpenChanged" />
+    <field id="requestClose" type="boolean" value="false" alwaysNotify="true" onChange="OnRequestClose" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="action" type="string" value="" alwaysNotify="true" />
+    <field id="cNeutral50" type="string" value="0xffffffff" />
+    <field id="cNeutral400" type="string" value="0xa3a3a3ff" />
+    <field id="cNeutral700" type="string" value="0x404040ff" />
+    <field id="cNeutral900" type="string" value="0x0a0a0aff" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/MediaUrl.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsService.brs" />
+  <script type="text/brightscript" uri="pkg:/components/reels/CommentSidebar.brs" />
+
+  <children>
+    <!-- Scrim stays fixed; drawer slides (index.css sidebarSlideIn/Out). -->
+    <Rectangle id="scrim" width="1920" height="1080" color="0x0000004d" opacity="0.0" visible="false" />
+    <Group id="drawer" translation="[1920, 0]">
+      <Rectangle id="panel" translation="[0, 96]" width="650" height="984" color="0x14141cff" />
+      <Label id="title" translation="[24, 116]" width="560" height="48" text="Comments" color="0xffffffff">
+        <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="30" />
+      </Label>
+      <Label id="countLbl" translation="[24, 164]" width="560" height="32" color="0xa3a3a3ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
+      </Label>
+      <Group id="closeBtn" translation="[578, 116]">
+        <Poster width="48" height="48" uri="pkg:/images/ui/avatar_circle.png" blendColor="0xffffff26" />
+        <Label text="X" width="48" height="48" horizAlign="center" vertAlign="center" color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="20" />
+        </Label>
+      </Group>
+      <Label id="loadingLbl" translation="[24, 220]" width="560" height="40" text="Loading comments..." color="0xa3a3a3ff" visible="false">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+      <Label id="emptyLbl" translation="[24, 220]" width="560" height="80" text="No comments yet" color="0xa3a3a3ff" visible="false">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+      <Group id="listHost" translation="[24, 220]" />
+    </Group>
+    <Animation id="slideAnim" duration="0.3" repeat="false" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="slideInterp" key="[0.0, 1.0]"
+        keyValue="[[1920.0, 0.0], [1270.0, 0.0]]" fieldToInterp="drawer.translation" />
+      <FloatFieldInterpolator id="scrimInterp" key="[0.0, 1.0]"
+        keyValue="[0.0, 1.0]" fieldToInterp="scrim.opacity" />
+    </Animation>
+  </children>
+</component>

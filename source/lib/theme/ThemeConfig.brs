@@ -75,6 +75,28 @@ function TC_HeroParallaxSlide() as string
     return "PARALLAX_SLIDE"
 end function
 
+' ── ReelLayout (theme.config.ts reelLayout) ─────────────────────────────────
+function TC_ReelLayoutDefault() as string
+    return "DEFAULT"
+end function
+
+function TC_ReelLayoutNewUi() as string
+    return "NEW_UI"
+end function
+
+function TC_ReelLayoutCleanUi() as string
+    return "CLEAN_UI"
+end function
+
+' ── CardFocusTrailerPlayback ────────────────────────────────────────────────
+function TC_CardFocusTrailerEnabled() as string
+    return "ENABLED"
+end function
+
+function TC_CardFocusTrailerDisabled() as string
+    return "DISABLED"
+end function
+
 ' ═══════════════════════════════════════════════════════════════════════════════
 ' Active layout config — change the return values below (mirrors theme.config.ts).
 ' headerStyle also controls Profile UI: NETFLIX → circular avatars, SIDEBAR → square cards.
@@ -134,24 +156,36 @@ function ThemeHeaderStyle() as string
 end function
 
 function ThemeHeroBannerStyle() as string
-    return TC_HeroCinematicZoom()
+    if FeatureEnableTrailerOnBanner() then return TC_HeroCinematicZoom()
+    return TC_HeroParallaxSlide()
+end function
+
+function ThemeReelLayout() as string
+    ' Mirrors theme.config.ts reelLayout: ReelLayout.CLEAN_UI (static — not API).
+    return TC_ReelLayoutCleanUi()
+end function
+
+function ThemeCardFocusTrailerPlayback() as string
+    return TC_CardFocusTrailerDisabled()
 end function
 
 ' ── Predicates ───────────────────────────────────────────────────────────────
-function ThemeIsNetflixHome() as boolean
-    return ThemeHomeLayout() = TC_HomeLayoutNetflix()
-end function
-
-function ThemeIsOttHome() as boolean
-    return ThemeHomeLayout() = TC_HomeLayoutOtt()
+' React header.tsx: enableSideBarMenu=true → NetflixHeader (top bar); false → sidebar.
+function ThemeIsNetflixHeader() as boolean
+    return FeatureEnableSideBarMenu()
 end function
 
 function ThemeIsSidebarHeader() as boolean
-    return ThemeHeaderStyle() = TC_HeaderSidebar()
+    return not ThemeIsNetflixHeader()
 end function
 
-function ThemeIsNetflixHeader() as boolean
-    return ThemeHeaderStyle() = TC_HeaderNetflix()
+' React home/index.tsx: enableHomeBanner=true → NetflixContent; false → OTT Content.
+function ThemeIsNetflixHome() as boolean
+    return FeatureEnableHomeBanner()
+end function
+
+function ThemeIsOttHome() as boolean
+    return not ThemeIsNetflixHome()
 end function
 
 ' True when the layout exposes top Netflix bar or left sidebar nav.

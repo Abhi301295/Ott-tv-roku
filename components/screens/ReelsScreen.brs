@@ -102,7 +102,8 @@ sub init()
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.observeField("businessResolved", "OnBusinessResolved")
     end if
-    ReelsDbg("init", "ReelsScreen ready seed=" + Str(m.seed) + " sim=" + ReelsDbgStr(ReelsIsSimulator()) + " inlineVideo=" + ReelsDbgStr(m.useInlineVideo))
+    InitReelsSocial()
+    ReelsDbg("init", "ReelsScreen ready seed=" + Str(m.seed) + " sim=" + ReelsDbgStr(ReelsIsSimulator()) + " inlineVideo=" + ReelsDbgStr(m.useInlineVideo) + " layout=" + ThemeReelLayout())
 end sub
 
 sub OnNavStateReady()
@@ -115,6 +116,9 @@ sub OnShellEnterContent()
     if m.top.shellEnterContent <> true then return
     m.top.shellEnterContent = false
     ReelsDbg("shell_content", "focus content index=" + Str(m.currentIndex))
+    m.reelsFocusZone = "video"
+    SyncReelsDetailPanel()
+    if m.initialFocusTimer <> invalid then m.initialFocusTimer.control = "start"
 end sub
 
 sub OnShellLayoutRev()
@@ -146,6 +150,12 @@ sub OnBusinessResolved()
     m.pageBgRest = m.cPageBg
     ApplyStaticColors()
     BrowseApplyPageLoaderColors(m)
+    if m.commentSidebar <> invalid then
+        m.commentSidebar.cNeutral50 = m.cNeutral50
+        m.commentSidebar.cNeutral400 = m.cNeutral400
+        m.commentSidebar.cNeutral700 = m.cNeutral700
+        m.commentSidebar.cNeutral900 = m.cPageBg
+    end if
 end sub
 
 sub OnDispose()
@@ -169,6 +179,7 @@ sub OnDispose()
     if m.videoPoster <> invalid then
         m.videoPoster.unobserveField("loadStatus")
     end if
+    DisposeReelsSocial()
 end sub
 
 sub KillReelsTask()
@@ -267,9 +278,10 @@ sub ApplyReelsShellLayout()
 
     vw = RL_VideoW()
     vh = RL_VideoH()
+    outerW = RL_VideoOuterW()
 
-    ' Center video column; metadata sits in a left column (React wide-layout parity).
-    m.videoX = Int((m.viewportW - vw) / 2)
+    ' Center the outer frame (border included); metadata sits left of it.
+    m.videoX = Int((m.viewportW - outerW) / 2)
     m.metaX = RL_MetaLeft() + RL_MetaPadX()
     m.metaColW = m.videoX - m.metaX - RL_MetaVideoGap()
     if m.metaColW < 400 then m.metaColW = 400
@@ -282,13 +294,13 @@ sub ApplyReelsShellLayout()
 
     absX = ReelsVideoAbsX()
     if m.overlayHost <> invalid then
-        m.overlayHost.translation = [absX + Int(vw / 2), m.shellOffY + Int(vh / 2)]
+        m.overlayHost.translation = [absX + Int(vw / 2), m.shellOffY + RL_VideoBorderW() + Int(vh / 2)]
     end if
 
     progressW = RL_VideoProgressW(vw)
     ph = RL_ProgressH()
     px = absX + Int((vw - progressW) / 2)
-    py = m.shellOffY + vh - RL_ProgressBottom() - ph
+    py = m.shellOffY + RL_VideoBorderW() + vh - RL_ProgressBottom() - ph
     if m.progressHost <> invalid then m.progressHost.translation = [px, py]
     if m.progressTrack <> invalid then m.progressTrack.width = progressW
     if m.seekPreview <> invalid then
@@ -299,7 +311,7 @@ sub ApplyReelsShellLayout()
     if m.metaContentH > 0 then LayoutMetaLabels()
     PositionMetaHost()
     ApplyVideoCornerLayout()
-    ReelsDbg("layout", "offX=" + Str(m.shellOffX) + " offY=" + Str(m.shellOffY) + " viewportW=" + Str(m.viewportW) + " metaX=" + Str(m.metaX) + " metaW=" + Str(m.metaColW) + " metaY=" + Str(m.metaY) + " metaH=" + Str(m.metaContentH) + " videoX=" + Str(m.videoX))
+    ReelsDbg("layout", "offX=" + Str(m.shellOffX) + " offY=" + Str(m.shellOffY) + " viewportW=" + Str(m.viewportW) + " outer=" + Str(outerW) + "x" + Str(RL_VideoOuterH()) + " videoX=" + Str(m.videoX) + " corners=TLTRBLBR")
 end sub
 
 function ReelsVideoAbsX() as integer
@@ -437,14 +449,20 @@ end sub
 
 sub ApplyVideoCornerLayout()
     if m.videoCornerHost = invalid then return
-    vw = RL_VideoW()
-    vh = RL_VideoH()
     bw = RL_VideoBorderW()
-    r = RL_VideoRadius()
-    outerW = vw + (bw * 2)
-    outerH = vh + (bw * 2)
+    r = RL_VideoOuterRadius()
+    outerW = RL_VideoOuterW()
+    outerH = RL_VideoOuterH()
 
     m.videoCornerHost.translation = [m.shellOffX + m.videoX, m.shellOffY]
+    for each corner in [m.cornerTL, m.cornerTR, m.cornerBL, m.cornerBR]
+        if corner <> invalid then
+            corner.width = r
+            corner.height = r
+            ' Match page bg so corners punch rounded holes over the bright frame.
+            corner.blendColor = "0x0a0a0aff"
+        end if
+    end for
     if m.cornerTL <> invalid then m.cornerTL.translation = [0, 0]
     if m.cornerTR <> invalid then m.cornerTR.translation = [outerW - r, 0]
     if m.cornerBL <> invalid then m.cornerBL.translation = [0, outerH - r]
@@ -455,9 +473,15 @@ sub ApplyVideoPosterLayout()
     vw = RL_VideoW()
     vh = RL_VideoH()
     bw = RL_VideoBorderW()
+    outerW = RL_VideoOuterW()
+    outerH = RL_VideoOuterH()
     if m.videoBorder <> invalid then
-        m.videoBorder.width = vw + (bw * 2)
-        m.videoBorder.height = vh + (bw * 2)
+        m.videoBorder.width = outerW
+        m.videoBorder.height = outerH
+    end if
+    if m.videoClip <> invalid then
+        m.videoClip.translation = [bw, bw]
+        m.videoClip.clippingRect = [0, 0, vw, vh]
     end if
     CardApplyPosterCover(m.videoPoster, m.videoClip, vw, vh)
     if m.videoPlaceholder <> invalid then
@@ -635,6 +659,7 @@ sub LoadCurrentReel(isNew as boolean)
     if m.pendingStreamUrl = "" then
         ReelsDbg("video_load", "no stream url — poster only")
     end if
+    ReelsSocialAfterReelLoad()
 end sub
 
 sub EnsureVideoContent() as boolean
@@ -669,7 +694,8 @@ sub ShowReelContent()
     if m.videoColumn <> invalid then m.videoColumn.visible = true
     if m.videoCornerHost <> invalid then m.videoCornerHost.visible = true
     if m.progressHost <> invalid then m.progressHost.visible = true
-    if m.metaHost <> invalid then m.metaHost.visible = true
+    if m.metaHost <> invalid then m.metaHost.visible = false
+    if m.reelDetailPanel <> invalid and m.reels.Count() > 0 then m.reelDetailPanel.visible = true
     if m.overlayHost <> invalid then m.overlayHost.visible = true
     ' Simulator: keep Video hidden so only the clipped Poster shows in the frame.
     if not m.useInlineVideo and m.videoNode <> invalid then
@@ -1042,31 +1068,6 @@ sub OnKey()
         return
     end if
     if m.reels.Count() = 0 then return
-
-    if key = "up" then
-        if m.currentIndex = 0 then
-            if NavUpOpensHeaderFromContent() then EnterReelsHeader()
-        else
-            SwitchReel(-1)
-        end if
-    else if key = "left" then
-        if NavLeftOpensSidebarFromContent(true) then EnterReelsHeader()
-    else if key = "down" then
-        SwitchReel(1)
-    else if key = "back" then
-        return
-    else if key = "left" or key = "rev" then
-        if m.loading then return
-        SeekBy(-RL_SeekStepSec())
-    else if key = "right" or key = "fwd" then
-        if m.loading then return
-        SeekBy(RL_SeekStepSec())
-    else if key = "ok" or key = "play" or key = "select" or key = "enter" then
-        if m.loading then
-            ReelsDbg("key", "play ignored — still loading")
-            return
-        end if
-        ReelsDbg("key", "play key=" + key)
-        TogglePlayPause()
-    end if
+    if key = "back" then return
+    HandleReelsSocialKey(key)
 end sub

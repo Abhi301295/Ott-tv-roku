@@ -77,6 +77,7 @@ function VP_SkipIntroPosition(introEnd as integer) as integer
 end function
 
 function VP_BingeShouldShow(nextItem as object, isTrailer as boolean, duration as float, position as float, bingeTrigger as integer) as boolean
+    if not FeatureIsBingeWatch() then return false
     if nextItem = invalid then return false
     if isTrailer then return false
     if duration <= 0 then return false

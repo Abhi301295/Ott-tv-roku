@@ -11,7 +11,10 @@
     <field id="parentalLock" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="showEditBadge" type="boolean" value="true" onChange="OnFocusChanged" />
     <field id="focusedState" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="editFocused" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="snapRest" type="boolean" value="false" />
+    <!-- Column switch (Left/Right): snap scale instead of re-animating the row pop. -->
+    <field id="scaleSnap" type="boolean" value="false" />
     <field id="selectingState" type="boolean" value="false" onChange="OnSelectingChanged" />
     <field id="skBaseColor" type="string" value="0x04478bff" onChange="OnSkColorsChanged" />
     <field id="skHighlightColor" type="string" value="0x0b75e0ff" onChange="OnSkColorsChanged" />
@@ -23,6 +26,9 @@
     <field id="portalPrimary" type="string" value="0x0b75e0ff" onChange="OnPortalColorsChanged" />
     <field id="portalSecondary" type="string" value="0xd355cbff" onChange="OnPortalColorsChanged" />
     <field id="portalTertiary" type="string" value="0xff6b00ff" onChange="OnPortalColorsChanged" />
+    <field id="cNeutral800" type="string" value="0x121212ff" onChange="OnColorsChanged" />
+    <field id="cNeutral400" type="string" value="0xc8c8c8ff" onChange="OnColorsChanged" />
+    <field id="cNeutral600" type="string" value="0x3d3d3dff" onChange="OnColorsChanged" />
     <function name="RefreshFocusChrome" />
   </interface>
 
@@ -31,9 +37,21 @@
   <script type="text/brightscript" uri="pkg:/components/widgets/ProfileAvatar.brs" />
 
   <children>
+    <!-- userProfile.tsx: left edit (ml-4 w-12), outside the scale-125 avatar wrapper.
+         transition-all duration-300 — scale and border animate on focus change. -->
+    <Group id="editFocusBtn" translation="[16, 59]" visible="false"
+      scaleRotateCenter="[24, 24]">
+      <Poster id="editFocusBorder" width="50" height="50" translation="[-1, -1]"
+        uri="pkg:/images/ui/avatar_circle.png" blendColor="0xffffffff" visible="false" />
+      <Poster id="editFocusBg" width="48" height="48"
+        uri="pkg:/images/ui/avatar_circle.png" blendColor="0x262626ff" />
+      <Poster id="editFocusIcon" translation="[14, 14]" width="20" height="20"
+        uri="pkg:/images/ui/profile_edit_icon.png" blendColor="0xc8c8c8ff" />
+    </Group>
+
     <!-- Everything that should grow/shrink on focus lives in this group so we can
          animate its scale smoothly (pop-in / pop-out) from the left-center anchor. -->
-    <Group id="scaler">
+    <Group id="scaler" translation="[88, 0]">
     <!-- Avatar (150) centered in the 166 ring footprint → 8px gap (React avatarSize + ringSize). -->
     <MaskGroup id="avatarMask" maskUri="pkg:/images/ui/avatar_circle.png"
       maskSize="[150, 150]" maskOffset="[8, 8]">
@@ -57,8 +75,7 @@
       uri="pkg:/images/ui/avatar_dot.png" blendColor="0xffffffff" visible="false" />
     <Poster id="lockBadge" translation="[69, 150]" width="28" height="28"
       uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" visible="false" />
-    <!-- React NetComponent parity: focused profile shows a left floating badge.
-         Unlocked = edit mark; locked = lock icon. Hidden while progress is running. -->
+    <!-- On-avatar badge: lock only (parental). Edit pencil stays on the left edit column. -->
     <Group id="editBadge" translation="[-4, 122]" visible="false">
       <Poster id="editBadgeBg" width="48" height="48"
         uri="pkg:/images/ui/avatar_circle.png" blendColor="0xf8f1f7ff" />
@@ -78,16 +95,21 @@
     <Animation id="focusAnim" duration="0.28" repeat="false" easeFunction="outCubic">
       <Vector2DFieldInterpolator id="focusInterp" key="[0.0, 1.0]"
         keyValue="[[1.0, 1.0], [1.25, 1.25]]" fieldToInterp="scaler.scale" />
+      <!-- Avatar column at x=88 (ml-4 + w-12 + gap-6); focus adds +34 pop. -->
       <Vector2DFieldInterpolator id="offsetInterp" key="[0.0, 1.0]"
-        keyValue="[[0.0, 0.0], [34.0, 0.0]]" fieldToInterp="scaler.translation" />
+        keyValue="[[88.0, 0.0], [122.0, 0.0]]" fieldToInterp="scaler.translation" />
     </Animation>
     <Timer id="sizeAnimTimer" duration="0.016" repeat="true" />
+    <!-- userProfile.tsx transition-all duration-300 on left edit scale / border flash. -->
+    <Timer id="editScaleTimer" duration="0.016" repeat="true" />
+    <Timer id="editBorderFlashTimer" duration="0.28" repeat="false" />
 
-    <Label id="nameLabel" translation="[292, 56]" width="420" height="40"
+    <!-- Rest name x ≈ 88 + 166 + ml-20(80) = 334 -->
+    <Label id="nameLabel" translation="[334, 56]" width="420" height="40"
       vertAlign="center" color="0xf8f1f7ff" visible="false">
       <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="30" />
     </Label>
-    <Label id="hintLabel" translation="[292, 98]" width="420" height="28"
+    <Label id="hintLabel" translation="[334, 98]" width="420" height="28"
       vertAlign="center" color="0x9ea4b0ff" visible="false">
       <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="16" />
     </Label>

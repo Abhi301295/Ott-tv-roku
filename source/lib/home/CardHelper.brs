@@ -103,9 +103,10 @@ function HC_PromotionalCard() as string
     return "PROMOTIONAL"
 end function
 
-' Vertical pitch between Netflix-style rows (parity with netflixContent translate step).
+' Fixed row geometry shared by Home and Genre (content.tsx, netflixContent.tsx,
+' and genre-list/Content.tsx).
 function HC_RowPitch() as integer
-    return 430
+    return 460
 end function
 
 ' Anchor focused row at ~65vh on a 1080p canvas (netflixContent.tsx).
@@ -113,14 +114,13 @@ function HC_NetflixAnchorY() as integer
     return 702
 end function
 
-' OTT layout row pitch (content.tsx scroll step ~280px).
 function HC_OttRowPitch() as integer
-    return 280
+    return 460
 end function
 
-' OTT rows overlap the banner (marginTop -55vh ≈ 594px on 1080p canvas).
+' React pins the focused row at 65vh on the 1080p canvas.
 function HC_OttAnchorY() as integer
-    return 594
+    return 702
 end function
 
 function HC_RowPitchForLayout(homeLayout as string) as integer
@@ -152,16 +152,8 @@ function HC_CardHeight(compName as string) as integer
     return 286
 end function
 
-' Full vertical slot for one OTT home row (parity with content.tsx row title + ContentRow).
 function HC_ContentRowLayoutHeight(cat as object) as integer
-    if cat = invalid then return HC_OttRowPitch()
-    rowType = ""
-    if cat.type <> invalid then rowType = cat.type
-    cardType = HC_CardTypeVertical()
-    if cat.cardType <> invalid and cat.cardType <> "" then cardType = cat.cardType
-    compName = CardComponentForRow(rowType, cardType)
-    if compName = "BannerCard" and rowType <> HC_PromotionalCard() then return HC_OttRowPitch()
-    return HC_RowCardsTop() + HC_CardHeight(compName) + HC_RowMarginBottom()
+    return 446
 end function
 
 function CardComponentWidth(compName as string, orientation = "" as string) as integer

@@ -3,7 +3,9 @@
 
 ' Resolved home layout for this build (parity with themeConfig.homeLayout).
 function HomeLayoutMode() as string
-    return ThemeHomeLayout()
+    layout = ThemeHomeLayout()
+    print "[HOME_LAYOUT_DBG] homeLayout="; layout; " netflixHeader="; ThemeIsNetflixHeader(); " homeBanner="; FeatureEnableHomeBanner(); " cardFocus="; FeatureEnableCardFocus(); " trailerBanner="; FeatureEnableTrailerOnBanner(); " displayTitle="; FeatureDisplayTitle()
+    return layout
 end function
 
 ' Pull listing[] from a home/continue API result envelope.

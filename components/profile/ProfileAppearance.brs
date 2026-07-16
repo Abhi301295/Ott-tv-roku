@@ -225,6 +225,9 @@ sub ApplyProfileArcColors()
             av.portalPrimary = m.cPortalPrimary
             av.portalSecondary = m.cPortalSecondary
             av.portalTertiary = m.cPortalTertiary
+            av.cNeutral800 = m.cNeutral800
+            av.cNeutral600 = m.cNeutral600
+            av.cNeutral400 = m.cNeutral400
         end if
     end for
     if m.selectingOverlay <> invalid then
@@ -277,11 +280,12 @@ end sub
 
 
 ' React profile.tsx: loginBackgroundImage while a profile is focused; focusedProfile
-' persists when the logout button is focused so the backdrop does not snap to black.
+' persists when the logout button or edit badge is focused so the backdrop does not snap to black.
 sub ApplyProfileFocusBackground()
     showImage = false
     if m.profilesLoaded = true and m.avatars <> invalid and m.avatars.Count() > 0 then
-        if m.focusArea = "profiles" or m.focusArea = "logout" then showImage = true
+        if m.focusArea = "profiles" or m.focusArea = "edit" or m.focusArea = "logout" then showImage = true
+        if m.popup = "edit" or m.popup = "confirm" or m.popup = "otp" then showImage = true
     end if
     if m.bgImage <> invalid then
         m.bgImage.opacity = 0.0

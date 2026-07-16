@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Profile editor parity with editProfilePopup.tsx.
+     ⚠ Parity Note: React uses backdrop-blur-sm + blur-md/brightness-75 on page content.
+     SceneGraph has no Gaussian blur — black/50 scrim + dark veil + dimmed content.
+     ⚠ Parity Note: React scale-105 on field/buttons is approximated with border/shadow
+     focus only — Group.scale with absolute centers displaces layout in SceneGraph. -->
+<component name="EditProfilePopup" extends="Group">
+  <interface>
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="profileName" type="string" value="" onChange="OnProfileChanged" />
+    <field id="isKid" type="boolean" value="false" />
+    <field id="isSaving" type="boolean" value="false" onChange="OnSavingChanged" />
+    <field id="action" type="string" value="" alwaysNotify="true" />
+    <field id="editedName" type="string" value="" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" onChange="OnThemeChanged" />
+    <field id="cNeutral50" type="string" value="0xffffffff" onChange="OnThemeChanged" />
+    <field id="cNeutral400" type="string" value="0xc8c8c8ff" onChange="OnThemeChanged" />
+    <field id="cNeutral600" type="string" value="0x3d3d3dff" onChange="OnThemeChanged" />
+    <field id="cNeutral700" type="string" value="0x404040ff" onChange="OnThemeChanged" />
+    <field id="cNeutral800" type="string" value="0x121212ff" onChange="OnThemeChanged" />
+    <field id="cNeutral900" type="string" value="0x0a0a0aff" onChange="OnThemeChanged" />
+    <field id="cPortalPrimary" type="string" value="0x0b75e0ff" onChange="OnThemeChanged" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/widgets/EditProfilePopup.brs" />
+
+  <children>
+    <!-- editProfilePopup.tsx: bg-black/50 backdrop-blur-sm.
+         ⚠ Parity Note: no live backdrop-blur — black/50 + ~40% black veil so midtones
+         match React's darker muted poster haze (blur softens highlights; veil stands in). -->
+    <Rectangle id="scrim" width="1920" height="1080" color="0x00000080" />
+    <Rectangle id="blurVeil" width="1920" height="1080" color="0x00000066" />
+
+    <!-- Card: w-[600] p-10 rounded-3xl bw-1 — fill under border so the 1px ring
+         (incl. corner AA) is not clipped by the black fill. -->
+    <Poster id="cardFill" translation="[660, 373]" width="600" height="334"
+      uri="pkg:/images/ui/edit_dialog_card_600.png" blendColor="0x000000ff"
+      loadDisplayMode="scaleToFit" />
+    <Poster id="cardBorder" translation="[659, 372]" width="602" height="336"
+      uri="pkg:/images/ui/edit_dialog_border_602.png" blendColor="0x404040ff"
+      loadDisplayMode="scaleToFit" />
+
+    <Label id="title" text="Edit Profile" translation="[660, 413]" width="600" height="44"
+      horizAlign="center" vertAlign="center" color="0xffffffff">
+      <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+    </Label>
+    <Label id="subtitle" text="Update your profile name below." translation="[660, 461]"
+      width="600" height="26" horizAlign="center" vertAlign="center" color="0xc8c8c8ff">
+      <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="18" />
+    </Label>
+
+    <!-- w-[85%] = 510 centered → x = 660 + 45 = 705; input h=52 -->
+    <Group id="inputGroup" translation="[705, 513]">
+      <Poster id="inputShadow" translation="[-2, -2]" width="514" height="56"
+        uri="pkg:/images/ui/popup_btn_shadow.png" blendColor="0x0b75e0ff" opacity="0.5" visible="false" />
+      <Poster id="inputBorder" translation="[0, 0]" width="510" height="52"
+        uri="pkg:/images/ui/edit_field_border_510.png" blendColor="0x3d3d3dff"
+        loadDisplayMode="scaleToFit" />
+      <Poster id="inputFill" translation="[2, 2]" width="506" height="48"
+        uri="pkg:/images/ui/edit_field_bg_506.png" blendColor="0xffffffff"
+        loadDisplayMode="scaleToFit" />
+      <Label id="nameLabel" translation="[26, 6]" width="400" height="40"
+        vertAlign="center" color="0x000000ff">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+      <Label id="placeholderLabel" text="Profile Name" translation="[26, 6]" width="400" height="40"
+        vertAlign="center" color="0x9ca3afff" visible="false">
+        <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="20" />
+      </Label>
+      <!-- React: p-2 + 24 icon → 40 hit target, but keep 32 glyph circle so input py has ~10px margin -->
+      <Group id="clearIcon" translation="[468, 10]">
+        <Poster id="clearBg" width="32" height="32" uri="pkg:/images/ui/avatar_circle.png"
+          blendColor="0x00000000" />
+        <Poster id="clearIconImg" translation="[6, 6]" width="20" height="20"
+          uri="pkg:/images/ui/ic_edit_clear_24.png" />
+      </Group>
+    </Group>
+
+    <!-- flex justify-center gap-6; p-10 bottom → buttons sit 40px above card bottom (707-40-52=615) -->
+    <Group id="cancelGroup" translation="[800, 615]">
+      <Poster id="cancelShadow" translation="[-2, 2]" width="152" height="56"
+        uri="pkg:/images/ui/popup_btn_shadow.png" blendColor="0x000000ff" opacity="0.35" visible="false" />
+      <Poster id="cancelBorder" translation="[0, 0]" width="148" height="52"
+        uri="pkg:/images/ui/popup_btn.png" blendColor="0x3d3d3dff" />
+      <Poster id="cancelFill" translation="[2, 2]" width="144" height="48"
+        uri="pkg:/images/ui/popup_btn.png" blendColor="0x000000ff" />
+      <Label id="cancelLabel" text="Cancel" translation="[0, 0]" width="148" height="52"
+        horizAlign="center" vertAlign="center" color="0xffffffff">
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="18" />
+      </Label>
+    </Group>
+
+    <Group id="saveGroup" translation="[972, 615]">
+      <Poster id="saveShadow" translation="[-2, 2]" width="152" height="56"
+        uri="pkg:/images/ui/popup_btn_shadow.png" blendColor="0x000000ff" opacity="0.35" visible="false" />
+      <Poster id="saveBorder" translation="[0, 0]" width="148" height="52"
+        uri="pkg:/images/ui/popup_btn.png" blendColor="0x3d3d3dff" />
+      <Poster id="saveFill" translation="[2, 2]" width="144" height="48"
+        uri="pkg:/images/ui/popup_btn.png" blendColor="0x0a0a0aff" />
+      <Label id="saveLabel" text="Save" translation="[0, 0]" width="148" height="52"
+        horizAlign="center" vertAlign="center" color="0x0b75e0ff">
+        <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="18" />
+      </Label>
+    </Group>
+  </children>
+</component>

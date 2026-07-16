@@ -8,6 +8,7 @@
 sub ResetAutoSelect()
     StopAutoSelect()
 
+    if not ProfileAutoLoginEnabled() then return
     if not m.profilesLoaded then return   ' do not start the loop before profiles load
     if m.focusArea <> "profiles" then return
     if m.profiles = invalid or m.profiles.Count() = 0 then return
@@ -19,10 +20,16 @@ sub ResetAutoSelect()
     if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "start"
 end sub
 
-' Disarm and stop the countdown.
+' Disarm and stop the countdown; clear arc chrome so it cannot linger on edit focus.
 sub StopAutoSelect()
     m.autoArmedIndex = -1
     if m.autoSelectTimer <> invalid then m.autoSelectTimer.control = "stop"
+    if m.avatars = invalid then return
+    for i = 0 to m.avatars.Count() - 1
+        av = m.avatars[i]
+        if av = invalid then continue for
+        if av.hasField("progress") then av.progress = 0.0
+    end for
 end sub
 
 ' Wall-time elapsed (ms) since the current window started; 0 when idle.
