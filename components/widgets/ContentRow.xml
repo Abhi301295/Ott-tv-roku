@@ -12,6 +12,10 @@
     <field id="rowSuppressed" type="boolean" value="false" onChange="OnRowVisualChanged" />
     <!-- Row stays visible below the hero when header/hero has focus (parity: netflixContent row 0). -->
     <field id="rowPeekVisible" type="boolean" value="false" onChange="OnRowVisualChanged" />
+    <!-- Catalogue rows reveal card skeletons immediately while poster nodes paint. -->
+    <field id="ottRowReveal" type="boolean" value="false" onChange="OnRowVisualChanged" />
+    <!-- Screen-controlled first paint: mount lightweight skeleton slots before card nodes. -->
+    <field id="deferCardBuild" type="boolean" value="false" />
     <field id="cardCount" type="integer" value="0" />
     <!-- Fires true once every card node for this row has been created, so the screen can
          drop the loading shimmer and reveal a fully-populated row in one shot. -->

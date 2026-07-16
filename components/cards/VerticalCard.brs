@@ -8,6 +8,16 @@ sub init()
     m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.veil = m.top.findNode("veil")
     m.thumb.observeField("loadStatus", "OnThumbLoad")
+    m.lastThumbnailUri = ""
+    m.skeletonDwellStarted = false
+    m.skeletonDwellComplete = false
+    m.thumbRevealTimer = CreateObject("roSGNode", "Timer")
+    ' ⚠ Parity Note: React's transition-opacity duration-300 gives the loading placeholder
+    ' a render window; cached Roku Posters can become ready before SceneGraph paints once.
+    m.thumbRevealTimer.duration = 0.3
+    m.thumbRevealTimer.repeat = false
+    m.top.appendChild(m.thumbRevealTimer)
+    m.thumbRevealTimer.observeField("fire", "OnThumbRevealTimer")
     ApplyAll()
 end sub
 
@@ -34,6 +44,19 @@ function ThumbH() as integer
 end function
 
 sub OnThumbLoad()
+    if m.thumb.loadStatus = "failed" then
+        ShowThumbLoading()
+        return
+    end if
+    if m.thumb.loadStatus = "ready" and m.skeletonDwellComplete then RevealThumb()
+end sub
+
+sub OnThumbRevealTimer()
+    m.skeletonDwellComplete = true
+    if m.thumb <> invalid and m.thumb.loadStatus = "ready" then RevealThumb()
+end sub
+
+sub RevealThumb()
     CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, ThumbW(), ThumbH())
 end sub
 
@@ -62,17 +85,24 @@ sub ApplyAll()
     if br <> invalid then br.translation = [w - 10, h - 10]
 
     uri = m.top.thumbnailUri
+    if uri <> m.lastThumbnailUri then
+        m.lastThumbnailUri = uri
+        m.skeletonDwellStarted = false
+        m.skeletonDwellComplete = false
+        if m.thumbRevealTimer <> invalid then m.thumbRevealTimer.control = "stop"
+    end if
     if uri <> invalid and uri <> "" then
         m.thumb.uri = uri
         status = m.thumb.loadStatus
-        ' Parity verticalCard.tsx / seriesCard.tsx — pulse until onLoad; poster stays hidden.
-        if status = "ready" or status = "failed" then
-            CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, w, h)
+        ' React sets loaded only from onLoad; loading, failed, and missing posters retain
+        ' the bg-white/10 animate-pulse card skeleton.
+        if status = "ready" and m.skeletonDwellComplete then
+            RevealThumb()
         else
             ShowThumbLoading()
         end if
     else
-        CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, w, h)
+        ShowThumbLoading()
     end if
     ApplyFocusVisual()
 end sub
@@ -85,6 +115,10 @@ sub ShowThumbLoading()
         m.skeleton.visible = true
         m.skeleton.running = true
         CardApplyHomeCardSkeleton(m.skeleton, true)
+    end if
+    if not m.skeletonDwellStarted then
+        m.skeletonDwellStarted = true
+        if m.thumbRevealTimer <> invalid then m.thumbRevealTimer.control = "start"
     end if
 end sub
 

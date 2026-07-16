@@ -35,7 +35,6 @@ sub init()
     m.pageBgRest = SK_LoadingPageBg()
     m.prefetchWarmupIdx = 1
     m.interacting = false
-    m.pendingHeroUpdate = false
     m.pendingPrefetchWarmup = false
 
     m.interactIdle = CreateObject("roSGNode", "Timer")
@@ -49,6 +48,18 @@ sub init()
     m.rowPrefetchTimer.repeat = false
     m.top.appendChild(m.rowPrefetchTimer)
     m.rowPrefetchTimer.observeField("fire", "OnGenreRowPrefetchTimer")
+
+    m.initialCardBuildTimer = CreateObject("roSGNode", "Timer")
+    ' React VerticalCard uses transition-opacity duration-300 after its pulse placeholder.
+    m.initialCardBuildTimer.duration = 0.3
+    m.initialCardBuildTimer.repeat = false
+    m.top.appendChild(m.initialCardBuildTimer)
+    m.initialCardBuildTimer.observeField("fire", "OnInitialCardBuild")
+    m.pendingInitialCardRow = invalid
+
+    m.heroPrefetchHost = CreateObject("roSGNode", "Group")
+    m.heroPrefetchHost.visible = false
+    m.top.appendChild(m.heroPrefetchHost)
 
     m.vm = FindViewManager(m.top)
     LoadGenreTokens()
@@ -165,6 +176,8 @@ sub OnDispose()
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
     if m.rowPrefetchTimer <> invalid then m.rowPrefetchTimer.control = "stop"
+    if m.initialCardBuildTimer <> invalid then m.initialCardBuildTimer.control = "stop"
+    if m.heroPrefetchHost <> invalid then CRC_ClearHost(m.heroPrefetchHost)
     BrowseDisarmLoaderTimeout(m)
     KillCatalogueTask(m.catalogueTask)
     m.catalogueTask = invalid
@@ -337,11 +350,38 @@ sub OnCatalogueResponse()
     ShowEmpty(false)
     PrimeHeroFromCategories()
     if m.rowWidgets.Count() = 0 then
+        StartInitialGenreHeroPrefetch()
         StartRowBuild()
+        ' React drops the initial Spinner when the catalogue promise resolves.
+        ' Card posters continue loading behind their VerticalCard skeletons.
+        PrepareGenreReveal()
     else
         AppendRowsFrom(m.categories.Count() - added)
         ApplyGenreFocus()
     end if
+end sub
+
+' ⚠ Parity Note: React's browser image cache resolves focused Banner images quickly.
+' Roku warms the first visible row because an uncached Poster can otherwise retain
+' the previous texture for several seconds after spatial focus has already moved.
+sub StartInitialGenreHeroPrefetch()
+    if m.heroPrefetchHost = invalid then return
+    CRC_ClearHost(m.heroPrefetchHost)
+    if m.categories.Count() = 0 then return
+    cat = m.categories[0]
+    if cat = invalid or cat.result = invalid then return
+
+    limit = cat.result.Count()
+    if limit > 6 then limit = 6
+    for i = 0 to limit - 1
+        uri = GetOttBannerImage(cat.result[i])
+        if uri <> "" then
+            poster = m.heroPrefetchHost.createChild("Poster")
+            poster.width = 2
+            poster.height = 2
+            poster.uri = uri
+        end if
+    end for
 end sub
 
 sub PrimeHeroFromCategories()
@@ -372,6 +412,19 @@ sub StartRowBuild()
     BrowseDbg("genre_rows", "build start count=" + Str(m.categories.Count()))
 end sub
 
+sub OnInitialCardBuild()
+    row = m.pendingInitialCardRow
+    m.pendingInitialCardRow = invalid
+    if row <> invalid then
+        if row.hasField("deferCardBuild") then row.deferCardBuild = false
+        row.callFunc("ResumeBuild", invalid)
+    end if
+    ApplyGenreFocus()
+    if m.rowBuildTimer <> invalid and m.rowBuildIndex < m.categories.Count() then
+        m.rowBuildTimer.control = "start"
+    end if
+end sub
+
 sub OnRowBuildTick()
     if m.top.dispose = true then
         if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
@@ -400,13 +453,14 @@ sub OnRowBuildTick()
     theme = GenreRowTheme()
     y = m.rowContentHeight
     if m.rowBuildIndex = 0 then
-        row = CRC_CreateDataRow(m.rowsHost, cat, y, theme)
+        row = CRC_CreateDataRow(m.rowsHost, cat, y, theme, 0, true)
         if row <> invalid then
             row.rowPeekVisible = true
             if row.cardCount = 0 then
                 PrepareGenreReveal()
             else
-                row.callFunc("BuildCardsNow", 6)
+                m.pendingInitialCardRow = row
+                BrowseDbg("genre_rows", "row0 skeleton slots mounted")
                 PrepareGenreReveal()
             end if
         end if
@@ -415,7 +469,14 @@ sub OnRowBuildTick()
     end if
     if row <> invalid then CRC_AppendRowRecord(m, row, y, cat)
     ApplyRowFocusState(m.rowWidgets.Count() - 1)
-    if m.rowsRevealed then MaterializePrefetchWindow()
+    if m.rowsRevealed then
+        if m.rowBuildIndex = 0 then
+            if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+            if m.initialCardBuildTimer <> invalid then m.initialCardBuildTimer.control = "start"
+        else
+            MaterializePrefetchWindow()
+        end if
+    end if
     m.rowBuildIndex = m.rowBuildIndex + 1
 end sub
 
@@ -440,20 +501,11 @@ end sub
 
 sub PrepareGenreReveal()
     if m.rowsRevealed then return
-    if m.rowWidgets.Count() > 0 then
-        row0 = m.rowWidgets[0]
-        if row0 <> invalid then
-            row0.callFunc("BuildCardsNow", 6)
-            row0.opacity = 1.0
-            if row0.hasField("rowPeekVisible") then row0.rowPeekVisible = true
-        end if
-    end if
     m.rowsRevealed = true
     if m.hero <> invalid then m.hero.visible = true
     if m.rowsHost <> invalid then m.rowsHost.visible = true
     m.pendingPrefetchWarmup = true
-    AttachGenrePaintWatch()
-    if GenrePaintGateOpen() then CompleteGenreReveal()
+    CompleteGenreReveal()
 end sub
 
 function GenrePaintGateOpen() as boolean
@@ -502,7 +554,7 @@ sub CompleteGenreReveal()
         ShellEnterContent(m.vm)
         BrowseDbg("genre_reveal", "handoff_to_rows categories=" + Str(m.categories.Count()) + " fromHeader=" + BrowseDbgStr(wasHeader))
     end if
-    BrowseDbg("genre_reveal", "loader off — hero or row0 painted")
+    BrowseDbg("genre_reveal", "loader off — catalogue data ready; card skeletons cover poster paint")
 end sub
 
 sub WarmGenreRow(row as object)
@@ -616,7 +668,7 @@ sub ApplyGenreFocusWindow()
     end for
 end sub
 
-' Horizontal nav — focus chrome only; card build + hero update defer to prefetch/idle.
+' React updates Banner activeItem in the card's onFocus callback, in the same key event.
 sub ApplyGenreCardFocusInstant()
     if m.rowWidgets.Count() = 0 then return
     if not m.rowsRevealed then return
@@ -624,11 +676,7 @@ sub ApplyGenreCardFocusInstant()
     if m.rowIndex >= m.rowWidgets.Count() then m.rowIndex = m.rowWidgets.Count() - 1
     ClampCardIndex()
     ApplyGenreFocusWindow()
-    if m.interacting then
-        m.pendingHeroUpdate = true
-    else
-        UpdateGenreHeroFromFocus()
-    end if
+    UpdateGenreHeroFromFocus()
     ScheduleGenreRowPrefetch()
 end sub
 
@@ -641,11 +689,7 @@ sub ApplyGenreFocus()
     ClampCardIndex()
     GenreApplyVerticalScroll()
     ApplyGenreFocusWindow()
-    if m.interacting then
-        m.pendingHeroUpdate = true
-    else
-        UpdateGenreHeroFromFocus()
-    end if
+    UpdateGenreHeroFromFocus()
     ScheduleGenreRowPrefetch()
     MaybeLoadMore()
 end sub
@@ -786,7 +830,6 @@ sub RunGenrePrefetchPass()
     PrimeFocusedRow()
     if m.interacting then return
     MaterializePrefetchWindow()
-    FlushPendingHeroUpdate()
     RunDeferredPrefetchWarmup()
 end sub
 
@@ -799,12 +842,6 @@ end sub
 
 sub OnGenreRowPrefetchTimer()
     RunGenrePrefetchPass()
-end sub
-
-sub FlushPendingHeroUpdate()
-    if not m.pendingHeroUpdate then return
-    m.pendingHeroUpdate = false
-    UpdateGenreHeroFromFocus()
 end sub
 
 sub RunDeferredPrefetchWarmup()
