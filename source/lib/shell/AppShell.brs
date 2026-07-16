@@ -24,6 +24,13 @@ function ShellContentOffsetX(header as object) as integer
     return ThemeSidebarOffset(expanded)
 end function
 
+' Netflix top bar is fixed over content (ottHeader.tsx). Reels clears it via top-[96px].
+function ShellContentOffsetY(header as object) as integer
+    if not ThemeIsNetflixHeader() then return 0
+    if header = invalid or header.visible <> true then return 0
+    return 96
+end function
+
 function ShellContentViewportW(header as object) as integer
     return 1920 - ShellContentOffsetX(header)
 end function

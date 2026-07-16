@@ -90,6 +90,14 @@
     <Video id="videoNode" width="608" height="1080" translation="[660, 4]" enableUI="false"
       loop="true" visible="false" />
 
+    <!-- radius-10 parity reels/index.tsx — baked corners over poster + inline video. -->
+    <Group id="videoCornerHost" visible="false">
+      <Poster id="videoCornerTL" uri="pkg:/images/ui/round_corner_tl.png" width="10" height="10" />
+      <Poster id="videoCornerTR" uri="pkg:/images/ui/round_corner_tr.png" width="10" height="10" />
+      <Poster id="videoCornerBL" uri="pkg:/images/ui/round_corner_bl.png" width="10" height="10" />
+      <Poster id="videoCornerBR" uri="pkg:/images/ui/round_corner_br.png" width="10" height="10" />
+    </Group>
+
     <!-- Layer 3: play overlay + progress (above video). -->
     <Group id="overlayHost" visible="false">
       <Group id="overlaySpin" rotation="0">

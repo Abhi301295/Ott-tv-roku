@@ -16,6 +16,11 @@ sub init()
     m.videoDummyArt = m.top.findNode("videoDummyArt")
     m.videoPoster = m.top.findNode("videoPoster")
     m.videoNode = m.top.findNode("videoNode")
+    m.videoCornerHost = m.top.findNode("videoCornerHost")
+    m.cornerTL = m.top.findNode("videoCornerTL")
+    m.cornerTR = m.top.findNode("videoCornerTR")
+    m.cornerBL = m.top.findNode("videoCornerBL")
+    m.cornerBR = m.top.findNode("videoCornerBR")
     m.overlayHost = m.top.findNode("overlayHost")
     m.overlayRing = m.top.findNode("overlayRing")
     m.overlayArc = m.top.findNode("overlayArc")
@@ -59,6 +64,7 @@ sub init()
     m.duration = 0.0
     m.viewportW = 1920
     m.shellOffX = 0
+    m.shellOffY = 0
     m.videoX = 0
     m.metaX = 0
     m.metaY = 0
@@ -255,8 +261,9 @@ end sub
 sub ApplyReelsShellLayout()
     header = FindAppHeader(m.top)
     m.shellOffX = ShellContentOffsetX(header)
+    m.shellOffY = ShellContentOffsetY(header)
     m.viewportW = ShellContentViewportW(header)
-    if m.contentHost <> invalid then m.contentHost.translation = [m.shellOffX, 0]
+    if m.contentHost <> invalid then m.contentHost.translation = [m.shellOffX, m.shellOffY]
 
     vw = RL_VideoW()
     vh = RL_VideoH()
@@ -275,13 +282,13 @@ sub ApplyReelsShellLayout()
 
     absX = ReelsVideoAbsX()
     if m.overlayHost <> invalid then
-        m.overlayHost.translation = [absX + Int(vw / 2), Int(vh / 2)]
+        m.overlayHost.translation = [absX + Int(vw / 2), m.shellOffY + Int(vh / 2)]
     end if
 
     progressW = RL_VideoProgressW(vw)
     ph = RL_ProgressH()
     px = absX + Int((vw - progressW) / 2)
-    py = vh - RL_ProgressBottom() - ph
+    py = m.shellOffY + vh - RL_ProgressBottom() - ph
     if m.progressHost <> invalid then m.progressHost.translation = [px, py]
     if m.progressTrack <> invalid then m.progressTrack.width = progressW
     if m.seekPreview <> invalid then
@@ -291,7 +298,8 @@ sub ApplyReelsShellLayout()
     ApplyMetaWidths()
     if m.metaContentH > 0 then LayoutMetaLabels()
     PositionMetaHost()
-    ReelsDbg("layout", "offX=" + Str(m.shellOffX) + " viewportW=" + Str(m.viewportW) + " metaX=" + Str(m.metaX) + " metaW=" + Str(m.metaColW) + " metaY=" + Str(m.metaY) + " metaH=" + Str(m.metaContentH) + " videoX=" + Str(m.videoX))
+    ApplyVideoCornerLayout()
+    ReelsDbg("layout", "offX=" + Str(m.shellOffX) + " offY=" + Str(m.shellOffY) + " viewportW=" + Str(m.viewportW) + " metaX=" + Str(m.metaX) + " metaW=" + Str(m.metaColW) + " metaY=" + Str(m.metaY) + " metaH=" + Str(m.metaContentH) + " videoX=" + Str(m.videoX))
 end sub
 
 function ReelsVideoAbsX() as integer
@@ -304,7 +312,7 @@ sub SyncVideoNodeLayout()
     vw = RL_VideoW()
     vh = RL_VideoH()
     absX = ReelsVideoAbsX()
-    m.videoNode.translation = [absX, bw]
+    m.videoNode.translation = [absX, m.shellOffY + bw]
     m.videoNode.width = vw
     m.videoNode.height = vh
     ReelsDbg("video_layout", "absX=" + Str(absX) + " y=" + Str(bw) + " w=" + Str(vw) + " h=" + Str(vh))
@@ -411,6 +419,7 @@ end sub
 
 sub HideContent()
     if m.videoColumn <> invalid then m.videoColumn.visible = false
+    if m.videoCornerHost <> invalid then m.videoCornerHost.visible = false
     if m.overlayHost <> invalid then m.overlayHost.visible = false
     if m.progressHost <> invalid then m.progressHost.visible = false
     if m.videoNode <> invalid then
@@ -426,9 +435,30 @@ sub ShowEmpty(show as boolean)
     if m.emptyLbl <> invalid then m.emptyLbl.text = RL_EmptyCopy()
 end sub
 
+sub ApplyVideoCornerLayout()
+    if m.videoCornerHost = invalid then return
+    vw = RL_VideoW()
+    vh = RL_VideoH()
+    bw = RL_VideoBorderW()
+    r = RL_VideoRadius()
+    outerW = vw + (bw * 2)
+    outerH = vh + (bw * 2)
+
+    m.videoCornerHost.translation = [m.shellOffX + m.videoX, m.shellOffY]
+    if m.cornerTL <> invalid then m.cornerTL.translation = [0, 0]
+    if m.cornerTR <> invalid then m.cornerTR.translation = [outerW - r, 0]
+    if m.cornerBL <> invalid then m.cornerBL.translation = [0, outerH - r]
+    if m.cornerBR <> invalid then m.cornerBR.translation = [outerW - r, outerH - r]
+end sub
+
 sub ApplyVideoPosterLayout()
     vw = RL_VideoW()
     vh = RL_VideoH()
+    bw = RL_VideoBorderW()
+    if m.videoBorder <> invalid then
+        m.videoBorder.width = vw + (bw * 2)
+        m.videoBorder.height = vh + (bw * 2)
+    end if
     CardApplyPosterCover(m.videoPoster, m.videoClip, vw, vh)
     if m.videoPlaceholder <> invalid then
         m.videoPlaceholder.width = vw
@@ -453,6 +483,7 @@ sub ApplyVideoPosterLayout()
         m.overlayPause.height = pauseSz
         m.overlayPause.translation = [-Int(pauseSz / 2), -Int(pauseSz / 2)]
     end if
+    ApplyVideoCornerLayout()
     SyncVideoNodeLayout()
 end sub
 
@@ -636,6 +667,7 @@ end sub
 
 sub ShowReelContent()
     if m.videoColumn <> invalid then m.videoColumn.visible = true
+    if m.videoCornerHost <> invalid then m.videoCornerHost.visible = true
     if m.progressHost <> invalid then m.progressHost.visible = true
     if m.metaHost <> invalid then m.metaHost.visible = true
     if m.overlayHost <> invalid then m.overlayHost.visible = true
