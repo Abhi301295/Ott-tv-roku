@@ -521,17 +521,8 @@ sub OnKey()
     if m.focusZone = "rows" and m.rowWidgets <> invalid and m.contentRowCats <> invalid then
         if m.rowWidgets.Count() < m.contentRowCats.Count() then MountRemainingRowShells()
     end if
-    navRowIdx = -1
-    if m.focusZone = "rows" and not AnyBootLoading() then
-        if key = "down" and m.rowIndex < LastRowIndex() then
-            navRowIdx = m.rowIndex + 1
-        else if key = "up" and m.rowIndex > 0 then
-            navRowIdx = m.rowIndex - 1
-        end if
-    end if
-    ' Give the render thread to this interaction: suspend background builds except the row
-    ' the user is scrolling into so that strip can materialize immediately.
-    BeginInteraction(navRowIdx)
+    ' Give the render thread exclusively to focus and row translation for this key.
+    BeginInteraction()
 
     if m.focusZone = "header" then
         HandleHeaderKey(key)
@@ -567,7 +558,6 @@ sub OnKey()
         if m.rowIndex > 0 then
             m.rowIndex = m.rowIndex - 1
             ClampCardIndex()
-            PrimeFocusedRow()
             ApplyHomeFocus()
         else if NavUpOpensHeaderFromContent() then
             EnterHeroOrHeader()
@@ -578,7 +568,6 @@ sub OnKey()
         if m.rowIndex < LastRowIndex() then
             m.rowIndex = m.rowIndex + 1
             ClampCardIndex()
-            PrimeFocusedRow()
             ApplyHomeFocus()
         else if m.hasMore and not m.loadingMore then
             LoadMoreCategories()
