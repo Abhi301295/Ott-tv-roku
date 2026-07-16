@@ -25,13 +25,23 @@ function RL_VideoBorderColor() as string
     return "0xa3a3a3ff"
 end function
 
-' max-w-[56.25vh] at 1080p → 607.5px; 9:16 aspect at full height.
+' Netflix header clearance — React reels `top-[96px]` (= var(--p-96)).
+function RL_ShellTopInset() as integer
+    if ThemeIsNetflixHeader() then return 96
+    return 0
+end function
+
+function RL_ContentH() as integer
+    return 1080 - RL_ShellTopInset()
+end function
+
+' 9:16 column below the Netflix header (sidebar layout uses full 1080).
 function RL_VideoH() as integer
-    return 1080
+    return RL_ContentH()
 end function
 
 function RL_VideoW() as integer
-    return 608
+    return Int(RL_ContentH() * 9.0 / 16.0 + 0.5)
 end function
 
 function RL_ProgressMaxW() as integer
