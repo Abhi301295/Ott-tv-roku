@@ -270,6 +270,9 @@ sub OnListResponse()
     m.hasMore = SL_PageHasMore(api, listing.Count(), SL_FlatItemCount(m.rows))
     BrowseDbg("series_response", "listingCount=" + Str(listing.Count()) + " hasMore=" + BrowseDbgStr(m.hasMore) + " loaded=" + Str(SL_FlatItemCount(m.rows)) + " page=" + Str(m.page))
     if m.page = 1 then
+        ' React clears loading as soon as the list promise resolves. Grid rows mount on
+        ' timer ticks after this, with VerticalCard skeletons visible until poster onLoad.
+        RevealContent()
         StartSeriesGridBuild(true)
     else
         StartSeriesGridBuild(false)
@@ -311,19 +314,6 @@ sub StartSeriesGridBuild(fresh as boolean)
     end if
     if m.rows = invalid or m.rows.Count() = 0 then return
 
-    if fresh then
-        syncMax = BS_SkeletonRows()
-        if syncMax > m.rows.Count() then syncMax = m.rows.Count()
-        for i = 0 to syncMax - 1
-            row = m.rows[i]
-            if row = invalid then continue for
-            EnsureSeriesRow(i, row)
-            m.rowBuildIdx = i + 1
-        end for
-        AttachSeriesPaintWatch()
-        print "[SERIES_DBG] grid_sync rows="; syncMax; " total="; m.rows.Count()
-    end if
-
     if m.rowBuildIdx >= m.rows.Count() then
         FinishSeriesGridBuild()
         return
@@ -346,9 +336,19 @@ sub OnSeriesRowBuildTick()
         return
     end if
 
-    row = m.rows[m.rowBuildIdx]
-    if row <> invalid then EnsureSeriesRow(m.rowBuildIdx, row)
+    buildingRow = m.rowBuildIdx
+    row = m.rows[buildingRow]
+    if row <> invalid then EnsureSeriesRow(buildingRow, row)
     m.rowBuildIdx = m.rowBuildIdx + 1
+
+    if buildingRow = 0 and m.page = 1 then
+        cardCount = 0
+        if m.rowNodes.Count() > 0 and m.rowNodes[0] <> invalid and m.rowNodes[0].cards <> invalid then
+            cardCount = m.rowNodes[0].cards.Count()
+        end if
+        BrowseDbg("series_rows", "row0 skeletons mounted cards=" + Str(cardCount))
+        SeriesHandoffContentFocus()
+    end if
 
     if m.rowBuildIdx >= m.rows.Count() then
         StopSeriesGridBuild()

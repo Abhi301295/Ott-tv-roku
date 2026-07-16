@@ -267,6 +267,10 @@ sub StartCardBuild(cat as object)
             ' Home calls BuildCardsNow next — keep the progressive timer off so it cannot
             ' race ahead and replace skeleton slots before the sync window runs.
             if m.cardTimer <> invalid then m.cardTimer.control = "stop"
+        else if m.top.deferCardBuild = true then
+            ' Catalogue first paint owns the start time so skeleton slots reach the
+            ' compositor before real card nodes begin replacing them.
+            if m.cardTimer <> invalid then m.cardTimer.control = "stop"
         else
             m.cardTimer.control = "start"
         end if

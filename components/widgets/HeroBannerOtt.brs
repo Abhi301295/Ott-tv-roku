@@ -85,15 +85,21 @@ sub OnActiveItemChanged()
     if item = invalid and m.fallbackItems.Count() > 0 then item = m.fallbackItems[0]
     ApplyMeta(item)
     uri = GetOttBannerImage(item)
+    m.requestedPosterUri = uri
+    m.revealedPosterUri = ""
     m.posterReadyFired = false
     if m.top.posterReady = true then m.top.posterReady = false
     if m.bannerPoster = invalid then return
     if uri <> "" then
+        ' React keeps the new image at opacity zero until its load event.
+        m.bannerPoster.visible = false
+        m.bannerPoster.opacity = 0.0
         m.bannerPoster.uri = uri
-        m.bannerPoster.visible = true
-        BeginFadeIn()
         st = m.bannerPoster.loadStatus
-        if st = "ready" or st = "failed" then
+        if st = "ready" then
+            RevealLoadedPoster()
+            MarkPosterReady()
+        else if st = "failed" then
             MarkPosterReady()
         else if m.posterReadyTimer <> invalid then
             m.posterReadyTimer.control = "stop"
@@ -138,8 +144,14 @@ end sub
 
 sub OnPosterLoad()
     if m.bannerPoster = invalid then return
+    if m.requestedPosterUri = invalid or m.requestedPosterUri = "" then return
+    if m.bannerPoster.uri <> m.requestedPosterUri then return
     st = m.bannerPoster.loadStatus
-    if st = "ready" or st = "failed" then
+    if st = "ready" then
+        if m.posterReadyTimer <> invalid then m.posterReadyTimer.control = "stop"
+        RevealLoadedPoster()
+        MarkPosterReady()
+    else if st = "failed" then
         if m.posterReadyTimer <> invalid then m.posterReadyTimer.control = "stop"
         MarkPosterReady()
     end if
@@ -147,7 +159,16 @@ end sub
 
 sub OnPosterReadyTimeout()
     if m.posterReadyFired then return
+    if m.bannerPoster <> invalid and m.bannerPoster.uri = m.requestedPosterUri and m.bannerPoster.loadStatus = "ready" then RevealLoadedPoster()
     MarkPosterReady()
+end sub
+
+sub RevealLoadedPoster()
+    if m.bannerPoster = invalid then return
+    if m.bannerPoster.uri = m.revealedPosterUri then return
+    m.revealedPosterUri = m.bannerPoster.uri
+    m.bannerPoster.visible = true
+    BeginFadeIn()
 end sub
 
 sub MarkPosterReady()
