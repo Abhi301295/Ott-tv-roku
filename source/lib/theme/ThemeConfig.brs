@@ -1,6 +1,6 @@
 ' ThemeConfig.brs — parity with src/config/theme.config.ts and HEADER_STYLE in header.tsx.
-' Static enums below are build-time (QA zips via scripts/build_layout_share.py).
-' Home / header / Netflix hero cinematic|parallax also follow BE feature flags.
+' Home / header / hero cinematic|parallax / Genre card-focus follow BE feature flags.
+' reelLayout remains static (theme.config.ts).
 
 ' ── AppTheme (theme.config.ts) ───────────────────────────────────────────────
 function TC_AppThemeDark() as string
@@ -99,14 +99,16 @@ function TC_CardFocusTrailerDisabled() as string
 end function
 
 ' ═══════════════════════════════════════════════════════════════════════════════
-' Active layout config — static enums below; Home/Header layout also follow BE flags:
-'   enableHomeBanner     → ThemeHomeLayout / ThemeIsOttHome / ThemeIsNetflixHome
-'   enableSideBarMenu    → ThemeIsNetflixHeader / ThemeIsSidebarHeader / ThemeHeaderStyle
-'   enableTrailerOnBanner→ ThemeHeroBannerStyle (Netflix) + card-focus trailer gate
-'   enableCardFocus      → Genre HeroBannerCardFocus vs Ott Banner
+' Active config
 '
-' Static hero style fallbacks (when Netflix home + trailer off → parallax):
-'   ThemeHeroBannerStyle() → CINEMATIC when trailer on, else PARALLAX
+' BE (admin / business-config):
+'   enableHomeBanner      → ThemeHomeLayout / ThemeIsOttHome / ThemeIsNetflixHome
+'   enableSideBarMenu     → ThemeIsNetflixHeader / ThemeIsSidebarHeader / ThemeHeaderStyle
+'   enableTrailerOnBanner → ThemeHeroBannerStyle cinematic|parallax + card-focus trailer
+'   enableCardFocus       → Genre HeroBannerCardFocus vs Ott Banner
+'
+' Static (theme.config.ts):
+'   ThemeReelLayout() → DEFAULT | NEW_UI | CLEAN_UI
 '
 ' Profile avatars follow header: NETFLIX top bar → circular; SIDEBAR → square.
 ' ═══════════════════════════════════════════════════════════════════════════════
