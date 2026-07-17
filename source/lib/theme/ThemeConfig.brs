@@ -1,5 +1,6 @@
 ' ThemeConfig.brs — parity with src/config/theme.config.ts and HEADER_STYLE in header.tsx.
-' All layout variants are static build-time config (React does not read these from the API).
+' Static enums below are build-time (QA zips via scripts/build_layout_share.py).
+' Home / header / Netflix hero cinematic|parallax also follow BE feature flags.
 
 ' ── AppTheme (theme.config.ts) ───────────────────────────────────────────────
 function TC_AppThemeDark() as string
@@ -98,42 +99,16 @@ function TC_CardFocusTrailerDisabled() as string
 end function
 
 ' ═══════════════════════════════════════════════════════════════════════════════
-' Active layout config — change the return values below (mirrors theme.config.ts).
-' headerStyle also controls Profile UI: NETFLIX → circular avatars, SIDEBAR → square cards.
+' Active layout config — static enums below; Home/Header layout also follow BE flags:
+'   enableHomeBanner     → ThemeHomeLayout / ThemeIsOttHome / ThemeIsNetflixHome
+'   enableSideBarMenu    → ThemeIsNetflixHeader / ThemeIsSidebarHeader / ThemeHeaderStyle
+'   enableTrailerOnBanner→ ThemeHeroBannerStyle (Netflix) + card-focus trailer gate
+'   enableCardFocus      → Genre HeroBannerCardFocus vs Ott Banner
 '
-' Layout presets (change ThemeHomeLayout / ThemeHeaderStyle / ThemeHeroBannerStyle):
+' Static hero style fallbacks (when Netflix home + trailer off → parallax):
+'   ThemeHeroBannerStyle() → CINEMATIC when trailer on, else PARALLAX
 '
-'   Case 1 — Baseline Netflix home + top bar + cinematic hero
-'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
-'     ThemeHeaderStyle()     → TC_HeaderNetflix()
-'     ThemeHeroBannerStyle() → TC_HeroCinematicZoom()
-'
-'   Case 2 — Netflix home + top bar + page-flip hero
-'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
-'     ThemeHeaderStyle()     → TC_HeaderNetflix()
-'     ThemeHeroBannerStyle() → TC_HeroPageFlip()
-'
-'   Case 3 — Netflix home + top bar + parallax hero
-'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
-'     ThemeHeaderStyle()     → TC_HeaderNetflix()
-'     ThemeHeroBannerStyle() → TC_HeroParallaxSlide()
-'
-'   Case 4 — Netflix home + sidebar + cinematic hero (Profile: square avatars)
-'     ThemeHomeLayout()      → TC_HomeLayoutNetflix()
-'     ThemeHeaderStyle()     → TC_HeaderSidebar()
-'     ThemeHeroBannerStyle() → TC_HeroCinematicZoom()
-'
-'   Case 5 — OTT home + top bar (hero style ignored; banner follows row focus)
-'     ThemeHomeLayout()      → TC_HomeLayoutOtt()
-'     ThemeHeaderStyle()     → TC_HeaderNetflix()
-'     ThemeHeroBannerStyle() → (any — not used for OTT home)
-'
-'   Case 6 — OTT home + sidebar (Profile: square avatars)
-'     ThemeHomeLayout()      → TC_HomeLayoutOtt()
-'     ThemeHeaderStyle()     → TC_HeaderSidebar()
-'     ThemeHeroBannerStyle() → (any — not used for OTT home)
-'
-' After editing: make sim
+' Profile avatars follow header: NETFLIX top bar → circular; SIDEBAR → square.
 ' ═══════════════════════════════════════════════════════════════════════════════
 function ThemeAppTheme() as string
     return TC_AppThemeDark()
@@ -147,12 +122,16 @@ function ThemeDeviceSize() as string
     return TC_DeviceFhd1080()
 end function
 
+' React index.tsx: features.enableHomeBanner (not static theme.config.homeLayout).
 function ThemeHomeLayout() as string
-    return TC_HomeLayoutNetflix()
+    if FeatureEnableHomeBanner() then return TC_HomeLayoutNetflix()
+    return TC_HomeLayoutOtt()
 end function
 
+' React header.tsx: enableSideBarMenu=true → Netflix top bar; false → sidebar.
 function ThemeHeaderStyle() as string
-    return TC_HeaderNetflix()
+    if FeatureEnableSideBarMenu() then return TC_HeaderNetflix()
+    return TC_HeaderSidebar()
 end function
 
 function ThemeHeroBannerStyle() as string
@@ -165,6 +144,8 @@ function ThemeReelLayout() as string
     return TC_ReelLayoutDefault()
 end function
 
+' React theme.config cardFocusTrailerPlayback — still DISABLED for old Banner path.
+' Card-focus / HeroBannerCardFocus trailers use features.enableTrailerOnBanner instead.
 function ThemeCardFocusTrailerPlayback() as string
     return TC_CardFocusTrailerDisabled()
 end function
@@ -185,7 +166,8 @@ function ThemeIsNetflixHome() as boolean
 end function
 
 function ThemeIsOttHome() as boolean
-    return not ThemeIsNetflixHome()
+    if FeatureEnableHomeBanner() then return false
+    return true
 end function
 
 ' True when the layout exposes top Netflix bar or left sidebar nav.

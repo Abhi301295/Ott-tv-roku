@@ -90,7 +90,8 @@ end sub
 sub FlushPendingHeroUpdate()
     if not m.pendingHeroUpdate then return
     m.pendingHeroUpdate = false
-    UpdateOttHeroFromFocus()
+    ' Only OTT / card-focus home syncs hero from the focused card.
+    if ThemeIsOttHome() then UpdateOttHeroFromFocus()
 end sub
 
 
@@ -127,6 +128,8 @@ end sub
 ' timer is reset on every key, so building only resumes once the user pauses (0.25s).
 sub BeginInteraction()
     m.interacting = true
+    ' OTT boot land: ignore late MaybeLandContentFocus after the user starts navigating.
+    if ThemeIsOttHome() then m.userMovedFocus = true
     PauseRowBuilding()
     SyncHeroAutoAdvanceHold()
     if m.interactIdle <> invalid then
@@ -139,6 +142,9 @@ end sub
 sub OnInteractIdle()
     m.interacting = false
     SyncHeroAutoAdvanceHold()
+    ' Flush even when focus already left rows (e.g. raced UP to header) so the last
+    ' focused card still drives the OTT/Netflix hero when deferral was used.
+    FlushPendingHeroUpdate()
     RunRowPrefetchPass()
     ResumeRowBuilding()
 end sub

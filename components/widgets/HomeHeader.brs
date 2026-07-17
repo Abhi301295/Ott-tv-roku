@@ -75,6 +75,7 @@ sub OnAvatarChanged()
     avatarMask = m.top.findNode("avatarMask")
     if avatarMask <> invalid then avatarMask.visible = false
     if m.avatarImg <> invalid then m.avatarImg.visible = false
+    if m.avatarBg <> invalid then m.avatarBg.visible = false
 end sub
 
 sub OnLogoChanged()

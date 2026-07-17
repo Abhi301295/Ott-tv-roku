@@ -18,6 +18,9 @@
     <field id="trailerPlaying" type="boolean" value="false" />
     <!-- Home turbo boot: defer trailer API + playback until content rows are visible. -->
     <field id="holdTrailerBoot" type="boolean" value="false" />
+    <!-- Parity HeroBannerCardFocus: single focused-item hero (no carousel chrome / auto-swipe).
+         Trailer gated by features.enableTrailerOnBanner; delay 2.0s. -->
+    <field id="cardFocusMode" type="boolean" value="false" onChange="OnCardFocusModeChanged" />
 
     <!-- D-pad actions invoked by HomeScreen via callFunc when a hero control is OK'd.
          callFunc ONLY reaches functions declared here — without these the prev/next
@@ -35,6 +38,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeroSlide.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/HeroBannerCommon.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />

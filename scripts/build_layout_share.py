@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
-"""Build QA share zips for ThemeConfig layout cases 1–6 (see ThemeConfig.brs presets)."""
+"""Build QA share zips for ThemeConfig values that are still static (not BE flags).
+
+API-driven (admin can flip in business config — no share zip needed):
+  enableHomeBanner, enableSideBarMenu, enableTrailerOnBanner, enableCardFocus, …
+
+Static (need a separate channel zip per variant for QA):
+  reelLayout                  DEFAULT | NEW_UI | CLEAN_UI
+  heroBannerStyle             PAGE_FLIP | CINEMATIC_ZOOM | PARALLAX_SLIDE
+                              (forces ThemeHeroBannerStyle; bypasses trailer→cinematic map)
+  cardFocusTrailerPlayback    ENABLED | DISABLED
+                              (old Genre Ott Banner path only)
+
+Usage:
+  python3 scripts/build_layout_share.py all
+  python3 scripts/build_layout_share.py reelLayout-NEW_UI
+  python3 scripts/build_layout_share.py list
+
+Output: out/share/ott-tv-roku_<slug>.zip
+"""
 from __future__ import annotations
 
 import re
@@ -13,43 +31,34 @@ THEME = ROOT / "source/lib/theme/ThemeConfig.brs"
 OUT_SHARE = ROOT / "out/share"
 APP_NAME = "ott-tv-roku"
 
-# Parity with ThemeConfig.brs layout preset comments (cases 1–6).
-CASES: dict[int, dict[str, str]] = {
-    1: {
-        "slug": "case01_netflix-home_netflix-header_cinematic-zoom",
-        "home": "TC_HomeLayoutNetflix()",
-        "header": "TC_HeaderNetflix()",
-        "hero": "TC_HeroCinematicZoom()",
+# slug → patches: ThemeFn → return expression (TC_* helper call)
+BUILDS: dict[str, dict[str, str]] = {
+    # ── reelLayout (theme.config.ts — fully static) ──────────────────────────
+    "reelLayout-DEFAULT": {
+        "ThemeReelLayout": "TC_ReelLayoutDefault()",
     },
-    2: {
-        "slug": "case02_netflix-home_netflix-header_page-flip",
-        "home": "TC_HomeLayoutNetflix()",
-        "header": "TC_HeaderNetflix()",
-        "hero": "TC_HeroPageFlip()",
+    "reelLayout-NEW_UI": {
+        "ThemeReelLayout": "TC_ReelLayoutNewUi()",
     },
-    3: {
-        "slug": "case03_netflix-home_netflix-header_parallax-slide",
-        "home": "TC_HomeLayoutNetflix()",
-        "header": "TC_HeaderNetflix()",
-        "hero": "TC_HeroParallaxSlide()",
+    "reelLayout-CLEAN_UI": {
+        "ThemeReelLayout": "TC_ReelLayoutCleanUi()",
     },
-    4: {
-        "slug": "case04_netflix-home_sidebar-header_cinematic-zoom",
-        "home": "TC_HomeLayoutNetflix()",
-        "header": "TC_HeaderSidebar()",
-        "hero": "TC_HeroCinematicZoom()",
+    # ── heroBannerStyle (force static; Netflix home carousel) ────────────────
+    "heroBannerStyle-PAGE_FLIP": {
+        "ThemeHeroBannerStyle": "TC_HeroPageFlip()",
     },
-    5: {
-        "slug": "case05_ott-home_netflix-header",
-        "home": "TC_HomeLayoutOtt()",
-        "header": "TC_HeaderNetflix()",
-        "hero": "TC_HeroCinematicZoom()",
+    "heroBannerStyle-CINEMATIC_ZOOM": {
+        "ThemeHeroBannerStyle": "TC_HeroCinematicZoom()",
     },
-    6: {
-        "slug": "case06_ott-home_sidebar-header",
-        "home": "TC_HomeLayoutOtt()",
-        "header": "TC_HeaderSidebar()",
-        "hero": "TC_HeroCinematicZoom()",
+    "heroBannerStyle-PARALLAX_SLIDE": {
+        "ThemeHeroBannerStyle": "TC_HeroParallaxSlide()",
+    },
+    # ── cardFocusTrailerPlayback (old Genre Banner; card-focus uses API) ─────
+    "cardFocusTrailerPlayback-ENABLED": {
+        "ThemeCardFocusTrailerPlayback": "TC_CardFocusTrailerEnabled()",
+    },
+    "cardFocusTrailerPlayback-DISABLED": {
+        "ThemeCardFocusTrailerPlayback": "TC_CardFocusTrailerDisabled()",
     },
 }
 
@@ -58,26 +67,19 @@ ZIP_OPTIONAL_DIRS = ("fonts", "locale")
 MANIFEST = "manifest"
 
 
-def patch_theme(text: str, case: int) -> str:
-    cfg = CASES[case]
-    text = re.sub(
-        r"(function ThemeHomeLayout\(\) as string\n    return )[^\n]+",
-        rf"\1{cfg['home']}",
-        text,
-        count=1,
-    )
-    text = re.sub(
-        r"(function ThemeHeaderStyle\(\) as string\n    return )[^\n]+",
-        rf"\1{cfg['header']}",
-        text,
-        count=1,
-    )
-    text = re.sub(
-        r"(function ThemeHeroBannerStyle\(\) as string\n    return )[^\n]+",
-        rf"\1{cfg['hero']}",
-        text,
-        count=1,
-    )
+def replace_theme_fn(text: str, fn_name: str, return_expr: str) -> str:
+    """Replace a Theme*() as string function body with a single return."""
+    pattern = rf"(function {re.escape(fn_name)}\(\) as string\n)(.*?)(\nend function)"
+    repl = rf"\1    return {return_expr}\3"
+    new, n = re.subn(pattern, repl, text, count=1, flags=re.DOTALL)
+    if n != 1:
+        raise RuntimeError(f"Failed to patch {fn_name} (matches={n})")
+    return new
+
+
+def patch_theme(text: str, patches: dict[str, str]) -> str:
+    for fn_name, return_expr in patches.items():
+        text = replace_theme_fn(text, fn_name, return_expr)
     return text
 
 
@@ -92,7 +94,7 @@ def zip_channel(dest: Path) -> None:
         for path in folder.rglob("*"):
             if not path.is_file():
                 continue
-            if path.name == ".gitkeep" or path.name == ".DS_Store":
+            if path.name in (".gitkeep", ".DS_Store"):
                 continue
             zf.write(path, path.relative_to(ROOT))
 
@@ -113,19 +115,20 @@ def zip_channel(dest: Path) -> None:
             zf.write(config, "config.json")
 
 
-def build_case(case: int) -> Path:
-    if case not in CASES:
-        raise SystemExit(f"Unknown layout case {case}; use 1–6.")
+def build_slug(slug: str) -> Path:
+    if slug not in BUILDS:
+        raise SystemExit(f"Unknown build {slug!r}. Use: list | all | <slug>")
 
+    patches = BUILDS[slug]
     original = THEME.read_text(encoding="utf-8")
-    cfg = CASES[case]
-    dest = OUT_SHARE / f"{APP_NAME}_{cfg['slug']}.zip"
+    dest = OUT_SHARE / f"{APP_NAME}_{slug}.zip"
 
-    print(f"==> Layout case {case}: {cfg['slug']}")
-    print(f"    home={cfg['home']} header={cfg['header']} hero={cfg['hero']}")
+    print(f"==> {slug}")
+    for fn, expr in patches.items():
+        print(f"    {fn} → {expr}")
 
     try:
-        THEME.write_text(patch_theme(original, case), encoding="utf-8")
+        THEME.write_text(patch_theme(original, patches), encoding="utf-8")
         subprocess.run(["make", "validate"], cwd=ROOT, check=True)
         zip_channel(dest)
     finally:
@@ -138,16 +141,24 @@ def build_case(case: int) -> Path:
 
 def main() -> None:
     if len(sys.argv) != 2:
-        cases = ", ".join(str(n) for n in sorted(CASES))
-        raise SystemExit(f"Usage: {sys.argv[0]} <case 1-6|all>\nCases: {cases}")
+        raise SystemExit(
+            f"Usage: {sys.argv[0]} <slug|all|list>\n"
+            f"Slugs: {', '.join(BUILDS)}"
+        )
 
-    arg = sys.argv[1].strip().lower()
-    if arg == "all":
-        for case in sorted(CASES):
-            build_case(case)
+    arg = sys.argv[1].strip()
+    if arg == "list":
+        for slug in BUILDS:
+            print(slug)
         return
 
-    build_case(int(arg))
+    if arg == "all":
+        for slug in BUILDS:
+            build_slug(slug)
+        print(f"\nAll builds in {OUT_SHARE}/")
+        return
+
+    build_slug(arg)
 
 
 if __name__ == "__main__":

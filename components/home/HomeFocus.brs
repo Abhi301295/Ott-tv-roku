@@ -65,15 +65,11 @@ sub RememberHeaderReturnZone()
     end if
 end sub
 
-' Case 4 parity: LEFT from hero/rows opens sidebar (case 1 uses UP for top header).
-
-' Case 4 parity: LEFT from hero/rows opens sidebar (case 1 uses UP for top header).
+' Sidebar: LEFT from hero/rows opens the menu. Netflix top bar: UP opens header.
 sub EnterHeaderFromContent()
     RememberHeaderReturnZone()
     EnterHeader()
 end sub
-
-' RIGHT leaves sidebar — collapse to icons and restore hero or row focus.
 
 ' RIGHT leaves sidebar — collapse to icons and restore hero or row focus.
 sub ExitHeaderToPrevious()
@@ -100,12 +96,25 @@ sub ExitHeaderToPrevious()
     ApplyHomeFocus()
 end sub
 
-' Rows ready / CW painted: stay on Home menu when header/sidebar exist; otherwise land row 0 once.
-
-' Rows ready / CW painted: stay on Home menu when header/sidebar exist; otherwise land row 0 once.
+' Rows ready: Netflix home keeps header focus; OTT / card-focus lands first row card
+' (parity Content.tsx setFocus(CONTENT) after categories load).
 sub MaybeLandContentFocus()
     if not IsHomeForeground() then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+
+    if ThemeIsOttHome() then
+        if not m.pendingContentFocus then return
+        ' User already navigated (e.g. Down from header) — never steal focus back to row 0.
+        if m.userMovedFocus = true then
+            m.pendingContentFocus = false
+            return
+        end if
+        m.pendingContentFocus = false
+        m.rowIndex = 0
+        m.cardIndex = 0
+        ExitHeaderToRows()
+        return
+    end if
 
     if ThemeHasHomeNav() then
         m.pendingContentFocus = false
@@ -171,11 +180,14 @@ sub HandleHeaderKey(key as string)
 end sub
 
 ' ── Hero banner focus zone (parity with the portal arrows / mute button) ─────
-' Vertical flow:  HEADER ↕ HERO (prev/next/mute) ↕ CONTINUE WATCHING.
+' Vertical flow (Netflix carousel):  HEADER ↕ HERO (prev/next/mute) ↕ ROWS.
+' OTT / card-focus (HeroBannerCardFocus): no hero focus zone — mute is visual-only.
+' UP from row 0 goes straight to HEADER; banner keeps last focused card (React Content).
 
 function HeroAvailable() as boolean
-    if ThemeIsOttHome() then return false
     if m.hero = invalid or m.hero.visible <> true then return false
+    ' Card-focus home: never trap D-pad on mute/arrows (React has no CONTENT→mute path).
+    if ThemeIsOttHome() then return false
     items = m.hero.bannerItems
     if items = invalid or items.Count() = 0 then return false
     ' Focusable only when there is something to act on: multiple slides (arrows) or a
@@ -449,10 +461,13 @@ sub ApplyHomeFocus()
     end if
 
     UpdateRowsScrim()
-    if m.interacting then
-        m.pendingHeroUpdate = true
-    else
+    ' Per-card hero sync is OTT-only (React Content / HeroBannerCardFocus).
+    ' Netflix carousel keeps bannerItems from UpdateHeroBanner — do not defer/flush that path.
+    if ThemeIsOttHome() then
         UpdateOttHeroFromFocus()
+        m.pendingHeroUpdate = false
+    else
+        m.pendingHeroUpdate = false
     end if
     SyncHeroAutoAdvanceHold()
     AnimateRowsHost(anchorY)

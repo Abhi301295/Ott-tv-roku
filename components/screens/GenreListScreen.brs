@@ -9,12 +9,13 @@ sub init()
     if m.useCardFocusHero and m.heroCardFocus <> invalid then
         m.hero = m.heroCardFocus
         if m.heroOtt <> invalid then m.heroOtt.visible = false
-        m.hero.holdTrailerBoot = (ThemeCardFocusTrailerPlayback() <> TC_CardFocusTrailerEnabled())
+        if m.hero.hasField("cardFocusMode") then m.hero.cardFocusMode = true
+        ' Trailer gated inside ScheduleTrailer via enableTrailerOnBanner (not holdTrailerBoot).
+        if m.hero.hasField("holdTrailerBoot") then m.hero.holdTrailerBoot = false
     else
         m.hero = m.heroOtt
         if m.heroCardFocus <> invalid then m.heroCardFocus.visible = false
     end if
-    print "[HOME_LAYOUT_DBG] genre cardFocus="; m.useCardFocusHero; " displayTitle="; FeatureDisplayTitle()
     m.loaderHost = m.top.findNode("loaderHost")
     m.loaderPageBg = m.top.findNode("loaderPageBg")
     m.loaderCenter = m.top.findNode("loaderCenter")
