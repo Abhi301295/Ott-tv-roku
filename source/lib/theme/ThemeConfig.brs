@@ -161,8 +161,8 @@ function ThemeHeroBannerStyle() as string
 end function
 
 function ThemeReelLayout() as string
-    ' Mirrors theme.config.ts reelLayout: ReelLayout.CLEAN_UI (static — not API).
-    return TC_ReelLayoutCleanUi()
+    ' Mirrors theme.config.ts reelLayout: ReelLayout.DEFAULT (static — not API).
+    return TC_ReelLayoutDefault()
 end function
 
 function ThemeCardFocusTrailerPlayback() as string

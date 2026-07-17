@@ -238,11 +238,28 @@ def main() -> None:
         aa_rounded_outline(w, h, 24, stroke=2).save(UI / f"reels_card_border_{w}x{h}.png", optimize=True)
     print("Wrote reels_card_* 400x112 / 400x148 / 400x80 / 543x*")
 
+    # CommentSidebar.tsx CommentItem: rounded-2xl (16), border 2px; max 3-line card 618x208.
+    cw, ch, cr = 618, 220, 16
+    aa_rounded_fill(cw, ch, cr).save(UI / f"reels_comment_card_fill_{cw}x{ch}.png", optimize=True)
+    aa_rounded_outline(cw, ch, cr, stroke=2).save(UI / f"reels_comment_card_border_{cw}x{ch}.png", optimize=True)
+    print(f"Wrote reels_comment_card_* {cw}x{ch} r={cr}")
+
     # CLEAN_UI genre pill: rounded-full border-white/30, transparent fill (px-4 py-1.5).
     for w, h in ((120, 32), (160, 32), (200, 32), (240, 32), (280, 32)):
         aa_rounded_fill(w, h, h // 2).save(UI / f"reels_genre_pill_fill_{w}x{h}.png", optimize=True)
         aa_rounded_outline(w, h, h // 2, stroke=1).save(UI / f"reels_genre_pill_ring_{w}x{h}.png", optimize=True)
     print("Wrote reels_genre_pill_*")
+
+    # DEFAULT OldActionButton / OldDetailCard: rounded-2xl (16).
+    for w, h, name in ((250, 150, "old_btn"), (516, 170, "old_title"), (516, 160, "old_info")):
+        aa_rounded_fill(w, h, 16).save(UI / f"reels_{name}_fill_{w}x{h}.png", optimize=True)
+        aa_rounded_outline(w, h, 16, stroke=2).save(UI / f"reels_{name}_border_{w}x{h}.png", optimize=True)
+    print("Wrote reels_old_* cards")
+
+    # Creator badge: rounded-lg (8), primary blendColor at runtime.
+    for w in (120, 160, 200, 240, 280, 320):
+        aa_rounded_fill(w, 36, 8).save(UI / f"reels_creator_badge_fill_{w}x36.png", optimize=True)
+    print("Wrote reels_creator_badge_fill_*")
 
     # Verified badge: bg #ffcc00 rounded-full — native size, never upscale (keeps Label sharp).
     vw, vh = 72, 20

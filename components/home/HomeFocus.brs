@@ -391,16 +391,43 @@ sub ApplyHomeFocus()
     if pitch = invalid or pitch <= 0 then pitch = HC_RowPitchForLayout(m.homeLayout)
     if m.focusZone = "rows" then
         if ThemeIsOttHome() and m.rowTops <> invalid and m.rowIndex >= 0 and m.rowIndex < m.rowTops.Count() then
-            anchorY = m.layoutAnchorY - m.rowTops[m.rowIndex]
+            ' Parity GenreApplyVerticalScroll: ideal pin + tailPinned when content still fits.
+            ' Do NOT add +80 to viewH — that jammed the last row too low and clipped displayTitle.
+            rowTop = m.rowTops[m.rowIndex]
+            idealAnchorY = m.layoutAnchorY - rowTop
+            anchorY = idealAnchorY
             contentH = OttRowsContentHeight()
-            viewH = 1080 - m.layoutAnchorY + 80
+            if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
+            viewH = 1080 - m.layoutAnchorY
             maxScroll = contentH - viewH
-            if maxScroll > 0 then
-                minAnchor = m.layoutAnchorY - maxScroll
-                if anchorY < minAnchor then anchorY = minAnchor
+            if maxScroll < 0 then maxScroll = 0
+            minAnchor = m.layoutAnchorY - maxScroll
+            if anchorY < minAnchor then
+                contentBottom = idealAnchorY + contentH
+                if contentBottom < 1080 then
+                    anchorY = idealAnchorY
+                else
+                    anchorY = minAnchor
+                end if
             end if
         else
-            anchorY = m.layoutAnchorY - (m.rowIndex * pitch)
+            idealAnchorY = m.layoutAnchorY - (m.rowIndex * pitch)
+            anchorY = idealAnchorY
+            ' Netflix path: same tail room so the last row is not stuck below the title band.
+            contentH = m.rowWidgets.Count() * pitch
+            if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
+            viewH = 1080 - m.layoutAnchorY
+            maxScroll = contentH - viewH
+            if maxScroll < 0 then maxScroll = 0
+            minAnchor = m.layoutAnchorY - maxScroll
+            if anchorY < minAnchor then
+                contentBottom = idealAnchorY + contentH
+                if contentBottom < 1080 then
+                    anchorY = idealAnchorY
+                else
+                    anchorY = minAnchor
+                end if
+            end if
         end if
     else
         anchorY = m.layoutAnchorY

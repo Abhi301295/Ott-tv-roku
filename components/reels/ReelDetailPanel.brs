@@ -49,6 +49,15 @@ sub CacheFocusNodes()
     m.cleanLikeRing = m.top.findNode("cleanLikeRing")
 
     m.oldLike = m.top.findNode("oldLike")
+    m.oldComment = m.top.findNode("oldComment")
+    m.oldActions = m.top.findNode("oldActions")
+    m.oldTitleCard = m.top.findNode("oldTitleCard")
+    m.oldInfoCard = m.top.findNode("oldInfoCard")
+    m.oldCreatorBadge = m.top.findNode("oldCreatorBadge")
+    m.oldGenrePill = m.top.findNode("oldGenrePill")
+    m.oldInfoEnterAnim = m.top.findNode("oldInfoEnterAnim")
+    m.oldTitleEnterAnim = m.top.findNode("oldTitleEnterAnim")
+    m.oldActionsEnterAnim = m.top.findNode("oldActionsEnterAnim")
 
     dur = RL_FocusTransitionSec()
     if m.newLikeFocusAnim <> invalid then m.newLikeFocusAnim.duration = dur
@@ -89,9 +98,12 @@ sub OnReelChanged()
     SetPanelText("cleanGenres", cleanGenre)
     SetPanelText("cleanCreator", ReelsFallback(creator, "User"))
     SetPanelText("oldTitle", title)
-    SetPanelText("oldGenres", genres)
-    SetPanelText("oldCreator", creator)
     SetPanelText("oldDescription", description)
+    ' DEFAULT-only chrome — do not touch when CLEAN/NEW is active.
+    if UCase(m.top.layout) <> "NEW_UI" and UCase(m.top.layout) <> "CLEAN_UI" then
+        ApplyOldCreatorBadge(creator)
+        ApplyOldGenrePill(cleanGenre)
+    end if
 
     ApplyPanelAvatar(m.top.findNode("newAvatar"), m.top.findNode("newUserFallback"), avatar)
     ApplyCleanAvatar(avatar, ReelsFallback(creator, "User"))
@@ -100,6 +112,164 @@ sub OnReelChanged()
     m.top.findNode("cleanUserCard").visible = showCreator
     m.top.findNode("oldInfoCard").visible = description <> "" or creator <> ""
     OnPanelChanged()
+    if UCase(m.top.layout) <> "NEW_UI" and UCase(m.top.layout) <> "CLEAN_UI" then
+        PlayOldEnterAnim()
+    end if
+end sub
+
+sub ApplyOldCreatorBadge(creator as string)
+    badge = m.oldCreatorBadge
+    lbl = m.top.findNode("oldCreator")
+    if badge = invalid or lbl = invalid then return
+    if creator = "" then
+        badge.visible = false
+        lbl.visible = false
+        return
+    end if
+    ' React: p-x-12 p-y-6 rounded-lg fs-20 fw-700 tracking-wide uppercase.
+    text = UCase(creator)
+    lbl.text = text
+    lbl.visible = true
+    badge.visible = true
+    fontSz = RL_OldUiCreatorFont()
+    SetLabelFontSize(lbl, fontSz)
+    padX = RL_OldUiCreatorBadgePadX()
+    padY = RL_OldUiCreatorBadgePadY()
+    badgeH = RL_OldUiCreatorBadgeH()
+    ' Bold uppercase + tracking-wide (0.025em) — 0.6 under-pads and clips into corners.
+    charW = Int(fontSz * 0.72 + 0.5)
+    textW = Len(text) * charW
+    if Len(text) > 1 then textW = textW + Int(0.025 * fontSz * (Len(text) - 1) + 0.5)
+    if textW < 48 then textW = 48
+    badgeW = textW + (padX * 2)
+    if badgeW > 320 then
+        badgeW = 320
+        textW = badgeW - (padX * 2)
+    end if
+    uriW = 160
+    if badgeW > 280 then
+        uriW = 320
+    else if badgeW > 240 then
+        uriW = 280
+    else if badgeW > 200 then
+        uriW = 240
+    else if badgeW > 160 then
+        uriW = 200
+    else if badgeW > 120 then
+        uriW = 160
+    else
+        uriW = 120
+    end if
+    badge.uri = "pkg:/images/ui/reels_creator_badge_fill_" + uriW.ToStr() + "x36.png"
+    badge.width = badgeW
+    badge.height = badgeH
+    ' React: linear-gradient(primary-600 → primary-400) — solid primary-600.
+    primary = m.top.cPrimary600
+    if primary = invalid or primary = "" then primary = m.top.cPrimary500
+    if primary = invalid or primary = "" then primary = "0x2563ebff"
+    badge.blendColor = primary
+    ' Horizontal inset = p-x-12; vertical pad comes from taller badge + vertAlign center.
+    lbl.width = textW
+    lbl.height = badgeH
+    lbl.horizAlign = "center"
+    lbl.vertAlign = "center"
+    m.oldCreatorTextW = textW
+    m.oldCreatorBadgeW = badgeW
+    m.oldCreatorBadgeH = badgeH
+    m.oldCreatorPadX = padX
+    m.oldCreatorPadY = padY
+end sub
+
+sub ApplyOldGenrePill(genre as string)
+    pill = m.oldGenrePill
+    lbl = m.top.findNode("oldGenres")
+    if pill = invalid or lbl = invalid then return
+    if genre = "" then genre = "Original Audio"
+    lbl.text = genre
+    SetLabelFontSize(lbl, RL_OldUiGenreFont())
+    textW = Len(genre) * Int(RL_OldUiGenreFont() * 0.55 + 0.5)
+    if textW < 40 then textW = 40
+    pillW = textW + 32
+    if pillW > 280 then pillW = 280
+    uriW = 160
+    if pillW > 240 then
+        uriW = 280
+    else if pillW > 200 then
+        uriW = 240
+    else if pillW > 160 then
+        uriW = 200
+    else if pillW > 120 then
+        uriW = 160
+    else
+        uriW = 120
+    end if
+    pillH = RL_OldUiGenrePillH()
+    pill.uri = "pkg:/images/ui/reels_genre_pill_fill_" + uriW.ToStr() + "x32.png"
+    pill.width = pillW
+    pill.height = pillH
+    pill.blendColor = "0xffffff26"
+    pill.visible = true
+    lbl.width = pillW
+    lbl.height = pillH
+end sub
+
+sub PlayOldEnterAnim()
+    ' CLEAN_UI reel-fade-in: opacity 0→1, translateY +20→0; actions delayed 0.2s.
+    titleY = RL_OldUiActionsH() + RL_OldUiGap()
+    infoY = titleY + 170 + RL_OldUiGap()
+    if m.oldTitleCardY <> invalid then titleY = m.oldTitleCardY
+    if m.oldInfoCardY <> invalid then infoY = m.oldInfoCardY
+    if m.oldTitleCard <> invalid then
+        m.oldTitleCard.opacity = 0.0
+        m.oldTitleCard.translation = [0, titleY + 20]
+    end if
+    if m.oldInfoCard <> invalid then
+        m.oldInfoCard.opacity = 0.0
+        m.oldInfoCard.translation = [0, infoY + 20]
+    end if
+    if m.oldActions <> invalid then
+        m.oldActions.opacity = 0.0
+        m.oldActions.translation = [0, 20]
+    end if
+    titleInterp = m.top.findNode("oldTitleYInterp")
+    infoInterp = m.top.findNode("oldInfoYInterp")
+    if titleInterp <> invalid then
+        titleInterp.keyValue = [[0.0, titleY + 20], [0.0, titleY]]
+    end if
+    if infoInterp <> invalid then
+        infoInterp.keyValue = [[0.0, infoY + 20], [0.0, infoY]]
+    end if
+    for each animId in ["oldTitleEnterAnim", "oldInfoEnterAnim", "oldActionsEnterAnim"]
+        anim = m.top.findNode(animId)
+        if anim <> invalid then
+            anim.control = "stop"
+            anim.control = "start"
+        end if
+    end for
+end sub
+
+sub SettleOldEnterState()
+    ' Stop DEFAULT enter anims and snap to end state so CLEAN/NEW never inherit opacity 0.
+    titleY = RL_OldUiActionsH() + RL_OldUiGap()
+    infoY = titleY + 170 + RL_OldUiGap()
+    if m.oldTitleCardY <> invalid then titleY = m.oldTitleCardY
+    if m.oldInfoCardY <> invalid then infoY = m.oldInfoCardY
+    for each animId in ["oldTitleEnterAnim", "oldInfoEnterAnim", "oldActionsEnterAnim"]
+        anim = m.top.findNode(animId)
+        if anim <> invalid then anim.control = "stop"
+    end for
+    if m.oldTitleCard <> invalid then
+        m.oldTitleCard.opacity = 1.0
+        m.oldTitleCard.translation = [0, titleY]
+    end if
+    if m.oldInfoCard <> invalid then
+        m.oldInfoCard.opacity = 1.0
+        m.oldInfoCard.translation = [0, infoY]
+    end if
+    if m.oldActions <> invalid then
+        m.oldActions.opacity = 1.0
+        m.oldActions.translation = [0, 0]
+    end if
 end sub
 
 sub OnPanelChanged()
@@ -109,6 +279,11 @@ sub OnPanelChanged()
     m.cleanHost.visible = layout = "CLEAN_UI"
     m.defaultHost.visible = layout <> "NEW_UI" and layout <> "CLEAN_UI"
 
+    ' Settled DEFAULT chrome when not animating in — avoids opacity=0 bleed after layout switch.
+    if layout = "NEW_UI" or layout = "CLEAN_UI" then
+        SettleOldEnterState()
+    end if
+
     inset = m.top.topInset
     if inset < 0 then inset = 0
     if layout = "NEW_UI" then
@@ -116,7 +291,7 @@ sub OnPanelChanged()
     else if layout = "CLEAN_UI" then
         LayoutCleanUiPanel(inset)
     else
-        m.defaultHost.translation = [RL_NewUiPanelLeft(), inset + 170]
+        LayoutOldUiPanel(inset)
     end if
 
     likes = m.top.likesCount.ToStr()
@@ -141,6 +316,166 @@ sub OnPanelChanged()
 
     ' Content/layout refresh keeps current focus chrome without restarting motion.
     ApplyPanelFocus(false)
+end sub
+
+' DEFAULT OldDetailCard — fonts via RL_RemPx (FontScale LARGE); title↔pill = m-b-16; desc line-clamp-4.
+sub LayoutOldUiPanel(inset as integer)
+    cardW = RL_OldUiCardW()
+    pad = RL_OldUiPad()
+    gap = RL_OldUiGap()
+    titleFont = RL_OldUiTitleFont()
+    titleLineH = RL_OldUiTitleLineH()
+    titleMb = RL_OldUiTitleMb()
+    genreFont = RL_OldUiGenreFont()
+    pillH = RL_OldUiGenrePillH()
+    descFont = RL_OldUiDescFont()
+    descLineH = RL_OldUiDescLineH()
+    descLines = RL_OldUiDescMaxLines()
+    creatorFont = RL_OldUiCreatorFont()
+    badgeH = RL_OldUiCreatorBadgeH()
+    creatorMb = RL_OldUiCreatorMb()
+    textW = cardW - (pad * 2)
+
+    titleLbl = m.top.findNode("oldTitle")
+    genresLbl = m.top.findNode("oldGenres")
+    descLbl = m.top.findNode("oldDescription")
+    creatorLbl = m.top.findNode("oldCreator")
+    SetLabelFontSize(titleLbl, titleFont)
+    SetLabelFontSize(genresLbl, genreFont)
+    SetLabelFontSize(descLbl, descFont)
+    SetLabelFontSize(creatorLbl, creatorFont)
+    SetLabelFontSize(m.top.findNode("oldLikeLabel"), RL_OldUiActionLabelFont())
+    SetLabelFontSize(m.top.findNode("oldCommentLabel"), RL_OldUiActionLabelFont())
+    SetLabelFontSize(m.top.findNode("oldLikeCount"), RL_OldUiActionCountFont())
+    SetLabelFontSize(m.top.findNode("oldCommentCount"), RL_OldUiActionCountFont())
+
+    titleText = ""
+    if titleLbl <> invalid then titleText = titleLbl.text
+    estTitleW = Len(titleText) * Int(titleFont * 0.55 + 0.5)
+    titleLines = 1
+    if estTitleW > textW then titleLines = 2
+    titleTextH = titleLineH * titleLines
+    titleCardH = pad + titleTextH + titleMb + pillH + pad
+
+    if titleLbl <> invalid then
+        titleLbl.translation = [pad, pad]
+        titleLbl.width = textW
+        titleLbl.height = titleTextH
+        titleLbl.wrap = true
+        titleLbl.maxLines = 2
+        titleLbl.vertAlign = "top"
+    end if
+
+    pillY = pad + titleTextH + titleMb
+    pill = m.oldGenrePill
+    if pill <> invalid then
+        pill.translation = [pad, pillY]
+        pill.height = pillH
+    end if
+    if genresLbl <> invalid then
+        genresLbl.translation = [pad, pillY]
+        genresLbl.height = pillH
+    end if
+
+    titleBg = m.top.findNode("oldTitleBg")
+    titleBorder = m.top.findNode("oldTitleBorder")
+    if titleBg <> invalid then
+        titleBg.width = cardW
+        titleBg.height = titleCardH
+    end if
+    if titleBorder <> invalid then
+        titleBorder.width = cardW
+        titleBorder.height = titleCardH
+    end if
+
+    hasCreator = false
+    if m.oldCreatorBadge <> invalid then hasCreator = (m.oldCreatorBadge.visible = true)
+    ' Card height follows content (React OldDetailCard) — only reserve used description lines.
+    descText = ""
+    if descLbl <> invalid then descText = descLbl.text
+    hasDesc = (descText <> "")
+    usedDescLines = 0
+    if hasDesc then
+        charsPerLine = Int(textW / (descFont * 0.5 + 0.5))
+        if charsPerLine < 12 then charsPerLine = 12
+        usedDescLines = Int((Len(descText) + charsPerLine - 1) / charsPerLine)
+        if usedDescLines < 1 then usedDescLines = 1
+        if usedDescLines > descLines then usedDescLines = descLines
+    end if
+    descH = descLineH * usedDescLines
+    infoCardH = pad * 2
+    descY = pad
+    if hasCreator then
+        infoCardH = pad + badgeH + pad
+        if hasDesc then infoCardH = pad + badgeH + creatorMb + descH + pad
+        descY = pad + badgeH + creatorMb
+        badgeX = pad
+        badgeY = pad
+        if m.oldCreatorBadge <> invalid then m.oldCreatorBadge.translation = [badgeX, badgeY]
+        ' Label: same origin as badge; height = badgeH + vertAlign center → equal top/bottom pad.
+        insetX = RL_OldUiCreatorBadgePadX()
+        if m.oldCreatorPadX <> invalid then insetX = m.oldCreatorPadX
+        if creatorLbl <> invalid then
+            creatorLbl.translation = [badgeX + insetX, badgeY]
+            if m.oldCreatorTextW <> invalid then creatorLbl.width = m.oldCreatorTextW
+            if m.oldCreatorBadgeH <> invalid then
+                creatorLbl.height = m.oldCreatorBadgeH
+            else
+                creatorLbl.height = badgeH
+            end if
+            creatorLbl.vertAlign = "center"
+            creatorLbl.horizAlign = "center"
+        end if
+        ' Re-tint from live panel fields (theme may arrive after first reel paint).
+        primary = m.top.cPrimary600
+        if primary = invalid or primary = "" then primary = m.top.cPrimary500
+        if primary <> invalid and primary <> "" and m.oldCreatorBadge <> invalid then
+            m.oldCreatorBadge.blendColor = primary
+        end if
+    else if hasDesc then
+        infoCardH = pad + descH + pad
+    end if
+
+    if descLbl <> invalid then
+        descLbl.translation = [pad, descY]
+        descLbl.width = textW
+        descLbl.visible = hasDesc
+        ' LiveTV / comments: height=0 + numLines + ellipsize (maxLines alone caps early).
+        descLbl.height = 0
+        descLbl.wrap = true
+        descLbl.vertAlign = "top"
+        descLbl.lineSpacing = RL_OldUiDescLineSpacing()
+        if usedDescLines > 0 then
+            descLbl.numLines = usedDescLines
+        else
+            descLbl.numLines = 1
+        end if
+        descLbl.ellipsizeOnBoundary = true
+        descLbl.color = "0xffffffd9"
+    end if
+
+    infoBg = m.top.findNode("oldInfoBg")
+    infoBorder = m.top.findNode("oldInfoBorder")
+    if infoBg <> invalid then
+        infoBg.width = cardW
+        infoBg.height = infoCardH
+    end if
+    if infoBorder <> invalid then
+        infoBorder.width = cardW
+        infoBorder.height = infoCardH
+    end if
+
+    titleY = RL_OldUiActionsH() + gap
+    infoY = titleY + titleCardH + gap
+    m.oldTitleCardY = titleY
+    m.oldInfoCardY = infoY
+    m.oldTitleCardH = titleCardH
+    m.oldInfoCardH = infoCardH
+
+    if m.oldTitleCard <> invalid then m.oldTitleCard.translation = [0, titleY]
+    if m.oldInfoCard <> invalid then m.oldInfoCard.translation = [0, infoY]
+
+    m.defaultHost.translation = [RL_NewUiPanelLeft(), inset + 120]
 end sub
 
 function PlayHeartPulse() as boolean
@@ -337,7 +672,8 @@ sub LayoutCleanUiPanel(inset as integer)
     if hasCreator then stackH = stackH + cardGap + userCardH
 
     contentH = 1080 - inset
-    padBottom = Int(contentH * 0.10 + 0.5)
+    ' React: pb-[10%] on the left column — CSS % padding uses containing-block width.
+    padBottom = RL_CleanUiInfoPb()
     outerW = RL_VideoOuterW()
     videoLeft = Int((1920 - outerW) / 2)
 
@@ -516,61 +852,170 @@ sub ApplyPanelFocus(animate as boolean)
     transparent = "0x00000000"
     layout = UCase(m.top.layout)
     isClean = (layout = "CLEAN_UI")
-
-    m.top.findNode("oldLikeBg").blendColor = "0xffffff14"
-    m.top.findNode("oldCommentBg").blendColor = "0xffffff14"
-    m.top.findNode("oldLikeCount").color = transparent
-    m.top.findNode("oldCommentCount").color = transparent
-    m.top.findNode("oldTitleBg").blendColor = "0xffffff14"
-    m.top.findNode("oldInfoBg").blendColor = "0xffffff14"
-
+    isNew = (layout = "NEW_UI")
+    isDefault = (not isClean and not isNew)
     likeOn = (target = "like")
     commentOn = (target = "comment")
 
-    ' Detail cards: glass + ring only — no scale/lift (user/parity: ring focus only).
+    if isClean then
+        ApplyCleanPanelFocus(likeOn, commentOn, animate, pulseActive, glass15, glass40, border05, white)
+    else if isNew then
+        ApplyNewPanelFocus(target, likeOn, commentOn, animate, pulseActive, glass15, glass40, glass35, border05, white)
+    else if isDefault then
+        ApplyDefaultPanelFocus(target, likeOn, commentOn, pulseActive, glass15, transparent, white)
+    end if
+
+    m.lastFocusTarget = target
+end sub
+
+sub ApplyCleanPanelFocus(likeOn as boolean, commentOn as boolean, animate as boolean, pulseActive as boolean, glass15 as string, glass40 as string, border05 as string, white as string)
+    m.top.findNode("cleanLikeCircle").blendColor = glass15
+    m.top.findNode("cleanCommentCircle").blendColor = glass15
+    m.top.findNode("cleanLikeRing").blendColor = border05
+    m.top.findNode("cleanCommentRing").blendColor = border05
+    if likeOn then
+        m.top.findNode("cleanLikeCircle").blendColor = glass40
+        m.top.findNode("cleanLikeRing").blendColor = white
+    end if
+    if commentOn then
+        m.top.findNode("cleanCommentCircle").blendColor = glass40
+        m.top.findNode("cleanCommentRing").blendColor = white
+    end if
+    RunCircleFocus("like", likeOn, animate and not pulseActive)
+    RunCircleFocus("comment", commentOn, animate)
+end sub
+
+sub ApplyNewPanelFocus(target as string, likeOn as boolean, commentOn as boolean, animate as boolean, pulseActive as boolean, glass15 as string, glass40 as string, glass35 as string, border05 as string, white as string)
+    ' Detail cards: glass + ring only — no scale/lift.
     SetCardFocusChrome(m.newTitleBg, m.newTitleBorder, false, glass15, glass35, border05, white)
     SetCardFocusChrome(m.newUserBg, m.newUserBorder, false, glass15, glass35, border05, white)
     ResetCardLayoutNoScale(m.top.findNode("newTitleCard"))
     ResetCardLayoutNoScale(m.top.findNode("newUserCard"))
-
-    if isClean then
-        m.top.findNode("cleanLikeCircle").blendColor = glass15
-        m.top.findNode("cleanCommentCircle").blendColor = glass15
-        m.top.findNode("cleanLikeRing").blendColor = border05
-        m.top.findNode("cleanCommentRing").blendColor = border05
-        if likeOn then
-            m.top.findNode("cleanLikeCircle").blendColor = glass40
-            m.top.findNode("cleanLikeRing").blendColor = white
-        end if
-        if commentOn then
-            m.top.findNode("cleanCommentCircle").blendColor = glass40
-            m.top.findNode("cleanCommentRing").blendColor = white
-        end if
-        RunCircleFocus("like", likeOn, animate and not pulseActive)
-        RunCircleFocus("comment", commentOn, animate)
-    else
-        SetCircleFocusChrome(likeOn, glass15, glass40, border05, white)
-        SetCommentFocusChrome(commentOn, glass15, glass40, border05, white)
-        RunCircleFocus("like", likeOn, animate and not pulseActive)
-        RunCircleFocus("comment", commentOn, animate)
-    end if
-
+    SetCircleFocusChrome(likeOn, glass15, glass40, border05, white)
+    SetCommentFocusChrome(commentOn, glass15, glass40, border05, white)
+    RunCircleFocus("like", likeOn, animate and not pulseActive)
+    RunCircleFocus("comment", commentOn, animate)
     if target = "detail0" then
         SetCardFocusChrome(m.newTitleBg, m.newTitleBorder, true, glass15, glass35, border05, white)
-        m.top.findNode("oldTitleBg").blendColor = "0xffffff26"
     else if target = "detail1" then
         SetCardFocusChrome(m.newUserBg, m.newUserBorder, true, glass15, glass35, border05, white)
-        m.top.findNode("oldInfoBg").blendColor = "0xffffff26"
-    else if target = "like" then
+    end if
+end sub
+
+sub ApplyDefaultPanelFocus(target as string, likeOn as boolean, commentOn as boolean, pulseActive as boolean, glass15 as string, transparent as string, white as string)
+    ' OldActionButton idle: border transparent in React — on Roku use same faint white/08 as cards
+    ' (0x00000000 blend leaves the white ring PNG fully visible on sim).
+    ' OldDetailCard idle: rgba(255,255,255,0.08); focused: rgba(255,255,255,0.4).
+    likeBorder = m.top.findNode("oldLikeBorder")
+    commentBorder = m.top.findNode("oldCommentBorder")
+    titleBorder = m.top.findNode("oldTitleBorder")
+    infoBorder = m.top.findNode("oldInfoBorder")
+    idleBorder = "0xffffff14"
+    focusBorder = "0xffffff66"
+    ' Pulse owns Like chrome sizes (same as CLEAN circle pulse) — do not snap mid-beat.
+    if pulseActive <> true then EnsureOldLikeChromeSize()
+    m.top.findNode("oldLikeBg").blendColor = "0xffffff14"
+    m.top.findNode("oldCommentBg").blendColor = "0xffffff14"
+    m.top.findNode("oldTitleBg").blendColor = "0xffffff14"
+    m.top.findNode("oldInfoBg").blendColor = "0xffffff14"
+    if likeBorder <> invalid then likeBorder.blendColor = idleBorder
+    if commentBorder <> invalid then commentBorder.blendColor = idleBorder
+    if titleBorder <> invalid then titleBorder.blendColor = idleBorder
+    if infoBorder <> invalid then infoBorder.blendColor = idleBorder
+    m.top.findNode("oldLikeCount").color = transparent
+    m.top.findNode("oldCommentCount").color = transparent
+    ' Focus scale is baked into pulse poster sizes (CLEAN pattern) — keep Group.scale at 1.
+    if m.oldLike <> invalid then m.oldLike.scale = [1.0, 1.0]
+    if m.oldComment <> invalid then m.oldComment.scale = [1.0, 1.0]
+
+    if likeOn then
+        m.top.findNode("oldLikeBg").blendColor = glass15
+        if likeBorder <> invalid then likeBorder.blendColor = focusBorder
+        if pulseActive <> true then ApplyOldLikeFocusScale(true)
         m.top.findNode("oldLikeCount").color = white
-    else if target = "comment" then
+    else if pulseActive <> true then
+        ApplyOldLikeFocusScale(false)
+    end if
+    if commentOn then
+        m.top.findNode("oldCommentBg").blendColor = glass15
+        if commentBorder <> invalid then commentBorder.blendColor = focusBorder
+        if m.oldComment <> invalid then m.oldComment.scale = [1.05, 1.05]
         m.top.findNode("oldCommentCount").color = white
     end if
-
-    if animate and target <> m.lastFocusTarget then
-        print "[REELS_SOCIAL_DBG] focusAnim "; m.lastFocusTarget; "->"; target; " dur="; RL_FocusTransitionSec(); " layout="; layout
+    if target = "detail0" then
+        m.top.findNode("oldTitleBg").blendColor = glass15
+        if titleBorder <> invalid then titleBorder.blendColor = focusBorder
+    else if target = "detail1" then
+        m.top.findNode("oldInfoBg").blendColor = glass15
+        if infoBorder <> invalid then infoBorder.blendColor = focusBorder
     end if
-    m.lastFocusTarget = target
+end sub
+
+' Restores idle 250×150 Like chrome + icon/label layout (never leave pulse mid-sizes).
+sub EnsureOldLikeChromeSize()
+    ApplyOldLikePulseLayout(1.0)
+end sub
+
+' OldActionButton focus scale(1.05) via poster bounds (Group.scale unreliable on sim).
+sub ApplyOldLikeFocusScale(focused as boolean)
+    if focused then
+        ApplyOldLikePulseLayout(1.05)
+    else
+        ApplyOldLikePulseLayout(1.0)
+    end if
+end sub
+
+' Center-pump layout for the 250×150 Like card — identical math to CLEAN's 80×80 circle pulse.
+sub ApplyOldLikePulseLayout(f as float)
+    if f > 1.2 then f = 1.2
+    if f < 0.7 then f = 0.7
+    cw = 250
+    ch = 150
+    w = Int(cw * f + 0.5)
+    h = Int(ch * f + 0.5)
+    if w < 120 then w = 120
+    if h < 72 then h = 72
+    offX = (cw - w) / 2.0
+    offY = (ch - h) / 2.0
+    bg = m.top.findNode("oldLikeBg")
+    border = m.top.findNode("oldLikeBorder")
+    icon = m.top.findNode("oldLikeIcon")
+    lbl = m.top.findNode("oldLikeLabel")
+    count = m.top.findNode("oldLikeCount")
+    if bg <> invalid then
+        bg.width = w
+        bg.height = h
+        bg.translation = [offX, offY]
+    end if
+    if border <> invalid then
+        border.width = w
+        border.height = h
+        border.translation = [offX, offY]
+    end if
+    ' Base icon center (125, 44); label/count centers map around card center (125, 75).
+    iconSz = Int(48 * f + 0.5)
+    if iconSz < 24 then iconSz = 24
+    if icon <> invalid then
+        icon.width = iconSz
+        icon.height = iconSz
+        icon.translation = [125.0 - iconSz / 2.0, 75.0 + (44.0 - 75.0) * f - iconSz / 2.0]
+    end if
+    labelH = Int(30 * f + 0.5)
+    if labelH < 18 then labelH = 18
+    if lbl <> invalid then
+        lbl.width = w
+        lbl.height = labelH
+        lbl.translation = [offX, 75.0 + (91.0 - 75.0) * f - labelH / 2.0]
+        SetLabelFontSize(lbl, Int(RL_OldUiActionLabelFont() * f + 0.5))
+    end if
+    countH = Int(32 * f + 0.5)
+    if countH < 18 then countH = 18
+    if count <> invalid then
+        count.width = w
+        count.height = countH
+        count.translation = [offX, 75.0 + (124.0 - 75.0) * f - countH / 2.0]
+        SetLabelFontSize(count, Int(RL_OldUiActionCountFont() * f + 0.5))
+    end if
 end sub
 
 sub SetCircleFocusChrome(focused as boolean, glass15 as string, glass40 as string, border05 as string, white as string)
@@ -693,11 +1138,12 @@ sub RunCircleFocus(which as string, focused as boolean, animate as boolean)
     anim.control = "start"
 end sub
 
-' Like pulse: never exceed focused NewCircleButton scale(1.15).
-' Sequence: shrink first → pump up to focus max → slight dip → settle at focus size.
-' ⚠ Parity Note: brs-engine ignores nested Group.scale; pulse resizes Poster bounds.
+' Like pulse (React .heart-pulse 400ms): shrink → pump → slight dip → settle.
+' ⚠ Parity Note: brs-engine ignores nested Group.scale — CLEAN/NEW/DEFAULT all resize
+' Poster bounds from center (circle 80×80 / OldActionButton 250×150).
 sub RunHeartPulse()
     layout = UCase(m.top.layout)
+    m.pulseIsOld = false
     m.pulseScaleNode = m.newLikeScale
     m.pulseCircle = m.top.findNode("newLikeCircle")
     m.pulseRing = m.top.findNode("newLikeRing")
@@ -710,37 +1156,38 @@ sub RunHeartPulse()
         m.pulseIcon = m.top.findNode("cleanLikeIcon")
         focusAnim = m.cleanLikeFocusAnim
     else if layout <> "NEW_UI" then
-        m.pulseScaleNode = m.oldLike
+        m.pulseIsOld = true
+        m.pulseScaleNode = invalid
         m.pulseCircle = m.top.findNode("oldLikeBg")
-        m.pulseRing = invalid
+        m.pulseRing = m.top.findNode("oldLikeBorder")
         m.pulseIcon = m.top.findNode("oldLikeIcon")
         focusAnim = invalid
+        if m.oldLike <> invalid then m.oldLike.scale = [1.0, 1.0]
     end if
-    if m.pulseIcon = invalid and m.pulseCircle = invalid then
-        print "[REELS_SOCIAL_DBG] heartPulse abort layout="; layout
+    if m.pulseCircle = invalid and m.pulseIcon = invalid then
         return
     end if
 
     if focusAnim <> invalid then focusAnim.control = "stop"
     if m.pulseStepTimer <> invalid then m.pulseStepTimer.control = "stop"
 
-    ' Settle scale = current focus size (1.15 when like focused, else 1.0).
+    ' Ceiling = current like size. CLEAN/NEW focus 1.15; DEFAULT OldActionButton focus 1.05.
     base = 1.0
-    if m.top.focusTarget = "like" then base = 1.15
-    if m.pulseScaleNode <> invalid and m.pulseScaleNode.scale <> invalid then
-        if m.pulseScaleNode.scale[0] > base then base = m.pulseScaleNode.scale[0]
+    if m.top.focusTarget = "like" then
+        if m.pulseIsOld = true then
+            base = 1.05
+        else
+            base = 1.15
+        end if
     end if
-    if base > 1.15 then base = 1.15
     m.pulseBaseScale = base
-    m.pulseMaxScale = 1.15
+    m.pulseMaxScale = base
     m.heartPulseActive = true
     m.pulseStep = 0
-    m.pulseIsOld = (layout <> "NEW_UI" and layout <> "CLEAN_UI")
 
-    if m.pulseScaleNode <> invalid then m.pulseScaleNode.scale = [1.0, 1.0]
-    ' Pehle small — then pump up to focused max (never above 1.15).
+    if m.pulseIsOld <> true and m.pulseScaleNode <> invalid then m.pulseScaleNode.scale = [1.0, 1.0]
+    ' Same beat as CLEAN: shrink first, then pump back up to current size (not past it).
     ApplyHeartPulseScale(m.pulseMaxScale * 0.82)
-    print "[REELS_SOCIAL_DBG] heartPulse start layout="; layout; " settle="; base; " max="; m.pulseMaxScale
 
     if m.pulseStepTimer = invalid then
         m.pulseStepTimer = CreateObject("roSGNode", "Timer")
@@ -758,29 +1205,24 @@ sub ApplyHeartPulseScale(absScale as float)
     if f < 0.7 then f = 0.7
 
     if m.pulseIsOld = true then
-        if m.pulseIcon <> invalid then
-            sz = Int(48 * f + 0.5)
-            m.pulseIcon.width = sz
-            m.pulseIcon.height = sz
-            m.pulseIcon.translation = [125 - Int(sz / 2), 44 - Int(sz / 2)]
-        end if
+        ' Full rectangle from center — same relative beat as CLEAN full-circle pulse.
+        ApplyOldLikePulseLayout(f)
         return
     end if
 
     btn = Int(80 * f + 0.5)
     if btn < 40 then btn = 40
     off = (80 - btn) / 2.0
+    ' Size only — focus glass/ring stays under ApplyPanelFocus (pulse must not look focused).
     if m.pulseCircle <> invalid then
         m.pulseCircle.width = btn
         m.pulseCircle.height = btn
         m.pulseCircle.translation = [off, off]
-        m.pulseCircle.blendColor = "0xffffff66"
     end if
     if m.pulseRing <> invalid then
         m.pulseRing.width = btn
         m.pulseRing.height = btn
         m.pulseRing.translation = [off, off]
-        m.pulseRing.blendColor = "0xffffffff"
     end if
     icon = Int(32 * f + 0.5)
     if icon < 16 then icon = 16
@@ -812,30 +1254,29 @@ end sub
 
 sub FinishHeartPulse()
     if m.pulseStepTimer <> invalid then m.pulseStepTimer.control = "stop"
-    if m.pulseCircle <> invalid then
-        m.pulseCircle.width = 80
-        m.pulseCircle.height = 80
-        m.pulseCircle.translation = [0, 0]
-    end if
-    if m.pulseRing <> invalid then
-        m.pulseRing.width = 80
-        m.pulseRing.height = 80
-        m.pulseRing.translation = [0, 0]
-    end if
-    if m.pulseIcon <> invalid then
-        if m.pulseIsOld = true then
-            m.pulseIcon.width = 48
-            m.pulseIcon.height = 48
-            m.pulseIcon.translation = [101, 20]
-        else
+    if m.pulseIsOld = true then
+        ' Settle at focus/idle size via same center layout (never 80×80 circle reset).
+        ApplyOldLikePulseLayout(m.pulseBaseScale)
+    else
+        if m.pulseCircle <> invalid then
+            m.pulseCircle.width = 80
+            m.pulseCircle.height = 80
+            m.pulseCircle.translation = [0, 0]
+        end if
+        if m.pulseRing <> invalid then
+            m.pulseRing.width = 80
+            m.pulseRing.height = 80
+            m.pulseRing.translation = [0, 0]
+        end if
+        if m.pulseIcon <> invalid then
             m.pulseIcon.width = 32
             m.pulseIcon.height = 32
             m.pulseIcon.translation = [24, 24]
         end if
-    end if
-    if m.pulseScaleNode <> invalid then
-        s = m.pulseBaseScale
-        m.pulseScaleNode.scale = [s, s]
+        if m.pulseScaleNode <> invalid then
+            s = m.pulseBaseScale
+            m.pulseScaleNode.scale = [s, s]
+        end if
     end if
     m.pulseScaleNode = invalid
     m.pulseCircle = invalid
@@ -843,7 +1284,6 @@ sub FinishHeartPulse()
     m.pulseIcon = invalid
     m.heartPulseActive = false
     ApplyPanelFocus(false)
-    print "[REELS_SOCIAL_DBG] heartPulse done layout="; UCase(m.top.layout)
 end sub
 
 ' Detail cards keep fixed layout size. React NewDetailCard uses scale(1.03) on focus;

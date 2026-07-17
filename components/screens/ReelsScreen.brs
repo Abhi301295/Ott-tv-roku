@@ -56,6 +56,7 @@ sub init()
     m.initialLoad = true
     m.seed = ReelsRandomSeed()
     m.hasUserInteracted = false
+    m.hasStartedOnce = false
     m.isPlaying = false
     m.isBuffering = false
     m.pendingStreamUrl = ""
@@ -155,7 +156,11 @@ sub OnBusinessResolved()
         m.commentSidebar.cNeutral400 = m.cNeutral400
         m.commentSidebar.cNeutral700 = m.cNeutral700
         m.commentSidebar.cNeutral900 = m.cPageBg
+        m.commentSidebar.cPrimary500 = m.cPrimary500
+        m.commentSidebar.cPrimary600 = m.cPrimary600
     end if
+    ' Re-sync detail panel so creator badge picks up API primary (not XML blue defaults).
+    if m.reelDetailPanel <> invalid then SyncReelsDetailPanel()
 end sub
 
 sub OnDispose()
@@ -210,9 +215,11 @@ sub LoadReelsTokens()
 
     ' Theme — React reels/index.tsx bg-black.
     m.cPageBg = SK_LoadingPageBg()
-    m.cPrimary500 = TC("primary-500", "#0b75e0")
-    m.cPrimary600 = TC("primary-600", "#0760bb")
-    m.cPrimary700 = TC("primary-700", "#04478b")
+    ' Fallbacks = React OldDetailCard gradient CSS defaults (#2563eb / #60a5fa); API primary overrides.
+    m.cPrimary400 = TC("primary-400", "#60a5fa")
+    m.cPrimary500 = TC("primary-500", "#3b82f6")
+    m.cPrimary600 = TC("primary-600", "#2563eb")
+    m.cPrimary700 = TC("primary-700", "#1d4ed8")
     m.cNeutral50 = TC("neutral-50", "#f5f5f5")
     m.cNeutral400 = TC("neutral-400", "#a3a3a3")
     m.cNeutral700 = TC("neutral-700", "#404040")
@@ -228,6 +235,9 @@ sub LoadReelsTokens()
     m.cProgressTrack = HexToRokuColor("#ffffff", "33")
     m.cSeekPreviewBg = HexToRokuColor("#000000", "cc")
     m.cOverlayCircle = HexToRokuColor("#000000", "ff")
+    m.cVideoFrameBg = RL_VideoFrameBgColor()
+    m.cVideoBorderIdle = RL_VideoBorderColor()
+    m.cVideoBorderPrePlay = RL_VideoBorderColorPrePlay()
 end sub
 
 function TC(name as string, fallbackHex as string) as string
@@ -244,8 +254,7 @@ end function
 
 sub ApplyStaticColors()
     if m.bg <> invalid then m.bg.color = m.cPageBg
-    if m.videoBorder <> invalid then m.videoBorder.color = m.cNeutral400
-    if m.videoPlaceholder <> invalid then m.videoPlaceholder.color = m.cNeutral700
+    SyncVideoFrameChrome()
     if m.videoDummyArt <> invalid then m.videoDummyArt.blendColor = m.cNeutral400
     if m.progressTrack <> invalid then m.progressTrack.color = m.cProgressTrack
     if m.progressFill <> invalid then m.progressFill.color = m.cPrimary500
@@ -269,6 +278,22 @@ sub ApplyStaticColors()
     if m.seekPreviewLbl <> invalid then m.seekPreviewLbl.color = m.cTextWhite
 end sub
 
+sub SyncVideoFrameChrome()
+    ' React: border-white/80 before first play, border-white/20 after; bg-[#111].
+    borderColor = m.cVideoBorderPrePlay
+    if m.hasStartedOnce = true then borderColor = m.cVideoBorderIdle
+    if borderColor = invalid or borderColor = "" then borderColor = RL_VideoBorderColorPrePlay()
+    if m.videoBorder <> invalid then m.videoBorder.color = borderColor
+    fill = m.cVideoFrameBg
+    if fill = invalid or fill = "" then fill = RL_VideoFrameBgColor()
+    if m.videoPlaceholder <> invalid then
+        m.videoPlaceholder.color = fill
+        m.videoPlaceholder.visible = true
+    end if
+    ApplyVideoCornerLayout()
+    ReelsDbg("frame_chrome", "startedOnce=" + ReelsDbgStr(m.hasStartedOnce) + " border=" + borderColor + " fill=" + fill)
+end sub
+
 sub ApplyReelsShellLayout()
     header = FindAppHeader(m.top)
     m.shellOffX = ShellContentOffsetX(header)
@@ -288,7 +313,12 @@ sub ApplyReelsShellLayout()
     if m.metaColW > RL_MetaMaxW() then m.metaColW = RL_MetaMaxW()
 
     if m.videoColumn <> invalid then
-        m.videoColumn.translation = [m.videoX, 0]
+        ' Rest pose when not mid enter-anim (React .reel-enter-active end state).
+        if m.reelsSwitching <> true then
+            m.videoColumn.translation = [m.videoX, 0]
+            m.videoColumn.scale = [1.0, 1.0]
+            m.videoColumn.opacity = 1.0
+        end if
     end if
     SyncVideoNodeLayout()
 
@@ -383,6 +413,7 @@ sub ResetAndFetch()
     m.reels = []
     m.currentIndex = 0
     m.hasUserInteracted = false
+    m.hasStartedOnce = false
     m.initialLoad = true
     StopVideo()
     HideContent()
@@ -393,17 +424,31 @@ end sub
 
 sub ApplyPageLoaderLayout(viewportW as integer)
     if viewportW < 1 then viewportW = 1920
-    if m.loaderPageBg <> invalid then m.loaderPageBg.width = viewportW
-    if m.loaderCenter <> invalid then m.loaderCenter.translation = [Int(viewportW / 2), 518]
+    if m.loaderPageBg <> invalid then
+        m.loaderPageBg.width = 1920
+        m.loaderPageBg.height = 1080
+    end if
+    ' Full-screen center — React Spinner is viewport-centered (not content-band offset).
+    if m.loaderCenter <> invalid then m.loaderCenter.translation = [960, 518]
 end sub
 
 sub ShowPageLoader(reason as string)
+    ' Never stack the page Spinner over an open comments drawer.
+    if m.commentSidebar <> invalid and m.commentSidebar.isOpen = true then return
+    ApplyPageLoaderLayout(m.viewportW)
     BrowseShowPageLoader(m, m.pageBgRest)
+    ReelsDbg("page_loader", "show reason=" + reason)
 end sub
 
 sub HidePageLoader(reason as string)
-    if not BrowsePageLoaderRunning(m) then return
     BrowseHidePageLoader(m, m.pageBgRest)
+    if m.loaderHost <> invalid then
+        m.loaderHost.visible = false
+        m.loaderHost.opacity = 1.0
+    end if
+    if m.pageLoader <> invalid then m.pageLoader.running = false
+    if m.loaderCenter <> invalid then m.loaderCenter.translation = [960, 518]
+    ReelsDbg("page_loader", "hide reason=" + reason)
 end sub
 
 sub OnBrowseLoaderTimeout()
@@ -424,9 +469,8 @@ sub TryCompleteReelsReveal()
 end sub
 
 sub CompleteReelsReveal()
-    if not BrowsePageLoaderRunning(m) then return
     if m.reels.Count() > 0 then ShowReelContent()
-    BrowseHidePageLoader(m, m.pageBgRest)
+    HidePageLoader("reveal")
 end sub
 
 sub HideContent()
@@ -455,12 +499,14 @@ sub ApplyVideoCornerLayout()
     outerH = RL_VideoOuterH()
 
     m.videoCornerHost.translation = [m.shellOffX + m.videoX, m.shellOffY]
+    pageBg = m.cPageBg
+    if pageBg = invalid or pageBg = "" then pageBg = "0x0a0a0aff"
     for each corner in [m.cornerTL, m.cornerTR, m.cornerBL, m.cornerBR]
         if corner <> invalid then
             corner.width = r
             corner.height = r
-            ' Match page bg so corners punch rounded holes over the bright frame.
-            corner.blendColor = "0x0a0a0aff"
+            ' Match page bg so corners punch rounded-[12px] on all 4 sides.
+            corner.blendColor = pageBg
         end if
     end for
     if m.cornerTL <> invalid then m.cornerTL.translation = [0, 0]
@@ -514,27 +560,23 @@ end sub
 sub ApplyReelPoster(reel as object)
     ApplyVideoPosterLayout()
     thumb = ReelsVerticalThumb(reel)
-    useDummy = thumb = ""
     posterUri = ReelsPosterUri(reel)
+    useDummy = (thumb = "") and (posterUri = RL_DummyThumbPosterUri())
     ReelsDbg("poster", "dummy=" + ReelsDbgStr(useDummy) + " uri=" + Left(posterUri, 80))
 
-    if m.videoPlaceholder <> invalid then
-        m.videoPlaceholder.visible = true
-        if useDummy then
-            m.videoPlaceholder.color = HexToRokuColor(RL_DummyThumbBgHex(), "ff")
-        else
-            m.videoPlaceholder.color = m.cNeutral700
-        end if
-    end if
+    SyncVideoFrameChrome()
     if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
     if m.videoPoster <> invalid then
         m.videoPoster.visible = true
         m.videoPoster.uri = posterUri
     end if
-    if m.videoNode <> invalid then m.videoNode.visible = false
-    if not m.useInlineVideo and m.videoNode <> invalid then
-        m.videoNode.control = "stop"
-        m.videoNode.content = invalid
+    ' Keep Video hidden until user plays — poster + #111 frame stay visible (React poster overlays).
+    if m.videoNode <> invalid then
+        m.videoNode.visible = false
+        if not m.useInlineVideo then
+            m.videoNode.control = "stop"
+            m.videoNode.content = invalid
+        end if
     end if
 end sub
 
@@ -550,9 +592,7 @@ sub OnReelPosterLoad()
         ReelsDbg("poster_load", "failed -> dummy placeholder")
         m.videoPoster.uri = RL_DummyThumbPosterUri()
         m.videoPoster.visible = true
-        if m.videoPlaceholder <> invalid then
-            m.videoPlaceholder.color = HexToRokuColor(RL_DummyThumbBgHex(), "ff")
-        end if
+        SyncVideoFrameChrome()
         TryCompleteReelsReveal()
     end if
 end sub
@@ -610,7 +650,8 @@ sub OnReelsResponse()
 
     accumulated = m.reels.Count()
     m.hasMore = ReelsPageHasMore(batch.Count(), accumulated, parsed.total)
-    ReelsDbg("response", "accumulated=" + Str(accumulated) + " hasMore=" + ReelsDbgStr(m.hasMore))
+    ReelsDbg("response", "accumulated=" + Str(accumulated) + " hasMore=" + ReelsDbgStr(m.hasMore) + " seed=" + Str(m.seed).Trim())
+    ReelsDbgOrder(batch, m.fetchingPage, m.seed)
 
     if accumulated = 0 then
         HidePageLoader("empty")
@@ -640,9 +681,13 @@ sub LoadCurrentReel(isNew as boolean)
 
     StopVideo()
     m.playRequested = false
+    m.hasStartedOnce = false
     m.pendingStreamUrl = ReelsStreamUrl(reel)
     ReelsDbgThumbProbe(reel, m.currentIndex)
     ReelsDbg("video_load", "index=" + Str(m.currentIndex) + " url=" + Left(m.pendingStreamUrl, 80) + " poster=" + ReelsDbgStr(ReelsHasPoster(reel)))
+
+    ' Rest Y before paint — switch anim starts from ±60 after this load.
+    if m.videoColumn <> invalid then m.videoColumn.translation = [m.videoX, 0]
 
     ApplyMeta(reel)
     ShowReelContent()
@@ -702,6 +747,8 @@ sub ShowReelContent()
         m.videoNode.visible = false
         m.videoNode.control = "stop"
     end if
+    ' Content is on screen — never leave the page Spinner stacked over the reel/detail.
+    if m.loaderHost <> invalid and m.loaderHost.visible = true then HidePageLoader("content")
     UpdateOverlay()
 end sub
 
@@ -876,14 +923,16 @@ sub OnVideoState()
 
     if state = "buffering" then
         m.isBuffering = true
-        if m.videoPlaceholder <> invalid then m.videoPlaceholder.visible = false
+        ' Keep poster until first decoded frames (React keeps poster overlays until hasStartedOnce).
+        if m.videoPoster <> invalid then m.videoPoster.visible = true
         if m.videoNode <> invalid then m.videoNode.visible = true
-        if m.videoPoster <> invalid then m.videoPoster.visible = false
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         UpdateOverlay()
     else if state = "playing" then
         m.isBuffering = false
         m.isPlaying = true
+        m.hasStartedOnce = true
+        SyncVideoFrameChrome()
         if m.videoPlaceholder <> invalid then m.videoPlaceholder.visible = false
         if m.videoNode <> invalid then m.videoNode.visible = true
         if m.videoPoster <> invalid then m.videoPoster.visible = false
@@ -893,6 +942,11 @@ sub OnVideoState()
     else if state = "paused" then
         m.isPlaying = false
         m.isBuffering = false
+        ' ⚠ Parity Note: React keeps the last decoded video frame when paused; Roku Video
+        ' often goes black, so restore the poster still inside the rounded frame.
+        if m.videoPoster <> invalid then m.videoPoster.visible = true
+        if m.videoNode <> invalid then m.videoNode.visible = false
+        if m.videoPlaceholder <> invalid then m.videoPlaceholder.visible = true
         UpdateOverlay()
     else if state = "finished" then
         m.isPlaying = true
@@ -980,12 +1034,15 @@ sub TogglePlayPause()
         m.playRequested = false
         m.videoNode.control = "pause"
         m.isPlaying = false
+        if m.videoPoster <> invalid then m.videoPoster.visible = true
+        if m.videoNode <> invalid then m.videoNode.visible = false
         ReelsDbg("play", "pause")
     else
         if not EnsureVideoContent() then return
         m.playRequested = true
         SyncVideoNodeLayout()
-        if m.videoPoster <> invalid then m.videoPoster.visible = false
+        ' Poster stays until state=playing (hasStartedOnce) so the frame never goes black.
+        if m.videoPoster <> invalid then m.videoPoster.visible = true
         if m.videoDummyArt <> invalid then m.videoDummyArt.visible = false
         m.videoNode.visible = true
         m.videoNode.control = "play"

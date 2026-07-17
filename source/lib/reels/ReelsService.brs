@@ -45,8 +45,12 @@ function ReelsCoerceList(val as object) as object
         if val.name <> invalid or val.title <> invalid or val._id <> invalid then
             return [val]
         end if
+        ' Numeric keys ("0","1",…) — AA for-each order is unstable; walk by index.
+        ordered = ReelsCoerceNumericKeyedList(val)
+        if ordered.Count() > 0 then return ordered
         items = []
-        for each item in val
+        for each key in val
+            item = val[key]
             if item <> invalid and type(item) <> "roString" and type(item) <> "String" then
                 items.Push(item)
             end if
@@ -54,6 +58,39 @@ function ReelsCoerceList(val as object) as object
         return items
     end if
     return []
+end function
+
+function ReelsCoerceNumericKeyedList(val as object) as object
+    items = []
+    if val = invalid then return items
+    maxIdx = -1
+    for each key in val
+        if key = invalid then continue for
+        ks = key.ToStr()
+        if ks = "" then continue for
+        if not ReelsIsDigits(ks) then return []
+        idx = ks.ToInt()
+        if idx > maxIdx then maxIdx = idx
+    end for
+    if maxIdx < 0 then return items
+    i = 0
+    while i <= maxIdx
+        item = val[Str(i).Trim()]
+        if item <> invalid then items.Push(item)
+        i = i + 1
+    end while
+    return items
+end function
+
+function ReelsIsDigits(s as string) as boolean
+    if s = invalid or s = "" then return false
+    i = 1
+    while i <= Len(s)
+        ch = Mid(s, i, 1)
+        if Asc(ch) < Asc("0") or Asc(ch) > Asc("9") then return false
+        i = i + 1
+    end while
+    return true
 end function
 
 function ReelsPageHasMore(batchCount as integer, accumulated as integer, total as integer) as boolean
@@ -138,6 +175,7 @@ function ReelsThumbByType(list as object, cardType as string) as string
 end function
 
 function ReelsVerticalThumb(reel as object) as string
+    ' React getVerticalThumbnail: MOBILE + VERTICAL from thumbnails[].
     if reel = invalid then return ""
     lists = ReelsCollectThumbnailLists(reel)
     for each thumbs in lists
@@ -153,6 +191,37 @@ function ReelsVerticalThumb(reel as object) as string
     return ""
 end function
 
+function ReelsAnyThumbPath(reel as object) as string
+    ' When API omits MOBILE VERTICAL, use any usable still so the frame is not empty.
+    if reel = invalid then return ""
+    lists = ReelsCollectThumbnailLists(reel)
+    ' Prefer any VERTICAL, then any MOBILE, then first path.
+    for each thumbs in lists
+        for each t in ReelsCoerceList(thumbs)
+            if t = invalid then continue for
+            if not ReelsThumbIsVertical(t) then continue for
+            p = ReelsThumbPath(t)
+            if p <> "" then return p
+        end for
+    end for
+    for each thumbs in lists
+        for each t in ReelsCoerceList(thumbs)
+            if t = invalid then continue for
+            if not ReelsIsMobilePlatform(t.platform) then continue for
+            p = ReelsThumbPath(t)
+            if p <> "" then return p
+        end for
+    end for
+    for each thumbs in lists
+        for each t in ReelsCoerceList(thumbs)
+            if t = invalid then continue for
+            p = ReelsThumbPath(t)
+            if p <> "" then return p
+        end for
+    end for
+    return ""
+end function
+
 function ReelsHasPoster(reel as object) as boolean
     ' React always supplies posterUrl (vertical thumb or Images.THUMBNAIL fallback).
     return true
@@ -160,6 +229,7 @@ end function
 
 function ReelsPosterUri(reel as object) as string
     thumb = ReelsVerticalThumb(reel)
+    if thumb = "" then thumb = ReelsAnyThumbPath(reel)
     if thumb <> "" then return thumb
     return RL_DummyThumbPosterUri()
 end function

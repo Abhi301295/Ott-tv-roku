@@ -127,17 +127,20 @@ end sub
 
 sub ApplyTitleVisual()
     if m.titleLabel = invalid then return
-    show = (m.top.displayTitle = true and m.top.cardTitle <> "")
+    show = false
+    if m.top.displayTitle and m.top.cardTitle <> "" then show = true
     m.titleLabel.visible = show
     if not show then return
     m.titleLabel.text = m.top.cardTitle
     w = ThumbW()
     m.titleLabel.width = w
     m.titleLabel.translation = [3, ThumbH() + 8]
-    if m.top.focusedState = true then
+    if m.top.focusedState then
         m.titleLabel.color = m.top.cPrimary500
     else
-        m.titleLabel.color = m.top.cNeutral400
+        c = m.top.cNeutral400
+        if c = invalid or c = "" then c = "0xa3a3a3ff"
+        m.titleLabel.color = c
     end if
 end sub
 

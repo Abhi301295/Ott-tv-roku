@@ -10,6 +10,9 @@
     <function name="PlayHeartPulse" />
     <field id="commentsCount" type="integer" value="0" onChange="OnPanelChanged" />
     <field id="topInset" type="integer" value="96" onChange="OnPanelChanged" />
+    <field id="cPrimary400" type="string" value="0x60a5faff" />
+    <field id="cPrimary500" type="string" value="0x3b82f6ff" />
+    <field id="cPrimary600" type="string" value="0x2563ebff" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
@@ -251,55 +254,106 @@
     </Group>
 
     <Group id="defaultHost" visible="false">
-      <Group id="oldActions">
+      <!-- DEFAULT / Old* — rounded-2xl glass cards; enter = CLEAN-style fade+slideY. -->
+      <Group id="oldActions" opacity="1.0">
         <Group id="oldLike" scaleRotateCenter="[125.0, 75.0]">
-          <Poster id="oldLikeBg" width="250" height="150" uri="pkg:/images/ui/popup_btn.png"
-            loadDisplayMode="scaleToFill" blendColor="0xffffff14" />
+          <Poster id="oldLikeBg" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_fill_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
+          <Poster id="oldLikeBorder" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_border_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
           <Poster id="oldLikeIcon" translation="[101, 20]" width="48" height="48"
             uri="pkg:/images/ui/reels_heart_outline_48.png" />
-          <Label text="Like" translation="[0, 76]" width="250" height="30" horizAlign="center" color="0xffffffe6">
-            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="18" />
+          <Label id="oldLikeLabel" text="Like" translation="[0, 76]" width="250" height="30" horizAlign="center" color="0xffffffe6">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
           </Label>
           <Label id="oldLikeCount" translation="[0, 108]" width="250" height="32"
             horizAlign="center" color="0x00000000">
-            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="26" />
           </Label>
         </Group>
-        <Group id="oldComment" translation="[266, 0]">
-          <Poster id="oldCommentBg" width="250" height="150" uri="pkg:/images/ui/popup_btn.png"
-            loadDisplayMode="scaleToFill" blendColor="0xffffff14" />
+        <Group id="oldComment" translation="[266, 0]" scaleRotateCenter="[125.0, 75.0]">
+          <Poster id="oldCommentBg" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_fill_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
+          <Poster id="oldCommentBorder" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_border_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
           <Poster translation="[101, 20]" width="48" height="48" uri="pkg:/images/ui/reels_comment_48.png" />
-          <Label text="Comment" translation="[0, 76]" width="250" height="30" horizAlign="center" color="0xffffffe6">
-            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="18" />
+          <Label id="oldCommentLabel" text="Comment" translation="[0, 76]" width="250" height="30" horizAlign="center" color="0xffffffe6">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
           </Label>
           <Label id="oldCommentCount" translation="[0, 108]" width="250" height="32"
             horizAlign="center" color="0x00000000">
-            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="26" />
           </Label>
         </Group>
       </Group>
-      <Group id="oldTitleCard" translation="[0, 166]">
-        <Poster id="oldTitleBg" width="516" height="170" uri="pkg:/images/ui/popup_btn.png"
-          loadDisplayMode="scaleToFill" blendColor="0xffffff14" />
-        <Label id="oldTitle" translation="[24, 20]" width="468" height="90" wrap="true" maxLines="2"
+
+      <!-- Sizes/Y from LayoutOldUiPanel (fs-* @ FontScale LARGE + m-b-16 / line-clamp-4). -->
+      <Group id="oldTitleCard" translation="[0, 174]" opacity="1.0">
+        <Poster id="oldTitleBg" width="516" height="170"
+          uri="pkg:/images/ui/reels_old_title_fill_516x170.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <Poster id="oldTitleBorder" width="516" height="170"
+          uri="pkg:/images/ui/reels_old_title_border_516x170.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <Label id="oldTitle" translation="[24, 24]" width="468" height="63" wrap="true" maxLines="2"
           color="0xffffffff">
-          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="43" />
         </Label>
-        <Label id="oldGenres" translation="[24, 118]" width="468" height="34" wrap="false" color="0xffffffff">
-          <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="18" />
-        </Label>
-      </Group>
-      <Group id="oldInfoCard" translation="[0, 352]">
-        <Poster id="oldInfoBg" width="516" height="130" uri="pkg:/images/ui/popup_btn.png"
-          loadDisplayMode="scaleToFill" blendColor="0xffffff14" />
-        <Label id="oldCreator" translation="[24, 18]" width="468" height="34" color="0xffffffff">
-          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="20" />
-        </Label>
-        <Label id="oldDescription" translation="[24, 58]" width="468" height="60" wrap="true" maxLines="2"
-          color="0xffffffd9">
-          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
+        <!-- Genre pill: rgba(255,255,255,0.15) rounded-full fs-18 -->
+        <Poster id="oldGenrePill" translation="[24, 103]" width="160" height="38"
+          uri="pkg:/images/ui/reels_genre_pill_fill_160x32.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff26" />
+        <Label id="oldGenres" translation="[24, 103]" width="160" height="38" wrap="false"
+          horizAlign="center" vertAlign="center" color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="22" />
         </Label>
       </Group>
+
+      <Group id="oldInfoCard" translation="[0, 368]" opacity="1.0">
+        <Poster id="oldInfoBg" width="516" height="268"
+          uri="pkg:/images/ui/reels_old_info_fill_516x160.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <Poster id="oldInfoBorder" width="516" height="268"
+          uri="pkg:/images/ui/reels_old_info_border_516x160.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <!-- Creator badge: primary gradient ≈ primary-600 fill, rounded-lg, uppercase fs-20 -->
+        <Poster id="oldCreatorBadge" translation="[24, 24]" width="160" height="36"
+          uri="pkg:/images/ui/reels_creator_badge_fill_160x36.png" loadDisplayMode="scaleToFill"
+          blendColor="0x0b75e0ff" />
+        <Label id="oldCreator" translation="[24, 24]" width="160" height="36"
+          horizAlign="center" vertAlign="center" color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+        </Label>
+        <!-- fs-22 leading-relaxed op-85 line-clamp-4 — height/numLines set in LayoutOldUiPanel -->
+        <Label id="oldDescription" translation="[24, 76]" width="468" height="0" wrap="true"
+          numLines="4" ellipsizeOnBoundary="true" color="0xffffffd9">
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="26" />
+        </Label>
+      </Group>
+
+      <!-- CLEAN-style enter: fade + translateY(20→0); actions delayed. Y keyValues set in PlayOldEnterAnim. -->
+      <Animation id="oldInfoEnterAnim" duration="0.6" repeat="false" easeFunction="easeOutCubic">
+        <FloatFieldInterpolator id="oldInfoOpInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+          fieldToInterp="oldInfoCard.opacity" />
+        <Vector2DFieldInterpolator id="oldInfoYInterp" key="[0.0, 1.0]"
+          keyValue="[[0.0, 388.0], [0.0, 368.0]]" fieldToInterp="oldInfoCard.translation" />
+      </Animation>
+      <Animation id="oldTitleEnterAnim" duration="0.6" repeat="false" easeFunction="easeOutCubic">
+        <FloatFieldInterpolator id="oldTitleOpInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+          fieldToInterp="oldTitleCard.opacity" />
+        <Vector2DFieldInterpolator id="oldTitleYInterp" key="[0.0, 1.0]"
+          keyValue="[[0.0, 194.0], [0.0, 174.0]]" fieldToInterp="oldTitleCard.translation" />
+      </Animation>
+      <Animation id="oldActionsEnterAnim" duration="0.7" delay="0.2" repeat="false" easeFunction="easeOutCubic">
+        <FloatFieldInterpolator id="oldActionsOpInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+          fieldToInterp="oldActions.opacity" />
+        <Vector2DFieldInterpolator id="oldActionsYInterp" key="[0.0, 1.0]"
+          keyValue="[[0.0, 20.0], [0.0, 0.0]]" fieldToInterp="oldActions.translation" />
+      </Animation>
     </Group>
   </children>
 </component>

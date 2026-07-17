@@ -105,21 +105,17 @@ end function
 
 ' Fixed row geometry shared by Home and Genre (content.tsx, netflixContent.tsx,
 ' and genre-list/Content.tsx).
-function HC_RowPitch() as integer
-    return 460
-end function
-
-' Anchor focused row at ~65vh on a 1080p canvas (netflixContent.tsx).
+' Anchor focused row on a 1080p canvas (netflixContent.tsx ~65vh = 702).
+' When displayTitle is on, titles sit under the poster (~415px below row top). At 702
+' they land past the visible/safe bottom — pull the pin up so title stays on-screen.
 function HC_NetflixAnchorY() as integer
+    if HC_IsDisplayTitleEnabled() then return 620
     return 702
-end function
-
-function HC_OttRowPitch() as integer
-    return 460
 end function
 
 ' React pins the focused row at 65vh on the 1080p canvas.
 function HC_OttAnchorY() as integer
+    if HC_IsDisplayTitleEnabled() then return 620
     return 702
 end function
 
@@ -142,18 +138,64 @@ function HC_RowMarginBottom() as integer
     return 75
 end function
 
+function HC_CardTitleExtraH() as integer
+    ' Space under Horizontal/Vertical posters for the title line + pb-2.
+    if HC_IsDisplayTitleEnabled() then return 56
+    return 0
+end function
+
+function HC_IsDisplayTitleEnabled() as boolean
+    ' Mirrors FeatureDisplayTitle / DefaultFeatures.displayTitle without requiring
+    ' BusinessConfig.brs on every CardHelper consumer.
+    if m.global <> invalid and m.global.businessResolved <> invalid then
+        f = m.global.businessResolved.features
+        if f <> invalid and f.displayTitle <> invalid then
+            v = f.displayTitle
+            t = type(v)
+            if t = "roBoolean" or t = "Boolean" then return v
+            if t = "roInteger" or t = "Integer" or t = "roFloat" or t = "Float" then return (v <> 0)
+            if t = "roString" or t = "String" then
+                s = LCase(v)
+                return (s = "true" or s = "1" or s = "yes")
+            end if
+        end if
+    end if
+    return false
+end function
+
 function HC_CardHeight(compName as string) as integer
-    if compName = "ContinueWatchCard" then return 286
-    if compName = "HorizontalCard" then return 312
-    if compName = "VerticalCard" then return 300
-    if compName = "NumberedVerticalCard" then return 260
-    if compName = "BannerCard" then return 400
-    if compName = "SeeAllCard" then return 305
-    return 286
+    base = 286
+    if compName = "ContinueWatchCard" then
+        base = 286
+    else if compName = "HorizontalCard" then
+        base = 312
+    else if compName = "VerticalCard" then
+        base = 300
+    else if compName = "NumberedVerticalCard" then
+        base = 260
+    else if compName = "BannerCard" then
+        base = 400
+    else if compName = "SeeAllCard" then
+        base = 305
+    end if
+    ' Title sits under Horizontal/Vertical posters only (React same).
+    if compName = "HorizontalCard" or compName = "VerticalCard" then
+        return base + HC_CardTitleExtraH()
+    end if
+    return base
 end function
 
 function HC_ContentRowLayoutHeight(cat as object) as integer
-    return 446
+    ' Title band + cards strip + m-b-75; grow when card titles are on.
+    return 446 + HC_CardTitleExtraH()
+end function
+
+function HC_RowPitch() as integer
+    return 460 + HC_CardTitleExtraH()
+end function
+
+function HC_OttRowPitch() as integer
+    return 460 + HC_CardTitleExtraH()
 end function
 
 function CardComponentWidth(compName as string, orientation = "" as string) as integer

@@ -136,9 +136,18 @@
     <ReelDetailPanel id="reelDetailPanel" visible="false" />
     <ReelsCommentDrawer id="commentSidebar" />
 
-    <Animation id="reelSwitchAnim" duration="0.45" repeat="false" easeFunction="inOutCubic">
+    <!-- React .reel-enter-active: opacity 450ms ease-out + transform 450ms cubic-bezier(0.22,1,0.36,1). -->
+    <Animation id="reelSwitchAnim" duration="0.45" repeat="false" easeFunction="easeOutCubic">
       <Vector2DFieldInterpolator id="reelSwitchInterp" key="[0.0, 1.0]"
         fieldToInterp="videoColumn.translation" />
+      <FloatFieldInterpolator id="reelSwitchOpacityInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="videoColumn.opacity" />
+      <Vector2DFieldInterpolator id="reelSwitchScaleInterp" key="[0.0, 1.0]"
+        keyValue="[[0.98, 0.98], [1.0, 1.0]]" fieldToInterp="videoColumn.scale" />
+      <Vector2DFieldInterpolator id="reelSwitchCornerInterp" key="[0.0, 1.0]"
+        fieldToInterp="videoCornerHost.translation" />
+      <FloatFieldInterpolator id="reelSwitchCornerOpacityInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="videoCornerHost.opacity" />
     </Animation>
 
     <!-- reels/index.tsx bg-neutral-900 + centered Spinner -->
