@@ -1,5 +1,6 @@
 ' HeaderSidebarMenu.brs — sidebar menu with icons (parity HeaderList.ts + HeaderMenuItem).
 
+' Order matches HeaderList.ts MENU_LIST: Reels → Live TV → Profile (last).
 function SidebarMenuItems(reelsEnabled as boolean, epgEnabled as boolean) as object
     items = [
         { text: "Home", route: RouteHome(), type: "", icon: "pkg:/images/ui/menu_home.png", iconActive: "pkg:/images/ui/menu_home_active.png" }
@@ -7,7 +8,6 @@ function SidebarMenuItems(reelsEnabled as boolean, epgEnabled as boolean) as obj
         { text: "Movies", route: RouteGenere(), type: HM_TypeSingleVideo(), icon: "pkg:/images/ui/menu_tv.png", iconActive: "pkg:/images/ui/menu_tv_active.png" }
         { text: "Series", route: RouteGenere(), type: HM_TypeSeries(), icon: "pkg:/images/ui/menu_play.png", iconActive: "pkg:/images/ui/menu_play_active.png" }
         { text: "My Watchlist", route: RouteMyListDetail(), type: "", icon: "pkg:/images/ui/menu_list.png", iconActive: "pkg:/images/ui/menu_list_active.png" }
-        { text: "Profile", route: RouteLoginProfile(), type: "", icon: "pkg:/images/ui/menu_profile.png", iconActive: "pkg:/images/ui/menu_profile_active.png" }
     ]
     if reelsEnabled then
         items.Push({ text: "Reels", route: RouteReels(), type: "", icon: "pkg:/images/ui/menu_reels.png", iconActive: "pkg:/images/ui/menu_reels_active.png" })
@@ -15,6 +15,7 @@ function SidebarMenuItems(reelsEnabled as boolean, epgEnabled as boolean) as obj
     if epgEnabled then
         items.Push({ text: "Live TV", route: RouteLiveTv(), type: "", icon: "pkg:/images/ui/menu_live_tv.png", iconActive: "pkg:/images/ui/menu_live_tv_active.png" })
     end if
+    items.Push({ text: "Profile", route: RouteLoginProfile(), type: "", icon: "pkg:/images/ui/menu_profile.png", iconActive: "pkg:/images/ui/menu_profile_active.png" })
     return items
 end function
 

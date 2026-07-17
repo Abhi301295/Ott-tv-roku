@@ -23,7 +23,10 @@
     <field id="sidebarWidth" type="integer" value="100" alwaysNotify="true" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/HomeSidebarHeader.brs" />
 
   <children>

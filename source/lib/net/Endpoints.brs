@@ -60,6 +60,8 @@ function Endpoints() as object
         GET_NEW_RELEASE_LIST: base + "/contents/new-release"
         SAVE_AD_VIEW: base + "/ads/view"
         REELS_LIST: base + "/contents/reels"
+        REEL_LIKE: base + "/contents/reel/like"
+        REEL_COMMENTS: base + "/reel-comment"
         BUSINESS_CONFIG: base + "/businesses/frontend/config"
     }
 end function

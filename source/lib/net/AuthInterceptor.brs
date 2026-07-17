@@ -45,6 +45,9 @@ function BearerContentPaths() as object
         ep.MY_LIST.MY_LIST_DETAIL
         ep.SAVE_AD_VIEW
         ep.REELS_LIST
+        ep.REEL_LIKE
+        ep.REEL_COMMENTS
+        ep.PROFILE.UPDATE_PROFILE
     ]
 end function
 

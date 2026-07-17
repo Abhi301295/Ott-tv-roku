@@ -1,7 +1,7 @@
 ' HomeService.brs — home data helpers (parity with features/home/services/action.ts
 ' and features/home/index.tsx boot logic). Network orchestration lives in HomeScreen.
 
-' Resolved home layout for this build (parity with themeConfig.homeLayout).
+' Resolved home layout — same source as ThemeHomeLayout (features.enableHomeBanner).
 function HomeLayoutMode() as string
     return ThemeHomeLayout()
 end function

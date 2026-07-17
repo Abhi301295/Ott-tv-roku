@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Comment drawer — parity with features/reels/components/CommentSidebar.tsx -->
+<component name="ReelsCommentDrawer" extends="Group">
+  <interface>
+    <field id="reelId" type="string" value="" onChange="OnReelChanged" />
+    <field id="totalComments" type="integer" value="0" onChange="OnReelChanged" />
+    <field id="isOpen" type="boolean" value="false" alwaysNotify="true" onChange="OnOpenChanged" />
+    <field id="requestClose" type="boolean" value="false" alwaysNotify="true" onChange="OnRequestClose" />
+    <field id="keyEvent" type="assocarray" alwaysNotify="true" />
+    <field id="action" type="string" value="" alwaysNotify="true" />
+    <field id="cNeutral50" type="string" value="0xffffffff" />
+    <field id="cNeutral400" type="string" value="0xa3a3a3ff" />
+    <field id="cNeutral700" type="string" value="0x404040ff" />
+    <field id="cNeutral900" type="string" value="0x0a0a0aff" />
+    <field id="cPrimary500" type="string" value="0x0b75e0ff" />
+    <field id="cPrimary600" type="string" value="0x0760bbff" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ColorShade.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/MediaUrl.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/Alert.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsService.brs" />
+  <script type="text/brightscript" uri="pkg:/components/reels/CommentSidebar.brs" />
+
+  <children>
+    <!-- Backdrop: rgba(0,0,0,0.3) — no blur. -->
+    <Rectangle id="scrim" width="1920" height="1080" color="0x0000004d" opacity="0.0" visible="false" />
+
+    <Group id="drawer" translation="[1920, 0]">
+      <!-- React: panel is top-[96px] — all chrome lives in panelHost so scroll cannot enter the shell header band. -->
+      <Group id="panelHost" translation="[0, 96]" clippingRect="[0, 0, 650, 984]"
+        clippingRectClipsChildren="true">
+        <Rectangle id="panelEdge" translation="[0, 0]" width="1" height="984" color="0xffffff0d" />
+        <Rectangle id="panel" translation="[1, 0]" width="649" height="984" color="0x14141cff" />
+
+        <Group id="listClip" translation="[16, 100]" clippingRect="[0, 0, 618, 860]"
+          clippingRectClipsChildren="true">
+          <Group id="listHost" />
+          <Group id="commentLoaderHost" translation="[309, 400]" visible="false">
+            <Group id="commentLoaderSpin" translation="[0, 0]" rotation="0.0">
+              <Poster id="commentLoaderRing" translation="[-24, -24]" width="48" height="48"
+                uri="pkg:/images/ui/spinner_ring.png" />
+              <Poster id="commentLoaderArc" translation="[-24, -24]" width="48" height="48"
+                uri="pkg:/images/ui/spinner_arc.png" />
+            </Group>
+            <Label id="commentLoaderText" translation="[-100, 40]" width="200" height="32"
+              horizAlign="center" text="Loading" color="0xffffffff">
+              <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="22" />
+            </Label>
+            <Animation id="commentLoaderAnim" duration="0.9" repeat="true" easeFunction="linear">
+              <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 6.2831853]"
+                fieldToInterp="commentLoaderSpin.rotation" />
+            </Animation>
+          </Group>
+          <Label id="emptyLbl" translation="[0, 360]" width="618" height="80"
+            text="No comments yet" horizAlign="center" color="0xffffff80" visible="false">
+            <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="24" />
+          </Label>
+        </Group>
+
+        <!-- Sticky header after list. Opaque bg covers any list overflow inside the panel. -->
+        <Group id="headerHost" translation="[0, 0]">
+          <Rectangle id="headerBg" width="650" height="88" color="0x14141cff" />
+          <Rectangle id="headerRule" translation="[0, 88]" width="650" height="1" color="0xffffff0d" />
+          <Label id="title" translation="[24, 20]" width="400" height="48" text="Comments"
+            vertAlign="center" color="0xffffffff">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="29" />
+          </Label>
+          <Label id="countLbl" translation="[180, 20]" width="120" height="48" text="0"
+            vertAlign="center" color="0xffffff80">
+            <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="22" />
+          </Label>
+          <Group id="closeBtn" translation="[578, 20]" scaleRotateCenter="[24, 24]">
+            <!-- React: fill #d03436; white 2px; primary-500 ring. Soft CSS glow omitted (sim reads as grey halo). -->
+            <Poster id="closeOuter" translation="[-2, -2]" width="52" height="52"
+              uri="pkg:/images/ui/reels_circle_ring_64.png" loadDisplayMode="scaleToFit"
+              blendColor="0x3b82f6ff" visible="false" />
+            <Poster id="closeBg" width="48" height="48"
+              uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill"
+              blendColor="0x2c2c33ff" />
+            <Poster id="closeBorder" width="48" height="48"
+              uri="pkg:/images/ui/reels_circle_ring_64.png" loadDisplayMode="scaleToFit"
+              blendColor="0xffffffff" visible="false" />
+            <Poster id="closeIcon" translation="[12, 12]" width="24" height="24"
+              uri="pkg:/images/ui/ic_edit_clear_24_white.png" loadDisplayMode="scaleToFit" />
+          </Group>
+        </Group>
+      </Group>
+      <!-- Sim may ignore clippingRect — opaque cap hides any scroll bleed into the shell header band. -->
+      <Rectangle id="topBleed" translation="[0, 0]" width="650" height="96" color="0x14141cff" />
+    </Group>
+
+    <!-- comment-sidebar-enter 300ms / exit 250ms. -->
+    <Animation id="slideAnim" duration="0.3" repeat="false" easeFunction="easeOutCubic">
+      <Vector2DFieldInterpolator id="slideInterp" key="[0.0, 1.0]"
+        keyValue="[[1920.0, 0.0], [1270.0, 0.0]]" fieldToInterp="drawer.translation" />
+      <FloatFieldInterpolator id="scrimInterp" key="[0.0, 1.0]"
+        keyValue="[0.0, 1.0]" fieldToInterp="scrim.opacity" />
+    </Animation>
+
+    <Timer id="focusTimer" duration="0.35" repeat="false" />
+  </children>
+</component>

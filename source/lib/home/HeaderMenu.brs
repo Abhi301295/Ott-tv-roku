@@ -29,7 +29,7 @@ function HeaderMenuFeatureFlags(fromNode as object) as object
     return { reels: reels, epg: epg }
 end function
 
-' Order matches HeaderList.ts: Profile before Reels; Live TV after Reels.
+' Order matches HeaderList.ts MENU_LIST: Reels → Live TV → Profile (last).
 function HeaderMenuItems(reelsEnabled as boolean, epgEnabled as boolean) as object
     items = [
         { text: "Home", route: RouteHome(), type: "" }
@@ -37,7 +37,6 @@ function HeaderMenuItems(reelsEnabled as boolean, epgEnabled as boolean) as obje
         { text: "Movies", route: RouteGenere(), type: HM_TypeSingleVideo() }
         { text: "Series", route: RouteGenere(), type: HM_TypeSeries() }
         { text: "My Watchlist", route: RouteMyListDetail(), type: "" }
-        { text: "Profile", route: RouteLoginProfile(), type: "" }
     ]
     if reelsEnabled then
         items.Push({ text: "Reels", route: RouteReels(), type: "" })
@@ -45,6 +44,7 @@ function HeaderMenuItems(reelsEnabled as boolean, epgEnabled as boolean) as obje
     if epgEnabled then
         items.Push({ text: "Live TV", route: RouteLiveTv(), type: "" })
     end if
+    items.Push({ text: "Profile", route: RouteLoginProfile(), type: "" })
     return items
 end function
 

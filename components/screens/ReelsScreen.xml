@@ -29,6 +29,7 @@
   <script type="text/brightscript" uri="pkg:/source/lib/browse/BrowsePageLoader.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
+  <script type="text/brightscript" uri="pkg:/components/reels/ReelsSocial.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/ReelsScreen.brs" />
 
   <children>
@@ -66,11 +67,11 @@
 
       <Group id="videoColumn" visible="false">
         <Group id="videoFrame">
-          <Rectangle id="videoBorder" width="616" height="1088" />
-          <Group id="videoClip" translation="[4, 4]" clippingRect="[0, 0, 608, 1080]"
+          <Rectangle id="videoBorder" width="556" height="986" />
+          <Group id="videoClip" translation="[1, 1]" clippingRect="[0, 0, 554, 984]"
             clippingRectClipsChildren="true">
-            <Rectangle id="videoPlaceholder" width="608" height="1080" />
-            <Poster id="videoDummyArt" width="200" height="200" translation="[204, 440]"
+            <Rectangle id="videoPlaceholder" width="554" height="984" />
+            <Poster id="videoDummyArt" width="200" height="200" translation="[177, 392]"
               uri="pkg:/images/ui/sk_base.png" loadDisplayMode="scaleToFit" visible="false" />
             <Poster id="videoPoster" width="608" height="1080" loadDisplayMode="scaleToZoom"
               visible="false" />
@@ -86,17 +87,9 @@
       </Group>
     </Group>
 
-    <!-- Layer 2: Roku Video — scene coords, 608x1080 centered (ignores parent clip). -->
+    <!-- Layer 2: Roku Video — scene coords, centered (ignores parent clip). -->
     <Video id="videoNode" width="608" height="1080" translation="[660, 4]" enableUI="false"
       loop="true" visible="false" />
-
-    <!-- radius-10 parity reels/index.tsx — baked corners over poster + inline video. -->
-    <Group id="videoCornerHost" visible="false">
-      <Poster id="videoCornerTL" uri="pkg:/images/ui/round_corner_tl.png" width="10" height="10" />
-      <Poster id="videoCornerTR" uri="pkg:/images/ui/round_corner_tr.png" width="10" height="10" />
-      <Poster id="videoCornerBL" uri="pkg:/images/ui/round_corner_bl.png" width="10" height="10" />
-      <Poster id="videoCornerBR" uri="pkg:/images/ui/round_corner_br.png" width="10" height="10" />
-    </Group>
 
     <!-- Layer 3: play overlay + progress (above video). -->
     <Group id="overlayHost" visible="false">
@@ -123,6 +116,14 @@
       <Rectangle id="progressFill" width="0" height="8" />
     </Group>
 
+    <!-- Outer rounded-[12px] on all 4 corners — above progress so BL/BR stay visible. -->
+    <Group id="videoCornerHost" visible="false">
+      <Poster id="videoCornerTL" uri="pkg:/images/ui/round_corner_tl.png" width="12" height="12" />
+      <Poster id="videoCornerTR" uri="pkg:/images/ui/round_corner_tr.png" width="12" height="12" />
+      <Poster id="videoCornerBL" uri="pkg:/images/ui/round_corner_bl.png" width="12" height="12" />
+      <Poster id="videoCornerBR" uri="pkg:/images/ui/round_corner_br.png" width="12" height="12" />
+    </Group>
+
     <Group id="seekPreview" visible="false">
       <Rectangle id="seekPreviewBg" width="120" height="40" />
       <Label id="seekPreviewLbl" width="120" height="40" horizAlign="center" vertAlign="center">
@@ -131,6 +132,23 @@
     </Group>
 
     <Timer id="seekPreviewTimer" duration="0.8" repeat="false" />
+
+    <ReelDetailPanel id="reelDetailPanel" visible="false" />
+    <ReelsCommentDrawer id="commentSidebar" />
+
+    <!-- React .reel-enter-active: opacity 450ms ease-out + transform 450ms cubic-bezier(0.22,1,0.36,1). -->
+    <Animation id="reelSwitchAnim" duration="0.45" repeat="false" easeFunction="easeOutCubic">
+      <Vector2DFieldInterpolator id="reelSwitchInterp" key="[0.0, 1.0]"
+        fieldToInterp="videoColumn.translation" />
+      <FloatFieldInterpolator id="reelSwitchOpacityInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="videoColumn.opacity" />
+      <Vector2DFieldInterpolator id="reelSwitchScaleInterp" key="[0.0, 1.0]"
+        keyValue="[[0.98, 0.98], [1.0, 1.0]]" fieldToInterp="videoColumn.scale" />
+      <Vector2DFieldInterpolator id="reelSwitchCornerInterp" key="[0.0, 1.0]"
+        fieldToInterp="videoCornerHost.translation" />
+      <FloatFieldInterpolator id="reelSwitchCornerOpacityInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+        fieldToInterp="videoCornerHost.opacity" />
+    </Animation>
 
     <!-- reels/index.tsx bg-neutral-900 + centered Spinner -->
     <Group id="loaderHost" translation="[0, 0]" visible="false">

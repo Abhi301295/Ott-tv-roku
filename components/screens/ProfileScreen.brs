@@ -10,6 +10,7 @@ sub init()
     m.listScrollY = 0
     m.listScrollTarget = 0
     m.prevProfileIndex = -1
+    m.prevFocusArea = "profiles"
     m.LIST_SCROLL_ANIM_STEPS = 4
     m.listScrollAnimTimer = CreateObject("roSGNode", "Timer")
     m.listScrollAnimTimer.duration = 0.016
@@ -19,6 +20,7 @@ sub init()
     m.logoutBtn = m.top.findNode("logoutBtn")
     m.confirmPopup = m.top.findNode("confirmPopup")
     m.otpPopup = m.top.findNode("otpPopup")
+    m.editProfilePopup = m.top.findNode("editProfilePopup")
     m.selectingOverlay = m.top.findNode("selectingOverlay")
     m.autoSelectTimer = m.top.findNode("autoSelectTimer")
     m.bg = m.top.findNode("bg")
@@ -36,10 +38,14 @@ sub init()
     m.focusArea = "profiles"   ' "profiles" | "logout"
     m.profileIndex = 0
     m.selectedProfile = invalid
-    m.popup = ""               ' "" | "confirm" | "otp"
+    m.popup = ""               ' "" | "confirm" | "otp" | "edit"
     m.selecting = false
     m.prefetching = false
     m.loggingOut = false
+    m.editingProfile = invalid
+    m.editSaving = false
+    m.editRefetchPending = false
+    m.editKeyboardDialog = invalid
     m.AUTO_TOTAL_MS = 15000      ' progress ring reaches 100% at 15s (parity with React)
     m.AUTO_SELECT_MS = 15500     ' auto-select fires after 15s + a 500ms buffer
     '
@@ -88,6 +94,7 @@ sub init()
     m.confirmPopup.observeField("action", "OnConfirmAction")
     m.otpPopup.observeField("submitted", "OnOtpSubmitted")
     m.otpPopup.observeField("action", "OnOtpAction")
+    m.editProfilePopup.observeField("action", "OnEditProfileAction")
     if m.vm <> invalid then m.vm.observeField("overlayDismiss", "OnOverlayDismiss")
 
     m.profileLoginDeferTimer = CreateObject("roSGNode", "Timer")
@@ -116,6 +123,7 @@ sub OnDispose()
     KillProfileTask(m.verifyTask)
     KillProfileTask(m.refreshTask)
     KillProfileTask(m.selectTask)
+    KillProfileTask(m.editTask)
     if m.listScrollAnimTimer <> invalid then m.listScrollAnimTimer.control = "stop"
     if m.profileFetchRetryTimer <> invalid then m.profileFetchRetryTimer.control = "stop"
     m.profilesTask = invalid
@@ -123,12 +131,14 @@ sub OnDispose()
     m.logoutTask = invalid
     m.verifyTask = invalid
     m.refreshTask = invalid
+    m.editTask = invalid
     m.selecting = false
     m.prefetching = false
     m.loggingOut = false
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")
     end if
+    CloseEditKeyboardDialog()
 end sub
 
 
@@ -140,9 +150,9 @@ end sub
 ' ── Theme ────────────────────────────────────────────────────────────────────
 
 
-' React userProfile.tsx branches on HEADER_STYLE === NETFLIX vs SIDEBAR (cases 4/6).
+' React userProfile.tsx currently hardcodes `true ? NetComponent : original`.
 function ProfileUsesSquareAvatars() as boolean
-    return ThemeIsSidebarHeader()
+    return false
 end function
 
 
@@ -210,6 +220,7 @@ sub OnAvatarLayoutChanged(event as object)
 end sub
 
 sub OnBusinessResolved()
+    wasAutoLogin = ProfileAutoLoginEnabled()
     LoadProfileTokens()
     m.uiSpec = ProfileUiSpec()
     m.useSquareAvatars = ProfileUsesSquareAvatars()
@@ -220,6 +231,12 @@ sub OnBusinessResolved()
     ApplySquareAvatarColors()
     ApplyProfileBranding()
     ApplyProfileFocus()
+    nowAutoLogin = ProfileAutoLoginEnabled()
+    if wasAutoLogin <> nowAutoLogin then
+        print "[PROFILE_EDIT_DBG] profileAutoLogin resolved="; nowAutoLogin
+        ResetAutoSelect()
+        ApplyProfileFocus()
+    end if
 end sub
 
 
@@ -318,6 +335,10 @@ sub OnProfilesResponse(event as object)
 
     m.profiles = ExtractProfiles(api.result)
     m.profilesLoaded = true
+    if m.editRefetchPending then
+        print "[PROFILE_EDIT_DBG] refetch response ok=true count="; m.profiles.Count()
+        m.editRefetchPending = false
+    end if
     ProfileSelectLogNode("PROFILE_FETCH", "ok count=" + ProfileSelectFmt(m.profiles.Count()), m.top)
     SaveProfilesMeta(m.profiles)
     BuildAvatars()
@@ -332,3 +353,187 @@ sub OnProfilesResponse(event as object)
 end sub
 
 ' Focus the stored profile if present, else the first (parity with focusSelf logic).
+
+sub OpenEditProfile()
+    if m.profiles = invalid or m.profileIndex < 0 or m.profileIndex >= m.profiles.Count() then return
+    if not ProfileEditBadgeVisibleForRow(m.profileIndex) then return
+    m.editingProfile = m.profiles[m.profileIndex]
+    m.popup = "edit"
+    m.editSaving = false
+    ApplyEditPopupTheme()
+    m.editProfilePopup.profileName = EditProfileNameValue(m.editingProfile)
+    m.editProfilePopup.isKid = (m.editingProfile.isKid = true)
+    m.editProfilePopup.isSaving = false
+    m.editProfilePopup.visible = true
+    SetOverlayOpen(true)
+    ApplyProfileFocusBackground()
+    ApplyProfileOverlayBackdrop(true)
+    print "[PROFILE_EDIT_DBG] open profileId="; EditProfileId(m.editingProfile)
+end sub
+
+sub CloseEditProfile()
+    m.popup = ""
+    m.editSaving = false
+    if m.editProfilePopup <> invalid then
+        m.editProfilePopup.isSaving = false
+        m.editProfilePopup.visible = false
+    end if
+    CloseEditKeyboardDialog()
+    SetOverlayOpen(false)
+    ApplyProfileOverlayBackdrop(false)
+    ApplyProfileFocus()
+end sub
+
+' profile.tsx: showOtpPopup|showPopUp|editingProfile → blur-md scale-[0.98] brightness-75
+' on the profile list + logout only. Poster bg + gradient layers stay full-strength
+' (they sit outside that div); EditProfilePopUp then paints bg-black/50 backdrop-blur-sm.
+' ⚠ Parity Note: SceneGraph cannot Gaussian-blur live UI — content dim + scale approximates
+' brightness-75/blur-md; overlay scrim+veil approximates backdrop-blur-sm (see EditProfilePopup).
+sub ApplyProfileOverlayBackdrop(active as boolean)
+    opacity = 1.0
+    scale = 1.0
+    if active then
+        opacity = 0.75
+        scale = 0.98
+    end if
+    for each id in ["profilesScrollHost", "profileHeaderChrome", "skeletonGroup", "logoutBtn"]
+        node = m.top.findNode(id)
+        if node = invalid then continue for
+        if node.hasField("opacity") then node.opacity = opacity
+        if node.hasField("scale") then
+            node.scale = [scale, scale]
+            node.scaleRotateCenter = [960, 540]
+        end if
+    end for
+    ' Poster + vignettes stay under ApplyProfileFocusBackground (opacity 0|1), matching React.
+    if active = false then ApplyProfileFocusBackground()
+end sub
+
+sub ApplyEditPopupTheme()
+    if m.editProfilePopup = invalid then return
+    if m.cPrimary500 <> invalid then m.editProfilePopup.cPrimary500 = m.cPrimary500
+    if m.cPrimary600 <> invalid then m.editProfilePopup.cPrimary600 = m.cPrimary600
+    if m.cNeutral50 <> invalid then m.editProfilePopup.cNeutral50 = m.cNeutral50
+    if m.cNeutral400 <> invalid then m.editProfilePopup.cNeutral400 = m.cNeutral400
+    if m.cNeutral600 <> invalid then m.editProfilePopup.cNeutral600 = m.cNeutral600
+    if m.cNeutral700 <> invalid then m.editProfilePopup.cNeutral700 = m.cNeutral700
+    if m.cNeutral800 <> invalid then m.editProfilePopup.cNeutral800 = m.cNeutral800
+    if m.cNeutral900 <> invalid then m.editProfilePopup.cNeutral900 = m.cNeutral900
+    if m.cPrimary500 <> invalid then m.editProfilePopup.cPortalPrimary = m.cPrimary500
+end sub
+
+sub OnEditProfileAction()
+    action = m.editProfilePopup.action
+    if action = "" then return
+    m.editProfilePopup.action = ""
+    if action = "cancel" then
+        CloseEditProfile()
+    else if action = "keyboard" then
+        ShowEditKeyboardDialog()
+    else if action = "save" then
+        StartEditProfileSave(m.editProfilePopup.editedName)
+    end if
+end sub
+
+sub ShowEditKeyboardDialog()
+    CloseEditKeyboardDialog()
+    isStandard = true
+    dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
+    if dialog = invalid or not dialog.hasField("keyboard") then
+        isStandard = false
+        dialog = CreateObject("roSGNode", "KeyboardDialog")
+    end if
+    dialog.title = CopyProfileName()
+    dialog.text = m.editProfilePopup.editedName
+    dialog.buttons = ["OK", "Cancel"]
+    if isStandard then dialog.keyboardDomain = "generic"
+    m.editKeyboardDialog = dialog
+    dialog.observeField("buttonSelected", "OnEditKeyboardButton")
+    dialog.observeField("wasClosed", "OnEditKeyboardClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub OnEditKeyboardButton()
+    dialog = m.editKeyboardDialog
+    if dialog = invalid then return
+    if dialog.buttonSelected = 0 then
+        m.editProfilePopup.profileName = dialog.text
+    end if
+    CloseEditKeyboardDialog()
+end sub
+
+sub OnEditKeyboardClosed()
+    CloseEditKeyboardDialog()
+end sub
+
+sub CloseEditKeyboardDialog()
+    if m.editKeyboardDialog <> invalid then
+        m.top.getScene().dialog = invalid
+        m.editKeyboardDialog = invalid
+    end if
+end sub
+
+sub StartEditProfileSave(name as string)
+    if m.editingProfile = invalid or m.editSaving then return
+    trimmed = name.Trim()
+    if trimmed = "" then return
+    profileId = EditProfileId(m.editingProfile)
+    if profileId = "" then return
+
+    m.editSaving = true
+    m.editProfilePopup.isSaving = true
+    path = UpdateProfilePath(profileId)
+    body = UpdateProfilePayload(trimmed, m.editingProfile.isKid = true)
+    print "[PROFILE_EDIT_DBG] save start id="; profileId; " name="; trimmed
+    KillProfileTask(m.editTask)
+    m.editTask = ApiPatch(path, body)
+    m.editTask.observeField("apiResult", "OnEditProfileSaveResponse")
+    StartHttpTask(m.editTask)
+end sub
+
+sub OnEditProfileSaveResponse()
+    if m.editTask = invalid then return
+    api = m.editTask.apiResult
+    if api = invalid then return
+    ReconcileEditProfileSave(api)
+end sub
+
+sub ReconcileEditProfileSave(api as object)
+    m.editSaving = false
+    if m.editProfilePopup <> invalid then m.editProfilePopup.isSaving = false
+    profileId = EditProfileId(m.editingProfile)
+    ReconcileEditProfileListName(profileId, m.editProfilePopup.editedName)
+    print "[PROFILE_EDIT_DBG] save response ok="; api.ok; " status="; api.statusCode
+    if IsProfileUpdateSuccessful(api) then
+        if profileId = GetProfileId() then SetValueByKey(SK_ProfileName(), m.editProfilePopup.editedName, "app")
+        ShowAlert(m.top, 1, MsgProfileUpdated())
+        m.editRefetchPending = true
+        CloseEditProfile()
+        FetchProfiles()
+        return
+    end if
+    ShowAlert(m.top, 2, MsgFailedUpdateProfile())
+end sub
+
+sub ReconcileEditProfileListName(profileId as string, name as string)
+    if profileId = "" or name = "" then return
+    for each p in m.profiles
+        if p <> invalid and EditProfileId(p) = profileId then
+            p.name = name
+            exit for
+        end if
+    end for
+    if m.editingProfile <> invalid then m.editingProfile.name = name
+end sub
+
+function EditProfileId(profile as object) as string
+    if profile = invalid then return ""
+    if profile._id <> invalid then return profile._id
+    if profile.id <> invalid then return profile.id
+    return ""
+end function
+
+function EditProfileNameValue(profile as object) as string
+    if profile = invalid or profile.name = invalid then return ""
+    return profile.name
+end function

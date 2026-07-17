@@ -3,7 +3,19 @@
 sub init()
     m.bg = m.top.findNode("bg")
     m.contentHost = m.top.findNode("contentHost")
-    m.hero = m.top.findNode("hero")
+    m.heroOtt = m.top.findNode("heroOtt")
+    m.heroCardFocus = m.top.findNode("heroCardFocus")
+    m.useCardFocusHero = FeatureEnableCardFocus()
+    if m.useCardFocusHero and m.heroCardFocus <> invalid then
+        m.hero = m.heroCardFocus
+        if m.heroOtt <> invalid then m.heroOtt.visible = false
+        if m.hero.hasField("cardFocusMode") then m.hero.cardFocusMode = true
+        ' Trailer gated inside ScheduleTrailer via enableTrailerOnBanner (not holdTrailerBoot).
+        if m.hero.hasField("holdTrailerBoot") then m.hero.holdTrailerBoot = false
+    else
+        m.hero = m.heroOtt
+        if m.heroCardFocus <> invalid then m.heroCardFocus.visible = false
+    end if
     m.loaderHost = m.top.findNode("loaderHost")
     m.loaderPageBg = m.top.findNode("loaderPageBg")
     m.loaderCenter = m.top.findNode("loaderCenter")
@@ -396,7 +408,12 @@ sub PrimeHeroFromCategories()
         end for
     end if
     if item <> invalid then
-        m.hero.activeItem = item
+        if m.useCardFocusHero then
+            m.hero.bannerItems = [item]
+            m.hero.callFunc("PauseAutoAdvance", invalid)
+        else
+            m.hero.activeItem = item
+        end if
         BrowseDbg("genre_hero", "primed title=" + BrowseDbgStr(item.title))
         if m.loaderHost <> invalid and m.loaderHost.visible = true then
             if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "start"
@@ -654,7 +671,13 @@ sub UpdateGenreHeroFromFocus()
         if row <> invalid then cardCount = row.cardCount
     end if
     item = GL_FocusedItem(m.categories, m.rowIndex, m.cardIndex, cardCount)
-    if item <> invalid then m.hero.activeItem = item
+    if item = invalid then return
+    if m.useCardFocusHero then
+        m.hero.bannerItems = [item]
+        m.hero.callFunc("PauseAutoAdvance", invalid)
+    else
+        m.hero.activeItem = item
+    end if
 end sub
 
 sub ApplyGenreFocusWindow()
@@ -898,7 +921,7 @@ sub ApplyRowFocusState(i as integer)
     row = m.rowWidgets[i]
     if row = invalid then return
     row.rowFocused = (i = m.rowIndex)
-    row.rowDimmed = false
+    row.rowDimmed = (i > m.rowIndex)
     peek = false
     if i = 0 and not m.rowsRevealed then
         peek = true

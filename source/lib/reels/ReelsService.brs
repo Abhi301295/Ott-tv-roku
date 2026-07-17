@@ -45,8 +45,12 @@ function ReelsCoerceList(val as object) as object
         if val.name <> invalid or val.title <> invalid or val._id <> invalid then
             return [val]
         end if
+        ' Numeric keys ("0","1",…) — AA for-each order is unstable; walk by index.
+        ordered = ReelsCoerceNumericKeyedList(val)
+        if ordered.Count() > 0 then return ordered
         items = []
-        for each item in val
+        for each key in val
+            item = val[key]
             if item <> invalid and type(item) <> "roString" and type(item) <> "String" then
                 items.Push(item)
             end if
@@ -54,6 +58,39 @@ function ReelsCoerceList(val as object) as object
         return items
     end if
     return []
+end function
+
+function ReelsCoerceNumericKeyedList(val as object) as object
+    items = []
+    if val = invalid then return items
+    maxIdx = -1
+    for each key in val
+        if key = invalid then continue for
+        ks = key.ToStr()
+        if ks = "" then continue for
+        if not ReelsIsDigits(ks) then return []
+        idx = ks.ToInt()
+        if idx > maxIdx then maxIdx = idx
+    end for
+    if maxIdx < 0 then return items
+    i = 0
+    while i <= maxIdx
+        item = val[Str(i).Trim()]
+        if item <> invalid then items.Push(item)
+        i = i + 1
+    end while
+    return items
+end function
+
+function ReelsIsDigits(s as string) as boolean
+    if s = invalid or s = "" then return false
+    i = 1
+    while i <= Len(s)
+        ch = Mid(s, i, 1)
+        if Asc(ch) < Asc("0") or Asc(ch) > Asc("9") then return false
+        i = i + 1
+    end while
+    return true
 end function
 
 function ReelsPageHasMore(batchCount as integer, accumulated as integer, total as integer) as boolean
@@ -77,11 +114,10 @@ function ReelsStreamUrl(reel as object) as string
     return MediaStreamUrl(raw)
 end function
 
-function ReelsIsTvPlatform(plat as dynamic) as boolean
+function ReelsIsMobilePlatform(plat as dynamic) as boolean
     if plat = invalid then return false
-    if plat = "TV" or plat = 1 or plat = "1" then return true
-    ' React Plateform.TV === '4' (common.enum.ts).
-    if plat = 4 or plat = "4" then return true
+    ' React Plateform.MOBILE === "3" (common.enum.ts).
+    if plat = 3 or plat = "3" or UCase(plat.ToStr()) = "MOBILE" then return true
     return false
 end function
 
@@ -139,21 +175,47 @@ function ReelsThumbByType(list as object, cardType as string) as string
 end function
 
 function ReelsVerticalThumb(reel as object) as string
+    ' React getVerticalThumbnail: MOBILE + VERTICAL from thumbnails[].
     if reel = invalid then return ""
     lists = ReelsCollectThumbnailLists(reel)
     for each thumbs in lists
         list = ReelsCoerceList(thumbs)
         for each t in list
             if t = invalid then continue for
-            if not ReelsIsTvPlatform(t.platform) then continue for
+            if not ReelsIsMobilePlatform(t.platform) then continue for
             if not ReelsThumbIsVertical(t) then continue for
             p = ReelsThumbPath(t)
             if p <> "" then return p
         end for
-        url = ReelsThumbByType(list, "VERTICAL")
-        if url <> "" then return url
-        for each thumb in list
-            p = ReelsThumbPath(thumb)
+    end for
+    return ""
+end function
+
+function ReelsAnyThumbPath(reel as object) as string
+    ' When API omits MOBILE VERTICAL, use any usable still so the frame is not empty.
+    if reel = invalid then return ""
+    lists = ReelsCollectThumbnailLists(reel)
+    ' Prefer any VERTICAL, then any MOBILE, then first path.
+    for each thumbs in lists
+        for each t in ReelsCoerceList(thumbs)
+            if t = invalid then continue for
+            if not ReelsThumbIsVertical(t) then continue for
+            p = ReelsThumbPath(t)
+            if p <> "" then return p
+        end for
+    end for
+    for each thumbs in lists
+        for each t in ReelsCoerceList(thumbs)
+            if t = invalid then continue for
+            if not ReelsIsMobilePlatform(t.platform) then continue for
+            p = ReelsThumbPath(t)
+            if p <> "" then return p
+        end for
+    end for
+    for each thumbs in lists
+        for each t in ReelsCoerceList(thumbs)
+            if t = invalid then continue for
+            p = ReelsThumbPath(t)
             if p <> "" then return p
         end for
     end for
@@ -167,6 +229,7 @@ end function
 
 function ReelsPosterUri(reel as object) as string
     thumb = ReelsVerticalThumb(reel)
+    if thumb = "" then thumb = ReelsAnyThumbPath(reel)
     if thumb <> "" then return thumb
     return RL_DummyThumbPosterUri()
 end function
@@ -236,6 +299,93 @@ function ReelsCreatorName(reel as object) as string
         if cb.name <> invalid and cb.name <> "" then return cb.name.ToStr()
     end if
     return ""
+end function
+
+' React reads profilePicture from the same array/object branch as createdBy.name.
+function ReelsCreatorAvatar(reel as object) as string
+    if reel = invalid or reel.createdBy = invalid then return ""
+    cb = reel.createdBy
+    t = type(cb)
+    creator = invalid
+    if t = "roArray" then
+        if cb.Count() > 0 then creator = cb[0]
+    else if t = "roAssociativeArray" or t = "AssociativeArray" then
+        if cb["0"] <> invalid then
+            creator = cb["0"]
+        else
+            creator = cb
+        end if
+    end if
+    if creator = invalid or creator.profilePicture = invalid then return ""
+    return creator.profilePicture.ToStr()
+end function
+
+function ReelsId(reel as object) as string
+    if reel = invalid then return ""
+    if reel._id <> invalid then return reel._id.ToStr()
+    if reel.id <> invalid then return reel.id.ToStr()
+    return ""
+end function
+
+function ReelsIsLiked(reel as object) as boolean
+    if reel = invalid or reel.isLiked = invalid then return false
+    return reel.isLiked = true
+end function
+
+function ReelsLikes(reel as object) as integer
+    if reel = invalid or reel.likes = invalid then return 0
+    return reel.likes
+end function
+
+function ReelsCommentsCount(reel as object) as integer
+    if reel = invalid or reel.commentsCount = invalid then return 0
+    return reel.commentsCount
+end function
+
+function ReelsLikePath(reelId as string, action as boolean) as string
+    return Endpoints().REEL_LIKE + "/" + reelId + BuildQueryString({ action: action })
+end function
+
+function ReelsCommentsQuery(reelId as string) as object
+    return { reel: reelId, limit: RL_CommentLimit() }
+end function
+
+function ReelsParseComments(api as object) as object
+    if api = invalid or api.ok <> true then return []
+    if api.statusCode <> invalid and api.statusCode <> 200 then return []
+    if api.result = invalid or api.result.data = invalid then return []
+    return ReelsCoerceList(api.result.data)
+end function
+
+function ReelsCommentName(comment as object) as string
+    if comment = invalid or comment.name = invalid then return ""
+    first = ""
+    last = ""
+    if comment.name.first <> invalid then first = comment.name.first.ToStr()
+    if comment.name.last <> invalid then last = comment.name.last.ToStr()
+    if first = "" then return last
+    if last = "" then return first
+    return first + " " + last
+end function
+
+function ReelsCommentText(comment as object) as string
+    if comment = invalid or comment.comment = invalid then return ""
+    return comment.comment.ToStr()
+end function
+
+function ReelsCommentAvatar(comment as object) as string
+    if comment = invalid or comment.avatar = invalid then return ""
+    return comment.avatar.ToStr()
+end function
+
+function ReelsCommentLikes(comment as object) as integer
+    if comment = invalid or comment.likes = invalid then return 0
+    return comment.likes
+end function
+
+function ReelsCommentReplies(comment as object) as integer
+    if comment = invalid or comment.replies = invalid then return 0
+    return comment.replies
 end function
 
 function ReelsObjectName(val as object) as string

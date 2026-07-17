@@ -116,9 +116,14 @@ function HC_HeroZoomSec() as float
     return 8.0
 end function
 
-' Minimum poster display before trailer playback (parity TRAILER_LOAD_DELAY 2500ms).
+' Minimum poster display before trailer playback (parity cinematic TRAILER_LOAD_DELAY 2500ms).
 function HC_HeroTrailerDelaySec() as float
     return 2.5
+end function
+
+' Card-focus hero linger before trailer (parity heroBannerCardFocus TRAILER_LOAD_DELAY 2000ms).
+function HC_HeroCardFocusTrailerDelaySec() as float
+    return 2.0
 end function
 
 ' Max time the loading skeleton waits for the hero poster to paint before it drops
@@ -143,7 +148,7 @@ function HC_RowBuildGateSec() as float
     return 3.5
 end function
 
-' OTT has no hero trailer — do not hold row build for the cinematic preview gate.
+' OTT / card-focus does not gate row build on trailer (React reveals rows independently).
 function HC_RowBuildGateSecForLayout(homeLayout as string) as float
     if homeLayout = HC_HomeLayoutOtt() then return 0.0
     return HC_RowBuildGateSec()

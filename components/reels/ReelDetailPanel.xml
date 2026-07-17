@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Reels social detail layouts from features/reels/components/ReelDetailPanel.tsx. -->
+<component name="ReelDetailPanel" extends="Group">
+  <interface>
+    <field id="reel" type="assocarray" onChange="OnReelChanged" />
+    <field id="layout" type="string" value="NEW_UI" onChange="OnPanelChanged" />
+    <field id="focusTarget" type="string" value="video" onChange="OnFocusTargetChanged" />
+    <field id="isLiked" type="boolean" value="false" onChange="OnPanelChanged" />
+    <field id="likesCount" type="integer" value="0" onChange="OnPanelChanged" />
+    <function name="PlayHeartPulse" />
+    <field id="commentsCount" type="integer" value="0" onChange="OnPanelChanged" />
+    <field id="topInset" type="integer" value="96" onChange="OnPanelChanged" />
+    <field id="cPrimary400" type="string" value="0x60a5faff" />
+    <field id="cPrimary500" type="string" value="0x3b82f6ff" />
+    <field id="cPrimary600" type="string" value="0x2563ebff" />
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Config.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/Endpoints.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/ApiClient.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/net/MediaUrl.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/reels/ReelsService.brs" />
+  <script type="text/brightscript" uri="pkg:/components/reels/ReelDetailPanel.brs" />
+
+  <children>
+    <Group id="newHost" visible="false">
+      <!-- React NewDetailCard: p-x-20 p-y-16; focus = glass + white ring only (no scale). -->
+      <Group id="newTitleCard">
+        <Poster id="newTitleBg" width="543" height="144"
+          uri="pkg:/images/ui/reels_card_fill_543x144.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff26" />
+        <Poster id="newTitleBorder" width="543" height="144"
+          uri="pkg:/images/ui/reels_card_border_543x144.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff0d" />
+        <Label id="newTitle" translation="[20, 16]" width="503" height="80" wrap="true" maxLines="2"
+          color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+        </Label>
+        <Poster id="musicIcon" translation="[20, 104]" width="32" height="32"
+          uri="pkg:/images/ui/reels_music_32.png" opacity="0.8" />
+        <Label id="newGenres" translation="[76, 104]" width="447" height="32" wrap="false"
+          vertAlign="center" color="0xffffffcc">
+          <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="22" />
+        </Label>
+      </Group>
+
+      <!-- React user card: p-x-20 p-y-16; 64 avatar + gap-12; full-width fill. -->
+      <Group id="newUserCard" translation="[0, 164]">
+        <Poster id="newUserBg" width="543" height="96"
+          uri="pkg:/images/ui/reels_card_fill_543x96.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff26" />
+        <Poster id="newUserBorder" width="543" height="96"
+          uri="pkg:/images/ui/reels_card_border_543x96.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff0d" />
+        <MaskGroup id="newAvatarMask" maskUri="pkg:/images/ui/avatar_circle.png" maskSize="[64, 64]" translation="[20, 16]">
+          <Poster id="newAvatar" width="64" height="64"
+            uri="pkg:/images/ui/reels_avatar_placeholder_64.png" loadDisplayMode="scaleToZoom" />
+        </MaskGroup>
+        <!-- Photo case: border-2 border-white/30 (placeholder already includes this). -->
+        <Poster id="newAvatarRing" translation="[20, 16]" width="64" height="64"
+          uri="pkg:/images/ui/reels_circle_ring_64.png" loadDisplayMode="scaleToFit"
+          blendColor="0xffffff4d" visible="false" />
+        <Poster id="newUserFallback" translation="[20, 16]" width="64" height="64"
+          uri="pkg:/images/ui/reels_avatar_placeholder_64.png" visible="false" />
+        <Label id="newCreator" translation="[96, 16]" width="427" height="64" wrap="false"
+          vertAlign="center" color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="26" />
+        </Label>
+      </Group>
+
+      <Group id="newActions" translation="[12, 288]">
+        <!-- React NewCircleButton: scale(1.15) translateY(-6), count opacity duration-400. -->
+        <Group id="newLike">
+          <!-- Lift on outer group; scale on inner pivot at circle center (React transform-origin: center). -->
+          <Group id="newLikeBtn">
+            <Group id="newLikeScale" translation="[40.0, 40.0]">
+              <Group translation="[-40.0, -40.0]">
+                <Poster id="newLikeCircle" width="80" height="80"
+                  uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill" blendColor="0xffffff26" />
+                <Poster id="newLikeRing" width="80" height="80"
+                  uri="pkg:/images/ui/reels_circle_ring_80.png" loadDisplayMode="scaleToFit" blendColor="0xffffff0d" />
+                <Poster id="newLikeIcon" translation="[24, 24]" width="32" height="32"
+                  uri="pkg:/images/ui/reels_heart_outline_32.png" />
+              </Group>
+            </Group>
+          </Group>
+          <Label id="newLikeCount" translation="[-10, 92]" width="100" height="34"
+            horizAlign="center" color="0xffffffff" opacity="0.0">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+          </Label>
+          <Animation id="newLikeFocusAnim" duration="0.4" repeat="false" easeFunction="outCubic">
+            <Vector2DFieldInterpolator id="newLikeScaleInterp" key="[0.0, 1.0]"
+              keyValue="[[1.0, 1.0], [1.15, 1.15]]" fieldToInterp="newLikeScale.scale" />
+            <Vector2DFieldInterpolator id="newLikeLiftInterp" key="[0.0, 1.0]"
+              keyValue="[[0.0, 0.0], [0.0, -6.0]]" fieldToInterp="newLikeBtn.translation" />
+            <FloatFieldInterpolator id="newLikeCountInterp" key="[0.0, 1.0]"
+              keyValue="[0.0, 1.0]" fieldToInterp="newLikeCount.opacity" />
+          </Animation>
+        </Group>
+        <Group id="newComment" translation="[96, 0]">
+          <Group id="newCommentBtn">
+            <Group id="newCommentScale" translation="[40.0, 40.0]">
+              <Group translation="[-40.0, -40.0]">
+                <Poster id="newCommentCircle" width="80" height="80"
+                  uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill" blendColor="0xffffff26" />
+                <Poster id="newCommentRing" width="80" height="80"
+                  uri="pkg:/images/ui/reels_circle_ring_80.png" loadDisplayMode="scaleToFit" blendColor="0xffffff0d" />
+                <Poster id="newCommentIcon" translation="[24, 24]" width="32" height="32"
+                  uri="pkg:/images/ui/reels_comment_32.png" />
+              </Group>
+            </Group>
+          </Group>
+          <Label id="newCommentCount" translation="[-10, 92]" width="100" height="34"
+            horizAlign="center" color="0xffffffff" opacity="0.0">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+          </Label>
+          <Animation id="newCommentFocusAnim" duration="0.4" repeat="false" easeFunction="outCubic">
+            <Vector2DFieldInterpolator id="newCommentScaleInterp" key="[0.0, 1.0]"
+              keyValue="[[1.0, 1.0], [1.15, 1.15]]" fieldToInterp="newCommentScale.scale" />
+            <Vector2DFieldInterpolator id="newCommentLiftInterp" key="[0.0, 1.0]"
+              keyValue="[[0.0, 0.0], [0.0, -6.0]]" fieldToInterp="newCommentBtn.translation" />
+            <FloatFieldInterpolator id="newCommentCountInterp" key="[0.0, 1.0]"
+              keyValue="[0.0, 1.0]" fieldToInterp="newCommentCount.opacity" />
+          </Animation>
+        </Group>
+      </Group>
+    </Group>
+
+    <Group id="cleanHost" visible="false">
+      <!-- CLEAN_UI: left info (non-focusable) + right vertical actions — ReelDetailPanel.tsx -->
+      <Group id="cleanInfo">
+        <!-- Card: rounded-[24px] p-x-20 p-y-16, bg white/15, border 2px white/5 -->
+        <Group id="cleanTitleCard">
+          <Poster id="cleanTitleBg" width="400" height="112"
+            uri="pkg:/images/ui/reels_card_fill_400x112.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff26" />
+          <Poster id="cleanTitleBorder" width="400" height="112"
+            uri="pkg:/images/ui/reels_card_border_400x112.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff0d" />
+          <!-- Genre: px-4 py-1.5 rounded-full border-white/30 text-white/90 text-sm (no solid fill) -->
+          <Group id="cleanGenrePill" translation="[20, 84]">
+            <Poster id="cleanGenrePillBg" width="160" height="32"
+              uri="pkg:/images/ui/reels_genre_pill_fill_160x32.png" loadDisplayMode="scaleToFill"
+              blendColor="0xffffff00" />
+            <Poster id="cleanGenrePillRing" width="160" height="32"
+              uri="pkg:/images/ui/reels_genre_pill_ring_160x32.png" loadDisplayMode="scaleToFill"
+              blendColor="0xffffff4d" />
+            <Label id="cleanGenres" translation="[16, 0]" width="128" height="32"
+              horizAlign="center" vertAlign="center" color="0xffffffe6">
+              <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="17" />
+            </Label>
+          </Group>
+          <!-- Title last so it paints above card chrome / pill assets -->
+          <Label id="cleanTitle" translation="[20, 16]" width="360" height="56" wrap="true" maxLines="2"
+            horizAlign="left" vertAlign="top" color="0xffffffff">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+          </Label>
+        </Group>
+
+        <Group id="cleanUserCard" translation="[0, 156]">
+          <Poster id="cleanUserBg" width="400" height="80"
+            uri="pkg:/images/ui/reels_card_fill_400x80.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff26" />
+          <Poster id="cleanUserBorder" width="400" height="80"
+            uri="pkg:/images/ui/reels_card_border_400x80.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff0d" />
+          <Poster id="cleanAvatarBg" translation="[20, 16]" width="48" height="48"
+            uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill" blendColor="0x6b7280ff" />
+          <MaskGroup id="cleanAvatarMask" maskUri="pkg:/images/ui/avatar_circle.png" maskSize="[44, 44]" translation="[22, 18]">
+            <Poster id="cleanAvatar" width="44" height="44" uri="pkg:/images/ui/avatar_circle.png"
+              loadDisplayMode="scaleToZoom" blendColor="0x6b7280ff" />
+          </MaskGroup>
+          <Label id="cleanAvatarInitial" translation="[20, 16]" width="48" height="48"
+            horizAlign="center" vertAlign="center" color="0xffffffff" visible="false">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+          </Label>
+          <Poster id="cleanAvatarRing" translation="[20, 16]" width="48" height="48"
+            uri="pkg:/images/ui/reels_circle_ring_64.png" loadDisplayMode="scaleToFit"
+            blendColor="0xffffff33" />
+          <!-- Name + Verified share a row (gap-2); name gets remaining width so it does not ellipsize. -->
+          <Label id="cleanCreator" translation="[72, 16]" width="220" height="48"
+            vertAlign="center" wrap="false" color="0xffffffff">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+          </Label>
+          <!-- Verified: text-xs / bg #ffcc00 — fixed native pill, Label on top (no scaled poster text). -->
+          <Group id="cleanVerified" translation="[300, 22]">
+            <Poster id="cleanVerifiedBg" width="72" height="20"
+              uri="pkg:/images/ui/reels_verified_pill_72x20.png" loadDisplayMode="noScale" />
+            <Label id="cleanVerifiedLbl" text="Verified" translation="[0, 0]" width="72" height="20"
+              horizAlign="center" vertAlign="center" color="0x000000ff">
+              <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="12" />
+            </Label>
+          </Group>
+        </Group>
+      </Group>
+
+      <Group id="cleanActions">
+        <Group id="cleanLike">
+          <Group id="cleanLikeBtn">
+            <Group id="cleanLikeScale" translation="[40.0, 40.0]">
+              <Group translation="[-40.0, -40.0]">
+                <Poster id="cleanLikeCircle" width="80" height="80"
+                  uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill" blendColor="0xffffff26" />
+                <Poster id="cleanLikeRing" width="80" height="80"
+                  uri="pkg:/images/ui/reels_circle_ring_80.png" loadDisplayMode="scaleToFit" blendColor="0xffffff0d" />
+                <Poster id="cleanLikeIcon" translation="[24, 24]" width="32" height="32"
+                  uri="pkg:/images/ui/reels_heart_outline_32.png" />
+              </Group>
+            </Group>
+          </Group>
+          <Label id="cleanLikeCount" translation="[-10, 92]" width="100" height="34"
+            horizAlign="center" color="0xffffffff" opacity="0.0">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+          </Label>
+          <Animation id="cleanLikeFocusAnim" duration="0.4" repeat="false" easeFunction="outCubic">
+            <Vector2DFieldInterpolator id="cleanLikeScaleInterp" key="[0.0, 1.0]"
+              keyValue="[[1.0, 1.0], [1.15, 1.15]]" fieldToInterp="cleanLikeScale.scale" />
+            <Vector2DFieldInterpolator id="cleanLikeLiftInterp" key="[0.0, 1.0]"
+              keyValue="[[0.0, 0.0], [0.0, -6.0]]" fieldToInterp="cleanLikeBtn.translation" />
+            <FloatFieldInterpolator id="cleanLikeCountInterp" key="[0.0, 1.0]"
+              keyValue="[0.0, 1.0]" fieldToInterp="cleanLikeCount.opacity" />
+          </Animation>
+        </Group>
+        <Group id="cleanComment" translation="[0, 126]">
+          <Group id="cleanCommentBtn">
+            <Group id="cleanCommentScale" translation="[40.0, 40.0]">
+              <Group translation="[-40.0, -40.0]">
+                <Poster id="cleanCommentCircle" width="80" height="80"
+                  uri="pkg:/images/ui/avatar_circle.png" loadDisplayMode="scaleToFill" blendColor="0xffffff26" />
+                <Poster id="cleanCommentRing" width="80" height="80"
+                  uri="pkg:/images/ui/reels_circle_ring_80.png" loadDisplayMode="scaleToFit" blendColor="0xffffff0d" />
+                <Poster id="cleanCommentIcon" translation="[24, 24]" width="32" height="32"
+                  uri="pkg:/images/ui/reels_comment_32.png" />
+              </Group>
+            </Group>
+          </Group>
+          <Label id="cleanCommentCount" translation="[-10, 92]" width="100" height="34"
+            horizAlign="center" color="0xffffffff" opacity="0.0">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+          </Label>
+          <Animation id="cleanCommentFocusAnim" duration="0.4" repeat="false" easeFunction="outCubic">
+            <Vector2DFieldInterpolator id="cleanCommentScaleInterp" key="[0.0, 1.0]"
+              keyValue="[[1.0, 1.0], [1.15, 1.15]]" fieldToInterp="cleanCommentScale.scale" />
+            <Vector2DFieldInterpolator id="cleanCommentLiftInterp" key="[0.0, 1.0]"
+              keyValue="[[0.0, 0.0], [0.0, -6.0]]" fieldToInterp="cleanCommentBtn.translation" />
+            <FloatFieldInterpolator id="cleanCommentCountInterp" key="[0.0, 1.0]"
+              keyValue="[0.0, 1.0]" fieldToInterp="cleanCommentCount.opacity" />
+          </Animation>
+        </Group>
+      </Group>
+    </Group>
+
+    <Group id="defaultHost" visible="false">
+      <!-- DEFAULT / Old* — rounded-2xl glass cards; enter = CLEAN-style fade+slideY. -->
+      <Group id="oldActions" opacity="1.0">
+        <Group id="oldLike" scaleRotateCenter="[125.0, 75.0]">
+          <Poster id="oldLikeBg" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_fill_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
+          <Poster id="oldLikeBorder" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_border_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
+          <Poster id="oldLikeIcon" translation="[101, 20]" width="48" height="48"
+            uri="pkg:/images/ui/reels_heart_outline_48.png" />
+          <Label id="oldLikeLabel" text="Like" translation="[0, 76]" width="250" height="30" horizAlign="center" color="0xffffffe6">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+          </Label>
+          <Label id="oldLikeCount" translation="[0, 108]" width="250" height="32"
+            horizAlign="center" color="0x00000000">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="26" />
+          </Label>
+        </Group>
+        <Group id="oldComment" translation="[266, 0]" scaleRotateCenter="[125.0, 75.0]">
+          <Poster id="oldCommentBg" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_fill_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
+          <Poster id="oldCommentBorder" width="250" height="150"
+            uri="pkg:/images/ui/reels_old_btn_border_250x150.png" loadDisplayMode="scaleToFill"
+            blendColor="0xffffff14" />
+          <Poster translation="[101, 20]" width="48" height="48" uri="pkg:/images/ui/reels_comment_48.png" />
+          <Label id="oldCommentLabel" text="Comment" translation="[0, 76]" width="250" height="30" horizAlign="center" color="0xffffffe6">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+          </Label>
+          <Label id="oldCommentCount" translation="[0, 108]" width="250" height="32"
+            horizAlign="center" color="0x00000000">
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="26" />
+          </Label>
+        </Group>
+      </Group>
+
+      <!-- Sizes/Y from LayoutOldUiPanel (fs-* @ FontScale LARGE + m-b-16 / line-clamp-4). -->
+      <Group id="oldTitleCard" translation="[0, 174]" opacity="1.0">
+        <Poster id="oldTitleBg" width="516" height="170"
+          uri="pkg:/images/ui/reels_old_title_fill_516x170.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <Poster id="oldTitleBorder" width="516" height="170"
+          uri="pkg:/images/ui/reels_old_title_border_516x170.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <Label id="oldTitle" translation="[24, 24]" width="468" height="63" wrap="true" maxLines="2"
+          color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="43" />
+        </Label>
+        <!-- Genre pill: rgba(255,255,255,0.15) rounded-full fs-18 -->
+        <Poster id="oldGenrePill" translation="[24, 103]" width="160" height="38"
+          uri="pkg:/images/ui/reels_genre_pill_fill_160x32.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff26" />
+        <Label id="oldGenres" translation="[24, 103]" width="160" height="38" wrap="false"
+          horizAlign="center" vertAlign="center" color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="22" />
+        </Label>
+      </Group>
+
+      <Group id="oldInfoCard" translation="[0, 368]" opacity="1.0">
+        <Poster id="oldInfoBg" width="516" height="268"
+          uri="pkg:/images/ui/reels_old_info_fill_516x160.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <Poster id="oldInfoBorder" width="516" height="268"
+          uri="pkg:/images/ui/reels_old_info_border_516x160.png" loadDisplayMode="scaleToFill"
+          blendColor="0xffffff14" />
+        <!-- Creator badge: primary gradient ≈ primary-600 fill, rounded-lg, uppercase fs-20 -->
+        <Poster id="oldCreatorBadge" translation="[24, 24]" width="160" height="36"
+          uri="pkg:/images/ui/reels_creator_badge_fill_160x36.png" loadDisplayMode="scaleToFill"
+          blendColor="0x0b75e0ff" />
+        <Label id="oldCreator" translation="[24, 24]" width="160" height="36"
+          horizAlign="center" vertAlign="center" color="0xffffffff">
+          <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="24" />
+        </Label>
+        <!-- fs-22 leading-relaxed op-85 line-clamp-4 — height/numLines set in LayoutOldUiPanel -->
+        <Label id="oldDescription" translation="[24, 76]" width="468" height="0" wrap="true"
+          numLines="4" ellipsizeOnBoundary="true" color="0xffffffd9">
+          <Font role="font" uri="pkg:/fonts/Inter-Regular.ttf" size="26" />
+        </Label>
+      </Group>
+
+      <!-- CLEAN-style enter: fade + translateY(20→0); actions delayed. Y keyValues set in PlayOldEnterAnim. -->
+      <Animation id="oldInfoEnterAnim" duration="0.6" repeat="false" easeFunction="easeOutCubic">
+        <FloatFieldInterpolator id="oldInfoOpInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+          fieldToInterp="oldInfoCard.opacity" />
+        <Vector2DFieldInterpolator id="oldInfoYInterp" key="[0.0, 1.0]"
+          keyValue="[[0.0, 388.0], [0.0, 368.0]]" fieldToInterp="oldInfoCard.translation" />
+      </Animation>
+      <Animation id="oldTitleEnterAnim" duration="0.6" repeat="false" easeFunction="easeOutCubic">
+        <FloatFieldInterpolator id="oldTitleOpInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+          fieldToInterp="oldTitleCard.opacity" />
+        <Vector2DFieldInterpolator id="oldTitleYInterp" key="[0.0, 1.0]"
+          keyValue="[[0.0, 194.0], [0.0, 174.0]]" fieldToInterp="oldTitleCard.translation" />
+      </Animation>
+      <Animation id="oldActionsEnterAnim" duration="0.7" delay="0.2" repeat="false" easeFunction="easeOutCubic">
+        <FloatFieldInterpolator id="oldActionsOpInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+          fieldToInterp="oldActions.opacity" />
+        <Vector2DFieldInterpolator id="oldActionsYInterp" key="[0.0, 1.0]"
+          keyValue="[[0.0, 20.0], [0.0, 0.0]]" fieldToInterp="oldActions.translation" />
+      </Animation>
+    </Group>
+  </children>
+</component>

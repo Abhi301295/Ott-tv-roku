@@ -57,7 +57,9 @@ sub OnProfileSelectResponse()
     end if
 
     if ok then
-        PersistSelectedProfile(profileId, avatar)
+        profileName = ""
+        if m.selectedProfile <> invalid and m.selectedProfile.name <> invalid then profileName = m.selectedProfile.name
+        PersistSelectedProfile(profileId, avatar, profileName)
         ProfileSelectLogNode("PROFILE_SELECT", "select ok -> prefetch + navigate", m.top)
         BeginHomePrefetch(profileId, avatar)
         return

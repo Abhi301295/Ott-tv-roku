@@ -18,6 +18,13 @@ function CopyUseThisPin() as string: return "Use this 6 digit PIN to access all 
 function CopyContinue() as string: return "Continue": end function
 function CopyEnterPinHint() as string: return "Enter PIN to access": end function
 
+' Edit profile popup
+function CopyEditProfile() as string: return "Edit Profile": end function
+function CopyUpdateProfileName() as string: return "Update your profile name below.": end function
+function CopyProfileName() as string: return "Profile Name": end function
+function CopySave() as string: return "Save": end function
+function CopySaving() as string: return "Saving...": end function
+
 function CopyAutoSelectingIn(secs as integer) as string
     if secs < 0 then secs = 0
     return "Auto-selecting in " + secs.ToStr() + "s"
@@ -48,3 +55,5 @@ function MsgFailedSelectAfterPin() as string: return "Failed to select profile a
 function MsgInvalidPin() as string: return "Invalid PIN. Please try again.": end function
 function MsgLoggedOut() as string: return "Logged out successfully": end function
 function MsgFailedLoadProfiles() as string: return "Failed to load profiles. Please try again.": end function
+function MsgProfileUpdated() as string: return "Profile updated successfully": end function
+function MsgFailedUpdateProfile() as string: return "Failed to update profile": end function

@@ -17,6 +17,7 @@ function SK_SelectedItem() as string: return "selectedItem": end function
 function SK_HomeProfileId() as string: return "homeProfileId": end function
 function SK_KidProfileId() as string: return "kidProfileId": end function
 function SK_Avatar() as string: return "avatar": end function
+function SK_ProfileName() as string: return "profileName": end function
 function SK_IsSubscribed() as string: return "isSubscribed": end function
 function SK_IsDefaultPlan() as string: return "isDefaultPlan": end function
 function SK_ShowPremiumBadge() as string: return "showPremiumBadge": end function
@@ -104,6 +105,10 @@ function SetProfileId(id as string) as void
     RegistryWrite(SK_ProfileId(), id, "app")
 end function
 
+function GetProfileName() as string
+    return RegistryRead(SK_ProfileName(), "app")
+end function
+
 function GetDeviceId() as string
     id = RegistryRead(SK_DeviceId(), "app")
     if id <> "" then return id
@@ -158,6 +163,7 @@ sub ClearAppKeys()
         SK_HomeProfileId()
         SK_KidProfileId()
         SK_Avatar()
+        SK_ProfileName()
         SK_IsSubscribed()
         SK_IsDefaultPlan()
         SK_ShowPremiumBadge()

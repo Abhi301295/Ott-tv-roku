@@ -47,6 +47,7 @@ sub init()
     m.layoutTimer.repeat = false
     m.top.appendChild(m.layoutTimer)
     m.layoutTimer.observeField("fire", "OnLayoutTimer")
+    OnAvatarChanged()
 end sub
 
 sub OnMenuChanged()
@@ -70,14 +71,11 @@ sub OnScrimOpacityChanged()
 end sub
 
 sub OnAvatarChanged()
-    if m.avatarImg = invalid then return
-    uri = m.top.avatarUri
-    if uri <> invalid and uri <> "" then
-        m.avatarImg.uri = uri
-        m.avatarImg.visible = true
-    else
-        m.avatarImg.visible = false
-    end if
+    ' React ottHeader.tsx removed the top-right profile avatar.
+    avatarMask = m.top.findNode("avatarMask")
+    if avatarMask <> invalid then avatarMask.visible = false
+    if m.avatarImg <> invalid then m.avatarImg.visible = false
+    if m.avatarBg <> invalid then m.avatarBg.visible = false
 end sub
 
 sub OnLogoChanged()

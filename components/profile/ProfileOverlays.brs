@@ -8,6 +8,7 @@ sub OpenConfirm()
     m.confirmPopup.isLoggingOut = false
     m.confirmPopup.visible = true
     SetOverlayOpen(true)
+    ApplyProfileOverlayBackdrop(true)
 end sub
 
 
@@ -15,6 +16,7 @@ sub CloseConfirm()
     m.popup = ""
     m.confirmPopup.visible = false
     SetOverlayOpen(false)
+    ApplyProfileOverlayBackdrop(false)
     ' Give the focused profile a fresh 15s after dismissing the dialog.
     ResetAutoSelect()
     ApplyProfileFocus()
@@ -71,6 +73,7 @@ sub OpenOtp()
     m.otpPopup.resetPin = true
     m.otpPopup.visible = true
     SetOverlayOpen(true)
+    ApplyProfileOverlayBackdrop(true)
 end sub
 
 
@@ -78,6 +81,7 @@ sub CloseOtp()
     m.popup = ""
     m.otpPopup.visible = false
     SetOverlayOpen(false)
+    ApplyProfileOverlayBackdrop(false)
     ResetAutoSelect()
     ApplyProfileFocus()
 end sub
@@ -109,6 +113,7 @@ sub OnVerifyResponse()
         m.popup = ""
         m.otpPopup.visible = false
         SetOverlayOpen(false)
+        ApplyProfileOverlayBackdrop(false)
         DoSelectProfile(m.selectedProfile._id)
     else
         ShowAlert(m.top, 2, MsgInvalidPin())
@@ -132,6 +137,8 @@ sub OnOverlayDismiss()
         if not m.loggingOut then CloseConfirm()
     else if m.popup = "otp" then
         if not m.otpPopup.verifying then CloseOtp()
+    else if m.popup = "edit" then
+        if not m.editSaving then CloseEditProfile()
     end if
 end sub
 

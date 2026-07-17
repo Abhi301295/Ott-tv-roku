@@ -7,6 +7,7 @@ sub init()
     m.thumbFallback = m.top.findNode("thumbFallback")
     m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.veil = m.top.findNode("veil")
+    m.titleLabel = m.top.findNode("titleLabel")
     m.thumb.observeField("loadStatus", "OnThumbLoad")
     m.lastThumbnailUri = ""
     m.skeletonDwellStarted = false
@@ -27,6 +28,7 @@ end sub
 
 sub OnFocusChanged()
     ApplyFocusVisual()
+    ApplyTitleVisual()
 end sub
 
 sub OnThemeChanged()
@@ -105,6 +107,7 @@ sub ApplyAll()
         ShowThumbLoading()
     end if
     ApplyFocusVisual()
+    ApplyTitleVisual()
 end sub
 
 sub ShowThumbLoading()
@@ -119,6 +122,25 @@ sub ShowThumbLoading()
     if not m.skeletonDwellStarted then
         m.skeletonDwellStarted = true
         if m.thumbRevealTimer <> invalid then m.thumbRevealTimer.control = "start"
+    end if
+end sub
+
+sub ApplyTitleVisual()
+    if m.titleLabel = invalid then return
+    show = false
+    if m.top.displayTitle and m.top.cardTitle <> "" then show = true
+    m.titleLabel.visible = show
+    if not show then return
+    m.titleLabel.text = m.top.cardTitle
+    w = ThumbW()
+    m.titleLabel.width = w
+    m.titleLabel.translation = [3, ThumbH() + 8]
+    if m.top.focusedState then
+        m.titleLabel.color = m.top.cPrimary500
+    else
+        c = m.top.cNeutral400
+        if c = invalid or c = "" then c = "0xa3a3a3ff"
+        m.titleLabel.color = c
     end if
 end sub
 

@@ -84,7 +84,7 @@ sub OnCardFocusChanged()
 end sub
 
 sub OnRowVisualChanged()
-    ' netflixContent.tsx: focused=1, above focus=0, below focus=0.4 (OTT below stays 1.0).
+    ' React row virtualization: focused=1, past=0.01, upcoming=0.4.
     if m.top.rowFocused = true then
         m.top.opacity = 1.0
         if m.top.ottRowReveal = true then
@@ -92,7 +92,7 @@ sub OnRowVisualChanged()
             if m.cards.Count() > 0 then RevealStripNow()
         end if
     else if m.top.rowSuppressed = true then
-        m.top.opacity = 0.0
+        m.top.opacity = 0.01
     else if m.top.rowPeekVisible = true then
         m.top.opacity = 1.0
     else if m.top.rowDimmed = true then
@@ -725,6 +725,16 @@ end sub
 
 sub ConfigureCard(card as object, compName as string, item as object, cardType as string, rank as integer)
     CardInjectTheme(card, m.top.cPrimary500, m.top.cPrimary600, m.top.cPrimary700, m.top.cNeutral50, m.top.cNeutral800, m.top.cNeutral700)
+    showTitle = FeatureDisplayTitle()
+    ' React contentRow: description={contentItemData?.title} (fallback empty).
+    cardTitle = ""
+    if item <> invalid then
+        if item.title <> invalid and item.title <> "" then
+            cardTitle = item.title
+        else if item.name <> invalid and item.name <> "" then
+            cardTitle = item.name
+        end if
+    end if
 
     if compName = "ContinueWatchCard" then
         ' Hold poster fetch until Home drops the page loader so CW skeleton+progress is visible.
@@ -751,6 +761,10 @@ sub ConfigureCard(card as object, compName as string, item as object, cardType a
     else if compName = "VerticalCard" then
         card.thumbnailUri = GetCardImgByType(cardType, item.thumbnails)
     end if
+
+    ' Set title text before displayTitle so OnDataChanged sees both when flag flips on.
+    if card.hasField("cardTitle") then card.cardTitle = cardTitle
+    if card.hasField("displayTitle") then card.displayTitle = showTitle
 end sub
 
 ' After page loader hides — start CW poster fetches (skeleton was held during boot).

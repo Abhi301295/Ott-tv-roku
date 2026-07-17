@@ -114,6 +114,42 @@ sub init()
     m.top.observeField("visible", "OnVisibleChanged")
     if m.activePoster <> invalid then m.activePoster.observeField("loadStatus", "OnActivePosterLoad")
     if m.nextPoster <> invalid then m.nextPoster.observeField("loadStatus", "OnNextPosterLoad")
+    ApplyCardFocusModeChrome()
+end sub
+
+' Parity HeroBannerCardFocus: hide carousel chrome; trailer uses 2s delay + enableTrailerOnBanner.
+sub OnCardFocusModeChanged()
+    ApplyCardFocusModeChrome()
+    if m.top.cardFocusMode = true then
+        StopSwipeTimer()
+        if m.top.visible = true and m.items <> invalid and m.items.Count() > 0 then ScheduleTrailer()
+    else if m.top.visible = true and ItemCount() > 1 then
+        StartSwipeTimer()
+    end if
+end sub
+
+sub ApplyCardFocusModeChrome()
+    isCf = (m.top.cardFocusMode = true)
+    if isCf then
+        if m.prevArrow <> invalid then m.prevArrow.visible = false
+        if m.nextArrow <> invalid then m.nextArrow.visible = false
+        if m.counterHost <> invalid then m.counterHost.visible = false
+        if m.barsHost <> invalid then m.barsHost.visible = false
+        if m.heroBarFill <> invalid then m.heroBarFill.visible = false
+        StopSwipeTimer()
+    else
+        if m.barsHost <> invalid then m.barsHost.visible = true
+        if m.heroBarFill <> invalid then m.heroBarFill.visible = true
+        ApplyNavChromeVisibility()
+        UpdateCounter()
+    end if
+    if m.trailerLoadTimer <> invalid then
+        if isCf then
+            m.trailerLoadTimer.duration = HC_HeroCardFocusTrailerDelaySec()
+        else
+            m.trailerLoadTimer.duration = HC_HeroTrailerDelaySec()
+        end if
+    end if
 end sub
 
 sub OnContentWidthChanged()
@@ -201,6 +237,7 @@ function PauseAutoAdvance(dummy = invalid as dynamic) as boolean
 end function
 
 function ResumeAutoAdvance(dummy = invalid as dynamic) as boolean
+    if m.top.cardFocusMode = true then return true
     if not m.top.visible or ItemCount() < 2 then return true
     if m.isVideoPlaying then return true
     RestartSwipeTimer()
@@ -219,7 +256,7 @@ function ResumeHeroPlayback(dummy = invalid as dynamic) as boolean
         ArmTrailerAfterDecoderRelease()
         return true
     end if
-    if ItemCount() > 1 then StartSwipeTimer()
+    if m.top.cardFocusMode <> true and ItemCount() > 1 then StartSwipeTimer()
     ScheduleTrailer()
     return true
 end function
@@ -310,7 +347,22 @@ sub RestartSwipeTimer()
 end sub
 
 sub OnBannerItemsChanged()
+    items = m.top.bannerItems
+    ' Card-focus: React skips when focusedItem._id is unchanged — avoid pulse remount.
+    if m.top.cardFocusMode = true then
+        newId = ""
+        oldId = ""
+        if items <> invalid and items.Count() > 0 and items[0] <> invalid and items[0]._id <> invalid then
+            newId = items[0]._id
+        end if
+        if m.items.Count() > 0 and m.items[0] <> invalid and m.items[0]._id <> invalid then
+            oldId = m.items[0]._id
+        end if
+        if newId <> "" and newId = oldId then return
+    end if
+
     StopSwipeTimer()
+    ' Switching cards: stop playback + cancel in-flight detail/trailer resolve (stale tasks).
     StopTrailer()
     m.isFading = false
     m.activeIndex = 0
@@ -321,7 +373,6 @@ sub OnBannerItemsChanged()
     if m.slidePosterTimer <> invalid then m.slidePosterTimer.control = "stop"
     if m.activeLayer <> invalid then m.activeLayer.opacity = 1.0
 
-    items = m.top.bannerItems
     if items = invalid then
         m.items = []
     else
@@ -332,10 +383,11 @@ sub OnBannerItemsChanged()
     BuildBars()
     UpdateCounter()
     ApplyNavChromeVisibility()
+    ApplyCardFocusModeChrome()
     PlayMetaEntrance()
     ApplySlides()
     ArmPosterRevealTimer()
-    if m.top.visible and m.items.Count() > 1 then StartSwipeTimer()
+    if m.top.cardFocusMode <> true and m.top.visible and m.items.Count() > 1 then StartSwipeTimer()
 end sub
 
 sub OnThemeChanged()
@@ -628,6 +680,20 @@ end sub
 ' (heroBarFill) so the timer animation never loses its field binding.
 sub BuildBars()
     if m.barsHost = invalid then return
+    if m.top.cardFocusMode = true then
+        if m.barAnim <> invalid then m.barAnim.control = "stop"
+        if m.heroBarFill <> invalid then
+            m.heroBarFill.width = 0
+            m.heroBarFill.visible = false
+        end if
+        count = m.barsHost.getChildCount()
+        for i = count - 1 to 0 step -1
+            m.barsHost.removeChildIndex(i)
+        end for
+        m.barsHost.visible = false
+        return
+    end if
+    if m.barsHost.visible <> true then m.barsHost.visible = true
     if m.barAnim <> invalid then m.barAnim.control = "stop"
     if m.heroBarFill <> invalid then m.heroBarFill.width = 0
 
@@ -746,6 +812,10 @@ end sub
 
 sub UpdateCounter()
     if m.counterHost = invalid then return
+    if m.top.cardFocusMode = true then
+        m.counterHost.visible = false
+        return
+    end if
     total = ItemCount()
     if total < 2 then
         m.counterHost.visible = false
@@ -757,7 +827,13 @@ sub UpdateCounter()
 end sub
 
 ' React only portals prev/next when items.length > 1 — hide (not disable) on single-slide heroes.
+' Card-focus mode never shows carousel arrows (parity HeroBannerCardFocus).
 sub ApplyNavChromeVisibility()
+    if m.top.cardFocusMode = true then
+        if m.prevArrow <> invalid then m.prevArrow.visible = false
+        if m.nextArrow <> invalid then m.nextArrow.visible = false
+        return
+    end if
     multi = (ItemCount() > 1)
     if m.prevArrow <> invalid then m.prevArrow.visible = multi
     if m.nextArrow <> invalid then m.nextArrow.visible = multi
@@ -783,7 +859,9 @@ end sub
 
 ' Auto-advance: 15s poster window, or hold until the trailer ends when one is playing
 ' (parity heroBannerCinematic.tsx — setInterval pauses while isVideoPlaying).
+' Card-focus mode has no carousel timer (parity HeroBannerCardFocus).
 sub StartSwipeTimer()
+    if m.top.cardFocusMode = true then return
     if m.swipeTimer = invalid or ItemCount() < 2 then return
     if m.isVideoPlaying then return
     m.swipeTimer.control = "start"
@@ -828,8 +906,10 @@ end sub
 ' ── Trailer autoplay (parity with hero trailer fetch + HLS playback) ─────────
 
 ' Resolve in the background when the poster is ready; playback waits TRAILER_LOAD_DELAY.
+' Card-focus: only when features.enableTrailerOnBanner (parity heroBannerCardFocus.tsx).
 sub ScheduleTrailer()
     if m.top.holdTrailerBoot = true then return
+    if m.top.cardFocusMode = true and not FeatureEnableTrailerOnBanner() then return
     StopTrailer()
     BeginTrailerPrefetch()
     StartTrailerLoadTimer()
@@ -837,7 +917,11 @@ end sub
 
 sub StartTrailerLoadTimer()
     if m.trailerLoadTimer = invalid then return
-    m.trailerLoadTimer.duration = HC_HeroTrailerDelaySec()
+    if m.top.cardFocusMode = true then
+        m.trailerLoadTimer.duration = HC_HeroCardFocusTrailerDelaySec()
+    else
+        m.trailerLoadTimer.duration = HC_HeroTrailerDelaySec()
+    end if
     m.trailerLoadTimer.control = "stop"
     m.trailerLoadTimer.control = "start"
 end sub

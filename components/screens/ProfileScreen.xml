@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!-- Profile selection — parity with src/features/profile/profile.tsx.
-     Avatar style follows layout headerStyle (React HEADER_STYLE):
-       NETFLIX header (cases 1–3, 5) → circular NetComponent-style ProfileAvatar
-       SIDEBAR header (cases 4, 6)     → square "original" ProfileAvatarSquare -->
+     React's current `true ? <NetComponent /> : ...` branch always renders circular avatars. -->
 <component name="ProfileScreen" extends="Group">
   <interface>
     <field id="navState" type="assocarray" />
@@ -96,6 +94,7 @@
 
     <ConfirmPopup id="confirmPopup" visible="false" />
     <OtpPopup id="otpPopup" visible="false" />
+    <EditProfilePopup id="editProfilePopup" visible="false" />
 
     <ProfileSelectingOverlay id="selectingOverlay" visible="false" />
 

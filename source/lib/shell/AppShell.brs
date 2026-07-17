@@ -262,6 +262,16 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
 
     if ThemeIsSidebarHeader() then
         if key = "up" then
+            homeIdx = HeaderSelectedIndex(menuItems, RouteHome())
+            if homeIdx >= 0 and menuIndex >= 0 and menuIndex < menuItems.Count() then
+                cur = menuItems[menuIndex]
+                if cur <> invalid and cur.text <> "Home" then
+                    menuIndex = homeIdx
+                    header.focusedIndex = menuIndex
+                    vm.menuIndex = menuIndex
+                    return true
+                end if
+            end if
             if menuIndex > 0 then
                 menuIndex = menuIndex - 1
                 header.focusedIndex = menuIndex

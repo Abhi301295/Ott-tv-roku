@@ -103,24 +103,20 @@ function HC_PromotionalCard() as string
     return "PROMOTIONAL"
 end function
 
-' Vertical pitch between Netflix-style rows (parity with netflixContent translate step).
-function HC_RowPitch() as integer
-    return 430
-end function
-
-' Anchor focused row at ~65vh on a 1080p canvas (netflixContent.tsx).
+' Fixed row geometry shared by Home and Genre (content.tsx, netflixContent.tsx,
+' and genre-list/Content.tsx).
+' Anchor focused row on a 1080p canvas (netflixContent.tsx ~65vh = 702).
+' When displayTitle is on, titles sit under the poster (~415px below row top). At 702
+' they land past the visible/safe bottom — pull the pin up so title stays on-screen.
 function HC_NetflixAnchorY() as integer
+    if HC_IsDisplayTitleEnabled() then return 620
     return 702
 end function
 
-' OTT layout row pitch (content.tsx scroll step ~280px).
-function HC_OttRowPitch() as integer
-    return 280
-end function
-
-' OTT rows overlap the banner (marginTop -55vh ≈ 594px on 1080p canvas).
+' React pins the focused row at 65vh on the 1080p canvas.
 function HC_OttAnchorY() as integer
-    return 594
+    if HC_IsDisplayTitleEnabled() then return 620
+    return 702
 end function
 
 function HC_RowPitchForLayout(homeLayout as string) as integer
@@ -142,26 +138,64 @@ function HC_RowMarginBottom() as integer
     return 75
 end function
 
-function HC_CardHeight(compName as string) as integer
-    if compName = "ContinueWatchCard" then return 286
-    if compName = "HorizontalCard" then return 312
-    if compName = "VerticalCard" then return 300
-    if compName = "NumberedVerticalCard" then return 260
-    if compName = "BannerCard" then return 400
-    if compName = "SeeAllCard" then return 305
-    return 286
+function HC_CardTitleExtraH() as integer
+    ' Space under Horizontal/Vertical posters for the title line + pb-2.
+    if HC_IsDisplayTitleEnabled() then return 56
+    return 0
 end function
 
-' Full vertical slot for one OTT home row (parity with content.tsx row title + ContentRow).
+function HC_IsDisplayTitleEnabled() as boolean
+    ' Mirrors FeatureDisplayTitle / DefaultFeatures.displayTitle without requiring
+    ' BusinessConfig.brs on every CardHelper consumer.
+    if m.global <> invalid and m.global.businessResolved <> invalid then
+        f = m.global.businessResolved.features
+        if f <> invalid and f.displayTitle <> invalid then
+            v = f.displayTitle
+            t = type(v)
+            if t = "roBoolean" or t = "Boolean" then return v
+            if t = "roInteger" or t = "Integer" or t = "roFloat" or t = "Float" then return (v <> 0)
+            if t = "roString" or t = "String" then
+                s = LCase(v)
+                return (s = "true" or s = "1" or s = "yes")
+            end if
+        end if
+    end if
+    return false
+end function
+
+function HC_CardHeight(compName as string) as integer
+    base = 286
+    if compName = "ContinueWatchCard" then
+        base = 286
+    else if compName = "HorizontalCard" then
+        base = 312
+    else if compName = "VerticalCard" then
+        base = 300
+    else if compName = "NumberedVerticalCard" then
+        base = 260
+    else if compName = "BannerCard" then
+        base = 400
+    else if compName = "SeeAllCard" then
+        base = 305
+    end if
+    ' Title sits under Horizontal/Vertical posters only (React same).
+    if compName = "HorizontalCard" or compName = "VerticalCard" then
+        return base + HC_CardTitleExtraH()
+    end if
+    return base
+end function
+
 function HC_ContentRowLayoutHeight(cat as object) as integer
-    if cat = invalid then return HC_OttRowPitch()
-    rowType = ""
-    if cat.type <> invalid then rowType = cat.type
-    cardType = HC_CardTypeVertical()
-    if cat.cardType <> invalid and cat.cardType <> "" then cardType = cat.cardType
-    compName = CardComponentForRow(rowType, cardType)
-    if compName = "BannerCard" and rowType <> HC_PromotionalCard() then return HC_OttRowPitch()
-    return HC_RowCardsTop() + HC_CardHeight(compName) + HC_RowMarginBottom()
+    ' Title band + cards strip + m-b-75; grow when card titles are on.
+    return 446 + HC_CardTitleExtraH()
+end function
+
+function HC_RowPitch() as integer
+    return 460 + HC_CardTitleExtraH()
+end function
+
+function HC_OttRowPitch() as integer
+    return 460 + HC_CardTitleExtraH()
 end function
 
 function CardComponentWidth(compName as string, orientation = "" as string) as integer

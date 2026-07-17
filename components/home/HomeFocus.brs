@@ -65,15 +65,11 @@ sub RememberHeaderReturnZone()
     end if
 end sub
 
-' Case 4 parity: LEFT from hero/rows opens sidebar (case 1 uses UP for top header).
-
-' Case 4 parity: LEFT from hero/rows opens sidebar (case 1 uses UP for top header).
+' Sidebar: LEFT from hero/rows opens the menu. Netflix top bar: UP opens header.
 sub EnterHeaderFromContent()
     RememberHeaderReturnZone()
     EnterHeader()
 end sub
-
-' RIGHT leaves sidebar — collapse to icons and restore hero or row focus.
 
 ' RIGHT leaves sidebar — collapse to icons and restore hero or row focus.
 sub ExitHeaderToPrevious()
@@ -100,12 +96,25 @@ sub ExitHeaderToPrevious()
     ApplyHomeFocus()
 end sub
 
-' Rows ready / CW painted: stay on Home menu when header/sidebar exist; otherwise land row 0 once.
-
-' Rows ready / CW painted: stay on Home menu when header/sidebar exist; otherwise land row 0 once.
+' Rows ready: Netflix home keeps header focus; OTT / card-focus lands first row card
+' (parity Content.tsx setFocus(CONTENT) after categories load).
 sub MaybeLandContentFocus()
     if not IsHomeForeground() then return
     if m.rowWidgets = invalid or m.rowWidgets.Count() = 0 then return
+
+    if ThemeIsOttHome() then
+        if not m.pendingContentFocus then return
+        ' User already navigated (e.g. Down from header) — never steal focus back to row 0.
+        if m.userMovedFocus = true then
+            m.pendingContentFocus = false
+            return
+        end if
+        m.pendingContentFocus = false
+        m.rowIndex = 0
+        m.cardIndex = 0
+        ExitHeaderToRows()
+        return
+    end if
 
     if ThemeHasHomeNav() then
         m.pendingContentFocus = false
@@ -171,11 +180,14 @@ sub HandleHeaderKey(key as string)
 end sub
 
 ' ── Hero banner focus zone (parity with the portal arrows / mute button) ─────
-' Vertical flow:  HEADER ↕ HERO (prev/next/mute) ↕ CONTINUE WATCHING.
+' Vertical flow (Netflix carousel):  HEADER ↕ HERO (prev/next/mute) ↕ ROWS.
+' OTT / card-focus (HeroBannerCardFocus): no hero focus zone — mute is visual-only.
+' UP from row 0 goes straight to HEADER; banner keeps last focused card (React Content).
 
 function HeroAvailable() as boolean
-    if ThemeIsOttHome() then return false
     if m.hero = invalid or m.hero.visible <> true then return false
+    ' Card-focus home: never trap D-pad on mute/arrows (React has no CONTENT→mute path).
+    if ThemeIsOttHome() then return false
     items = m.hero.bannerItems
     if items = invalid or items.Count() = 0 then return false
     ' Focusable only when there is something to act on: multiple slides (arrows) or a
@@ -391,16 +403,43 @@ sub ApplyHomeFocus()
     if pitch = invalid or pitch <= 0 then pitch = HC_RowPitchForLayout(m.homeLayout)
     if m.focusZone = "rows" then
         if ThemeIsOttHome() and m.rowTops <> invalid and m.rowIndex >= 0 and m.rowIndex < m.rowTops.Count() then
-            anchorY = m.layoutAnchorY - m.rowTops[m.rowIndex]
+            ' Parity GenreApplyVerticalScroll: ideal pin + tailPinned when content still fits.
+            ' Do NOT add +80 to viewH — that jammed the last row too low and clipped displayTitle.
+            rowTop = m.rowTops[m.rowIndex]
+            idealAnchorY = m.layoutAnchorY - rowTop
+            anchorY = idealAnchorY
             contentH = OttRowsContentHeight()
-            viewH = 1080 - m.layoutAnchorY + 80
+            if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
+            viewH = 1080 - m.layoutAnchorY
             maxScroll = contentH - viewH
-            if maxScroll > 0 then
-                minAnchor = m.layoutAnchorY - maxScroll
-                if anchorY < minAnchor then anchorY = minAnchor
+            if maxScroll < 0 then maxScroll = 0
+            minAnchor = m.layoutAnchorY - maxScroll
+            if anchorY < minAnchor then
+                contentBottom = idealAnchorY + contentH
+                if contentBottom < 1080 then
+                    anchorY = idealAnchorY
+                else
+                    anchorY = minAnchor
+                end if
             end if
         else
-            anchorY = m.layoutAnchorY - (m.rowIndex * pitch)
+            idealAnchorY = m.layoutAnchorY - (m.rowIndex * pitch)
+            anchorY = idealAnchorY
+            ' Netflix path: same tail room so the last row is not stuck below the title band.
+            contentH = m.rowWidgets.Count() * pitch
+            if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
+            viewH = 1080 - m.layoutAnchorY
+            maxScroll = contentH - viewH
+            if maxScroll < 0 then maxScroll = 0
+            minAnchor = m.layoutAnchorY - maxScroll
+            if anchorY < minAnchor then
+                contentBottom = idealAnchorY + contentH
+                if contentBottom < 1080 then
+                    anchorY = idealAnchorY
+                else
+                    anchorY = minAnchor
+                end if
+            end if
         end if
     else
         anchorY = m.layoutAnchorY
@@ -422,10 +461,13 @@ sub ApplyHomeFocus()
     end if
 
     UpdateRowsScrim()
-    if m.interacting then
-        m.pendingHeroUpdate = true
-    else
+    ' Per-card hero sync is OTT-only (React Content / HeroBannerCardFocus).
+    ' Netflix carousel keeps bannerItems from UpdateHeroBanner — do not defer/flush that path.
+    if ThemeIsOttHome() then
         UpdateOttHeroFromFocus()
+        m.pendingHeroUpdate = false
+    else
+        m.pendingHeroUpdate = false
     end if
     SyncHeroAutoAdvanceHold()
     AnimateRowsHost(anchorY)
@@ -442,12 +484,7 @@ sub ApplyRowFocusState(i as integer)
     row = m.rowWidgets[i]
     if row = invalid then return
     row.rowFocused = (m.focusZone = "rows" and i = m.rowIndex)
-    ' Netflix netflixContent.tsx dims rows below focus to 0.4; OTT content.tsx does not.
-    if ThemeIsOttHome() then
-        row.rowDimmed = false
-    else
-        row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
-    end if
+    row.rowDimmed = (m.focusZone = "rows" and i > m.rowIndex)
     peek = false
     if i = 0 and not m.rowsRevealed then
         peek = true

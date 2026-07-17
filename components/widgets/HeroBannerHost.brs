@@ -16,8 +16,17 @@ end sub
 
 sub ApplyHeroSelection()
     HideAllHeroes()
+    ' Clear card-focus chrome unless this selection is OTT (enableHomeBanner=false).
+    if m.heroCinematic <> invalid and m.heroCinematic.hasField("cardFocusMode") then
+        m.heroCinematic.cardFocusMode = false
+    end if
+    ' React: enableHomeBanner=false → Content + HeroBannerCardFocus.
+    ' enableHomeBanner=true → NetflixContent + cinematic/page-flip/parallax (not card-focus).
     if ThemeIsOttHome() then
-        m.activeHero = m.heroOtt
+        m.activeHero = m.heroCinematic
+        if m.heroCinematic <> invalid and m.heroCinematic.hasField("cardFocusMode") then
+            m.heroCinematic.cardFocusMode = true
+        end if
     else if ThemeHeroBannerStyle() = TC_HeroPageFlip() then
         m.activeHero = m.heroPageFlip
     else if ThemeHeroBannerStyle() = TC_HeroParallaxSlide() then

@@ -24,6 +24,7 @@
     <function name="ResumeHeroPlayback" />
   </interface>
 
+  <script type="text/brightscript" uri="pkg:/source/lib/theme/BusinessConfig.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/theme/ThemeConfig.brs" />
   <script type="text/brightscript" uri="pkg:/components/widgets/HeroBannerHost.brs" />
 

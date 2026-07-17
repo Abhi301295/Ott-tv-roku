@@ -62,7 +62,14 @@ function ProfileUiSpec() as object
         skNameMarginLeft: 80          ' ml-20
         skRowHeight: 166              ' min-h-[166px]
 
-        ' netComponent.tsx edit/lock badge (-bottom-1 -left-1, w-12 h-12, icon w-6 h-6)
+        ' userProfile.tsx: left edit (ml-4 w-12) + gap-6 before the avatar column
+        editFocusX: 16
+        editFocusSize: 48
+        editFocusIconSize: 20
+        editFocusGap: 24             ' gap-6
+        editFocusY: 59               ' vertically center on 166px ring: (166-48)/2
+
+        ' netComponent.tsx on-avatar badge (-bottom-1 -left-1) when PROFILE focused
         editBadgeSize: 48
         editIconSize: 24
         editBadgeInset: 4

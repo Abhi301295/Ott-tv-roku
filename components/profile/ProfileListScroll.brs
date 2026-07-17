@@ -14,7 +14,7 @@ sub UpdateProfileListScrollTarget()
     target = m.listScrollY
     if target = invalid then target = 0
 
-    if m.focusArea = "profiles" and m.profileIndex >= 0 and m.profileIndex < m.rowTops.Count() then
+    if (m.focusArea = "profiles" or m.focusArea = "edit") and m.profileIndex >= 0 and m.profileIndex < m.rowTops.Count() then
         idx = m.profileIndex
         rowTop = m.rowTops[idx]
         rowBottom = rowTop + ProfileAvatarRowHeight(idx)

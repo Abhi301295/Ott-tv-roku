@@ -37,6 +37,7 @@ sub init()
     ' Until rows are ready the header stays focused so nav remains usable during shimmer.
     m.focusZone = "header"
     m.pendingContentFocus = true
+    m.userMovedFocus = false
     m.menuItems = []
     m.menuIndex = 0
     m.headerReturnZone = "rows"
@@ -542,8 +543,24 @@ sub UpdateOttHeroFromFocus()
     if m.hero = invalid then return
     item = ItemAtRowCard(m.contentRowCats, m.rowIndex, m.cardIndex)
     if item = invalid then item = ExtractOttActiveItem(m.categories)
-    if item <> invalid then m.hero.activeItem = item
+    if item = invalid then return
+    newId = ""
+    if item._id <> invalid then newId = item._id
+    ' Same focused card (e.g. header → Down onto the same CW card): do not remount banner.
+    if newId <> "" and newId = OttHeroFocusedItemId() then return
+    ' Parity HeroBannerCardFocus focusedItem — single-item banner list drives poster + trailer.
+    m.hero.bannerItems = [item]
+    if m.hero.hasField("activeItem") then m.hero.activeItem = item
 end sub
+
+function OttHeroFocusedItemId() as string
+    if m.hero = invalid then return ""
+    items = m.hero.bannerItems
+    if items = invalid or items.Count() < 1 then return ""
+    it = items[0]
+    if it = invalid or it._id = invalid then return ""
+    return it._id
+end function
 
 
 sub ApplyThemeToHero()
@@ -556,16 +573,24 @@ end sub
 sub UpdateHeroBanner()
     if m.hero = invalid then return
     items = ExtractBannerItems(m.categories)
-    print "[HOME] UpdateHeroBanner bannerItems="; items.Count(); " layout="; m.homeLayout
+    isOtt = ThemeIsOttHome()
+    print "[HOME] UpdateHeroBanner bannerItems="; items.Count(); " layout="; m.homeLayout; " isOtt="; isOtt
     ApplyThemeToHero()
-    m.hero.bannerItems = items
-    if ThemeIsOttHome() then
-        m.hero.activeItem = ExtractOttActiveItem(m.categories)
+    if isOtt then
+        item = ExtractOttActiveItem(m.categories)
+        if item <> invalid then
+            m.hero.bannerItems = [item]
+            if m.hero.hasField("activeItem") then m.hero.activeItem = item
+        else
+            m.hero.bannerItems = []
+        end if
+    else
+        m.hero.bannerItems = items
     end if
     ' Do not re-show the hero while Home is covered — that leaves hero.visible=true under
     ' a paused screen and blocks trailer resume when the user pops back.
     if IsHomeForeground() then
-        m.hero.visible = (items.Count() > 0 or ThemeIsOttHome())
+        m.hero.visible = (items.Count() > 0 or isOtt)
     end if
 end sub
 
