@@ -329,12 +329,15 @@ sub OnCardBuildTick()
         return
     end if
 
-    ' Boot row: finish the paint window before building see-all / off-screen cards.
+    ' Boot row: pause progressive build until the boot paint window is ready, then resume.
     if m.top.bootPaintCardCount > 0 and m.top.paintedReady <> true then
         target = m.top.bootPaintCardCount
         if m.buildPlan <> invalid and m.buildPlan.Count() < target then target = m.buildPlan.Count()
         if m.cards.Count() >= target then
             m.cardTimer.control = "stop"
+            ' Sync BuildCardsNow can fill the window without going through Append+MaybeBootPaintProgress —
+            ' arm the paint poll so paintedReady can fire and ResumeBootCardBuildIfNeeded continues.
+            MaybeStartPaintGate()
             return
         end if
     end if
@@ -444,6 +447,7 @@ function BuildCardsNow(maxCards as dynamic) as boolean
         end while
         RevealStripNow()
         EnsurePendingSkeletonSlots()
+        MaybeStartPaintGate()
         HomeLoaderLog("row0 skeleton window", "cards=" + Str(m.cards.Count()) + " idx=" + Str(m.buildIdx) + "/" + Str(m.buildPlan.Count()))
         if m.buildIdx >= m.buildPlan.Count() then
             FinishCardBuildIfDone()
@@ -511,35 +515,52 @@ sub EnsurePendingSkeletonSlots()
         w = 256
         h = 286
         isCw = false
+        showTitleSkel = false
         if plan.kind = "seeAll" then
             w = CardComponentWidth("SeeAllCard", m.seeAllOrientation)
-            h = HC_CardHeight("SeeAllCard")
+            h = HC_CardPosterHeight("SeeAllCard")
         else if plan.comp <> invalid then
             w = CardComponentWidth(plan.comp)
-            h = HC_CardHeight(plan.comp)
+            h = HC_CardPosterHeight(plan.comp)
+            showTitleSkel = HC_CardUsesDisplayTitle(plan.comp)
             if plan.comp = "ContinueWatchCard" then isCw = true
         end if
+
+        posterW = w - 6
+        if posterW < 1 then posterW = w
 
         slot = m.cardsHost.createChild("Group")
         slot.translation = [x, 0]
         bg = slot.createChild("Rectangle")
         bg.translation = [3, 3]
-        bg.width = w - 6
-        if bg.width < 1 then bg.width = w
+        bg.width = posterW
         bg.height = h
         bg.color = CardWhite10Color()
         sk = slot.createChild("Skeleton")
         sk.translation = [3, 3]
-        sk.boxWidth = bg.width
+        sk.boxWidth = posterW
         sk.boxHeight = h
         CardApplySkeleton(sk, skColors.base, skColors.highlight)
         if sk.hasField("running") then sk.running = true
         if isCw then
             track = slot.createChild("Rectangle")
             track.translation = [3, 3 + h - 8]
-            track.width = bg.width
+            track.width = posterW
             track.height = 8
             track.color = CardWhite10Color()
+        end if
+        if showTitleSkel then
+            titleW = HC_CardTitleShimmerWidth(posterW)
+            titleH = HC_CardTitleShimmerH()
+            titleX = 3 + Int((posterW - titleW) / 2)
+            titleY = 3 + h + HC_CardTitleShimmerGap()
+            titleSk = slot.createChild("Skeleton")
+            titleSk.translation = [titleX, titleY]
+            titleSk.boxWidth = titleW
+            titleSk.boxHeight = titleH
+            if titleSk.hasField("shapeUri") then titleSk.shapeUri = SkeletonProfileNameShapeUri()
+            CardApplySkeleton(titleSk, skColors.base, skColors.highlight)
+            if titleSk.hasField("running") then titleSk.running = true
         end if
         m.pendingSkelSlots.Push(slot)
         x = x + w + gap
@@ -593,6 +614,9 @@ end sub
 
 function CardSlotPainted(card as object) as boolean
     if card = invalid then return true
+    ' Branded missing/broken poster tile is a terminal paint state (not still loading).
+    fallback = card.findNode("thumbFallback")
+    if fallback <> invalid and fallback.visible = true then return true
     thumb = card.findNode("thumb")
     if thumb = invalid then return true
     st = thumb.loadStatus

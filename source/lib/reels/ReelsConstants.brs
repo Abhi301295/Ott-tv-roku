@@ -48,9 +48,79 @@ function RL_ReelEnterOffsetY() as integer
     return 60
 end function
 
-' NEW_UI detail host — React index.tsx: left: calc(50% + 28.125vh) at FHD.
+' React index.tsx overlay: left calc(50% + 28.125vh) ≡ right edge of the centered 9:16 video.
+function RL_ReelDetailPanelLeft(viewportW as integer) as integer
+    if viewportW < 1 then viewportW = 1920
+    outerW = RL_VideoOuterW()
+    return Int((viewportW + outerW) / 2.0 + 0.5)
+end function
+
+function RL_NewUiVhOffset() as integer
+    return Int(28.125 * 1080.0 / 100.0 + 0.5)
+end function
+
 function RL_NewUiPanelLeft() as integer
-    return Int(960.0 + (28.125 * 1080.0 / 100.0) + 0.5)
+    return RL_ReelDetailPanelLeft(1920)
+end function
+
+' Content-band coords (detailPanelHost already applies shellOffX).
+function RL_ReelDetailPanelLeftInBand(viewportW as integer) as integer
+    return RL_ReelDetailPanelLeft(viewportW)
+end function
+
+function RL_VideoOuterLeftInBand(viewportW as integer) as integer
+    if viewportW < 1 then viewportW = 1920
+    outerW = RL_VideoOuterW()
+    return Int((viewportW - outerW) / 2)
+end function
+
+' React index.tsx detail wrapper p-r-60.
+function RL_ReelDetailPanelRightPad() as integer
+    return 60
+end function
+
+function RL_ReelDetailPanelWidth(layout as string) as integer
+    lu = UCase(layout)
+    if lu = "NEW_UI" then return RL_NewUiCardW()
+    if lu = "CLEAN_UI" then return RL_CleanUiCardW()
+    return RL_OldUiCardW()
+end function
+
+function RL_ReelCleanBandWidth() as integer
+    ' Info column + gap + video + actions column (80px circles).
+    return RL_CleanUiCardW() + RL_CleanUiInfoPr() + RL_VideoOuterW() + RL_CleanUiActionsPl() + 80
+end function
+
+' Fit video + detail chrome inside the content band (sidebar expanded or collapsed).
+function RL_ReelBandLayout(viewportW as integer, layout as string) as object
+    if viewportW < 1 then viewportW = 1920
+    outerW = RL_VideoOuterW()
+    lu = UCase(layout)
+
+    if lu = "CLEAN_UI" then
+        totalW = RL_ReelCleanBandWidth()
+        startX = Int((viewportW - totalW) / 2)
+        if startX < 0 then startX = 0
+        videoX = startX + RL_CleanUiCardW() + RL_CleanUiInfoPr()
+        return { videoX: videoX, panelHostX: 0 }
+    end if
+
+    panelW = RL_ReelDetailPanelWidth(lu)
+    leftPad = RL_NewUiOverlayPadLeft()
+    rightPad = RL_ReelDetailPanelRightPad()
+    centerX = Int((viewportW - outerW) / 2)
+    maxVideoX = viewportW - rightPad - panelW - leftPad - outerW
+    if maxVideoX < 0 then maxVideoX = 0
+
+    videoX = centerX
+    if videoX > maxVideoX then videoX = maxVideoX
+
+    panelHostX = videoX + outerW + leftPad
+    maxPanelX = viewportW - rightPad - panelW
+    if panelHostX > maxPanelX then panelHostX = maxPanelX
+    if panelHostX < 0 then panelHostX = 0
+
+    return { videoX: videoX, panelHostX: panelHostX }
 end function
 
 ' Overlay on NEW_UI: p-l-40 (index.tsx detail panel wrapper).

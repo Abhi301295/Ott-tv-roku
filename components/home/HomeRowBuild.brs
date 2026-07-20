@@ -463,10 +463,9 @@ sub WarmWelcomeRow(row as object)
     if row = invalid then return
     if row.hasField("ottRowReveal") then row.ottRowReveal = true
     row.callFunc("Materialize", invalid)
-    ' Keep one real card ready for the first CW→row focus move. Remaining slots stay
-    ' as skeletons and continue only after navigation becomes idle.
+    ' Seed the first off-screen row so CW→row1 is ready; idle warm-up finishes the rest.
     row.callFunc("BuildCardsNow", 1)
-    row.callFunc("PauseBuild", invalid)
+    row.callFunc("ResumeBuild", invalid)
 end sub
 
 ' Start the next row progressively after shells mount so CW→row navigation is ready
@@ -478,6 +477,7 @@ sub WarmWelcomeRowsWindow()
     for i = 1 to hi
         WarmWelcomeRow(m.rowWidgets[i])
     end for
+    ScheduleHomePrefetchWarmup()
 end sub
 
 ' Row 0 thumbnails painted — drop the rows shimmer when CW row is ready (if applicable).
@@ -602,6 +602,8 @@ end sub
 
 sub ClearContentRows()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+    StopHomePrefetchWarmup()
+    m.homeWarmDone = false
     m.rowWidgets = []
     CRC_ClearHost(m.rowsHost)
 end sub

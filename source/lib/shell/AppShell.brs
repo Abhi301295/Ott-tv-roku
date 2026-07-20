@@ -61,6 +61,36 @@ sub ShellEnterContent(vm as object)
     AppShellNotifyLayoutChange(vm)
 end sub
 
+' Auto land content + collapse the sidebar only when the focused menu entry is still
+' this screen's module. If the user moved sidebar focus elsewhere while content was
+' loading, keep the sidebar expanded and do not steal focus to the first card.
+function ShellSidebarFocusMatchesPage(vm as object, route as string, typeVal = "" as string) as boolean
+    if vm = invalid then return true
+    if not ThemeIsSidebarHeader() then return true
+    if vm.shellFocus <> "header" then return true
+
+    menuItems = vm.menuItems
+    if menuItems = invalid or menuItems.Count() = 0 then return true
+
+    idx = vm.menuIndex
+    if idx = invalid then idx = -1
+    header = vm.findNode("appHeader")
+    if (idx < 0 or idx >= menuItems.Count()) and header <> invalid then
+        if header.focusedIndex <> invalid then idx = header.focusedIndex
+    end if
+    if idx = invalid or idx < 0 or idx >= menuItems.Count() then return false
+
+    item = menuItems[idx]
+    if item = invalid then return false
+    if item.route <> route then return false
+    if route = RouteGenere() then
+        itemType = ""
+        if item.type <> invalid then itemType = item.type
+        return itemType = typeVal
+    end if
+    return true
+end function
+
 ' Leave the header menu and hand off to the active screen (hero, rows, etc.).
 sub AppShellLeaveHeader(vm as object, action = "" as string)
     ShellEnterContent(vm)
@@ -262,16 +292,10 @@ function AppShellHandleHeaderKey(vm as object, key as string) as boolean
 
     if ThemeIsSidebarHeader() then
         if key = "up" then
-            homeIdx = HeaderSelectedIndex(menuItems, RouteHome())
-            if homeIdx >= 0 and menuIndex >= 0 and menuIndex < menuItems.Count() then
-                cur = menuItems[menuIndex]
-                if cur <> invalid and cur.text <> "Home" then
-                    menuIndex = homeIdx
-                    header.focusedIndex = menuIndex
-                    vm.menuIndex = menuIndex
-                    return true
-                end if
-            end if
+            ' One step up in the menu list (Series → Movies → … → Home).
+            ' ⚠ Parity Note: React headerMenuItem.tsx onArrowPress UP from any non-Home
+            ' item setFocus('Home') — skips intermediate entries. Roku moves one index so
+            ' the item directly above receives focus (expected vertical sidebar nav).
             if menuIndex > 0 then
                 menuIndex = menuIndex - 1
                 header.focusedIndex = menuIndex

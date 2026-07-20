@@ -7,6 +7,24 @@ sub init()
     OnPanelChanged()
 end sub
 
+function PanelContentViewportW() as integer
+    w = m.top.contentViewportW
+    if w = invalid or w < 1 then return 1920
+    return w
+end function
+
+function PanelVideoOuterLeft() as integer
+    x = m.top.videoOuterX
+    if x <> invalid and x >= 0 then return x
+    return RL_VideoOuterLeftInBand(PanelContentViewportW())
+end function
+
+function PanelDetailHostX() as integer
+    x = m.top.panelHostX
+    if x <> invalid and x >= 0 then return x
+    return PanelVideoOuterLeft() + RL_VideoOuterW() + RL_NewUiOverlayPadLeft()
+end function
+
 sub CacheFocusNodes()
     m.newLikeBtn = m.top.findNode("newLikeBtn")
     m.newLikeScale = m.top.findNode("newLikeScale")
@@ -475,7 +493,7 @@ sub LayoutOldUiPanel(inset as integer)
     if m.oldTitleCard <> invalid then m.oldTitleCard.translation = [0, titleY]
     if m.oldInfoCard <> invalid then m.oldInfoCard.translation = [0, infoY]
 
-    m.defaultHost.translation = [RL_NewUiPanelLeft(), inset + 120]
+    m.defaultHost.translation = [PanelDetailHostX(), inset + 120]
 end sub
 
 function PlayHeartPulse() as boolean
@@ -675,7 +693,7 @@ sub LayoutCleanUiPanel(inset as integer)
     ' React: pb-[10%] on the left column — CSS % padding uses containing-block width.
     padBottom = RL_CleanUiInfoPb()
     outerW = RL_VideoOuterW()
-    videoLeft = Int((1920 - outerW) / 2)
+    videoLeft = PanelVideoOuterLeft()
 
     infoX = videoLeft - RL_CleanUiInfoPr() - cardW
     if infoX < 16 then infoX = 16
@@ -811,7 +829,7 @@ sub LayoutNewUiPanel(inset as integer)
     contentH = 1080 - inset
     hostY = inset + (contentH - padBottom - stackH)
     if hostY < inset then hostY = inset
-    hostX = RL_NewUiPanelLeft() + RL_NewUiOverlayPadLeft()
+    hostX = PanelDetailHostX()
     m.newHost.translation = [hostX, hostY]
 
     y = 0

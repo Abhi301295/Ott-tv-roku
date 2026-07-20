@@ -144,6 +144,38 @@ function HC_CardTitleExtraH() as integer
     return 0
 end function
 
+' Poster-only height — card shimmer must not grow when displayTitle is on.
+function HC_CardPosterHeight(compName as string) as integer
+    if compName = "ContinueWatchCard" then return 286
+    if compName = "HorizontalCard" then return 312
+    if compName = "VerticalCard" then return 300
+    if compName = "NumberedVerticalCard" then return 260
+    if compName = "BannerCard" then return 400
+    if compName = "SeeAllCard" then return 305
+    return 286
+end function
+
+function HC_CardUsesDisplayTitle(compName as string) as boolean
+    if not HC_IsDisplayTitleEnabled() then return false
+    return (compName = "HorizontalCard" or compName = "VerticalCard")
+end function
+
+' Thin title-line shimmer under the poster (React keeps title outside the card pulse).
+function HC_CardTitleShimmerH() as integer
+    return 22
+end function
+
+function HC_CardTitleShimmerGap() as integer
+    return 8
+end function
+
+function HC_CardTitleShimmerWidth(posterW as integer) as integer
+    w = Int(posterW * 0.72 + 0.5)
+    if w < 80 then w = 80
+    if w > posterW then w = posterW
+    return w
+end function
+
 function HC_IsDisplayTitleEnabled() as boolean
     ' Mirrors FeatureDisplayTitle / DefaultFeatures.displayTitle without requiring
     ' BusinessConfig.brs on every CardHelper consumer.
@@ -164,24 +196,9 @@ function HC_IsDisplayTitleEnabled() as boolean
 end function
 
 function HC_CardHeight(compName as string) as integer
-    base = 286
-    if compName = "ContinueWatchCard" then
-        base = 286
-    else if compName = "HorizontalCard" then
-        base = 312
-    else if compName = "VerticalCard" then
-        base = 300
-    else if compName = "NumberedVerticalCard" then
-        base = 260
-    else if compName = "BannerCard" then
-        base = 400
-    else if compName = "SeeAllCard" then
-        base = 305
-    end if
+    base = HC_CardPosterHeight(compName)
     ' Title sits under Horizontal/Vertical posters only (React same).
-    if compName = "HorizontalCard" or compName = "VerticalCard" then
-        return base + HC_CardTitleExtraH()
-    end if
+    if HC_CardUsesDisplayTitle(compName) then return base + HC_CardTitleExtraH()
     return base
 end function
 

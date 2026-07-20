@@ -95,6 +95,9 @@
         fieldToInterp="homeLoaderHost.translation" />
     </Animation>
 
+    <!-- Idle catalogue warm-up: materialize shell rows while the user watches the hero. -->
+    <Timer id="prefetchWarmupTimer" duration="0.05" repeat="true" />
+
     <!-- Direct header nodes live on ViewManager appHeader (PageContainer parity). -->
   </children>
 </component>

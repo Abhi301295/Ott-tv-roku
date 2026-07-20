@@ -10,6 +10,9 @@
     <function name="PlayHeartPulse" />
     <field id="commentsCount" type="integer" value="0" onChange="OnPanelChanged" />
     <field id="topInset" type="integer" value="96" onChange="OnPanelChanged" />
+    <field id="contentViewportW" type="integer" value="1920" onChange="OnPanelChanged" />
+    <field id="videoOuterX" type="integer" value="-1" onChange="OnPanelChanged" />
+    <field id="panelHostX" type="integer" value="-1" onChange="OnPanelChanged" />
     <field id="cPrimary400" type="string" value="0x60a5faff" />
     <field id="cPrimary500" type="string" value="0x3b82f6ff" />
     <field id="cPrimary600" type="string" value="0x2563ebff" />

@@ -133,7 +133,11 @@
 
     <Timer id="seekPreviewTimer" duration="0.8" repeat="false" />
 
-    <ReelDetailPanel id="reelDetailPanel" visible="false" />
+    <!-- Clipped to the content band beside the sidebar — panel coords stay content-local. -->
+    <Group id="detailPanelHost" translation="[0, 0]" clippingRect="[0, 0, 1920, 1080]"
+      clippingRectClipsChildren="true">
+      <ReelDetailPanel id="reelDetailPanel" visible="false" />
+    </Group>
     <ReelsCommentDrawer id="commentSidebar" />
 
     <!-- React .reel-enter-active: opacity 450ms ease-out + transform 450ms cubic-bezier(0.22,1,0.36,1). -->

@@ -1,5 +1,6 @@
 sub init()
     m.spec = ProfileUiSpec()
+    m.avatarColumn = m.top.findNode("avatarColumn")
     m.cardScaler = m.top.findNode("cardScaler")
     m.selectingGroup = m.top.findNode("selectingGroup")
     m.skA = m.top.findNode("skA")
@@ -19,9 +20,15 @@ sub init()
     m.initialsFont = m.initialsLabel.findNode("font")
     m.lockBadge = m.top.findNode("lockBadge")
     m.lockBadgeBg = m.top.findNode("lockBadgeBg")
+    m.editFocusBtn = m.top.findNode("editFocusBtn")
+    m.editFocusBorder = m.top.findNode("editFocusBorder")
+    m.editFocusBg = m.top.findNode("editFocusBg")
+    m.editFocusIcon = m.top.findNode("editFocusIcon")
     m.nameLabel = m.top.findNode("nameLabel")
     m.hintLabel = m.top.findNode("hintLabel")
     m.sizeAnimTimer = m.top.findNode("sizeAnimTimer")
+    m.editScaleTimer = m.top.findNode("editScaleTimer")
+    m.editBorderFlashTimer = m.top.findNode("editBorderFlashTimer")
 
     m.CARD = m.spec.cardSize
     m.ARC_FRAMES = 151
@@ -29,6 +36,14 @@ sub init()
     m.REST_SCALE = 1.0
     m.FOCUS_OFFSET_X = m.spec.focusOffsetX
     m.REST_OFFSET_X = 0.0
+    m.EDIT_FOCUS_SCALE = 1.25
+    m.EDIT_REST_SCALE = 1.0
+    m.EDIT_SCALE_STEPS = 18
+    m.EDIT_BTN_SIZE = 48
+    m.EDIT_ICON_SIZE = 20
+    m.editVisualScale = m.EDIT_REST_SCALE
+    m.editBorderFlash = false
+    m.wasEditFocused = false
     m.SIZE_ANIM_STEPS = 10
     m.DEFOCUS_ANIM_STEPS = 4
     m.animStepCount = m.SIZE_ANIM_STEPS
@@ -38,8 +53,11 @@ sub init()
     m.top.focusable = true
     m.top.drawFocusFeedback = false
     if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.observeField("fire", "OnSizeAnimTick")
+    if m.editScaleTimer <> invalid then m.editScaleTimer.observeField("fire", "OnEditScaleTick")
+    if m.editBorderFlashTimer <> invalid then m.editBorderFlashTimer.observeField("fire", "OnEditBorderFlashEnd")
 
     ApplyLayoutFromSpec()
+    ApplyEditFocusBtnLayout()
     OnColorsChanged()
     OnDataChanged()
     OnHintChanged()
@@ -52,6 +70,7 @@ sub OnSelectingChanged()
     if m.cardStack <> invalid then m.cardStack.visible = not show
     if m.nameLabel <> invalid then m.nameLabel.visible = not show
     if m.hintLabel <> invalid then m.hintLabel.visible = false
+    if m.editFocusBtn <> invalid then m.editFocusBtn.visible = false
     if show then SnapSelectingFocusScale()
     if m.selectingGroup <> invalid then
         m.selectingGroup.visible = show
@@ -64,7 +83,7 @@ sub OnSelectingChanged()
     if m.skA <> invalid then m.skA.running = show
     if show then
         keepHint = (m.top.focusedState = true and m.top.hintText <> "")
-        holdH = ProfileSquareRowContentHeight(m.top.focusedState = true, keepHint)
+        holdH = m.spec.rowItemMarginTop + ProfileSquareRowContentHeight(m.top.focusedState = true, keepHint)
         if holdH < m.spec.skRowHeight then holdH = m.spec.skRowHeight
         m.top.layoutHeight = holdH
     else
@@ -124,6 +143,10 @@ sub OnSkColorsChanged()
 end sub
 
 sub ApplyLayoutFromSpec()
+    spec = ProfileUiSpec()
+    colX = spec.editFocusX + spec.editFocusSize + spec.editFocusGap
+    m.editBtnBaseY = spec.rowItemMarginTop + Int((spec.cardSize - spec.editFocusSize) / 2)
+    if m.avatarColumn <> invalid then m.avatarColumn.translation = [colX, spec.rowItemMarginTop]
     ApplyLabelLayout()
 end sub
 
@@ -173,8 +196,8 @@ end sub
 
 sub UpdateLayoutHeight(showHint as boolean)
     focused = (m.top.focusedState = true)
-    h = ProfileSquareRowContentHeight(focused, showHint)
-    if h < 1 then h = ProfileSquareRowContentHeight(false, false)
+    h = m.spec.rowItemMarginTop + ProfileSquareRowContentHeight(focused, showHint)
+    if h < 1 then h = m.spec.rowItemMarginTop + ProfileSquareRowContentHeight(false, false)
     if m.top.layoutHeight <> h then m.top.layoutHeight = h
 end sub
 
@@ -206,24 +229,32 @@ sub OnHintChanged()
     if m.hintLabel = invalid then return
     txt = m.top.hintText
     m.hintLabel.text = txt
-    m.hintLabel.visible = (m.top.focusedState and txt <> "")
+    profileChrome = (m.top.focusedState = true and m.top.editFocused <> true)
+    m.hintLabel.visible = (profileChrome and txt <> "")
     if m.hintLabel.visible then m.hintLabel.color = m.top.hintColor
     ApplyLabelLayout()
 end sub
 
+function ProfileColumnFocused() as boolean
+    return (m.top.focusedState = true and m.top.editFocused <> true)
+end function
+
 sub OnFocusChanged()
-    focused = m.top.focusedState
-    if focused <> true then focused = false
+    if m.top.selectingState = true then return
+
+    profileChrome = ProfileColumnFocused()
     locked = (m.top.parentalLock = true)
     progress = m.top.progress
     if progress < 0 then progress = 0
     if progress > 1 then progress = 1
 
-    ApplyCardChrome(focused)
+    ApplyFocusChrome()
 
-    if m.outerBorder <> invalid then m.outerBorder.visible = focused
+    ApplyCardChrome(profileChrome)
 
-    showTrack = (focused and not locked)
+    if m.outerBorder <> invalid then m.outerBorder.visible = profileChrome
+
+    showTrack = (profileChrome and not locked)
     showArc = (showTrack and progress > 0)
 
     if m.progressTrack <> invalid then m.progressTrack.visible = showTrack
@@ -231,13 +262,28 @@ sub OnFocusChanged()
         m.progressArc.visible = showArc
         if showArc then m.progressArc.uri = SquareArcFrameUri(progress)
     end if
-    if m.lockBadge <> invalid then m.lockBadge.visible = (focused and locked)
+    if m.lockBadge <> invalid then m.lockBadge.visible = (profileChrome and locked)
 
     OnHintChanged()
     ApplyLabelLayout()
-    if m.top.selectingState = true then return
-    AnimateScale(focused)
-    ProfileUiLogRow(m.top.rowIndex, focused, progress, m.visualScale, 1.0, m.lastOffsetX)
+
+    if m.top.scaleSnap = true then
+        m.top.scaleSnap = false
+        SnapSquareAvatarScale(profileChrome)
+    else
+        AnimateScale(profileChrome)
+    end if
+    ProfileUiLogRow(m.top.rowIndex, profileChrome, progress, m.visualScale, 1.0, m.lastOffsetX)
+end sub
+
+sub ApplyFocusChrome()
+    profileChrome = ProfileColumnFocused()
+    editFocused = (m.top.editFocused = true)
+    canEdit = true
+    if m.top.hasField("showEditBadge") then canEdit = (m.top.showEditBadge = true)
+    showLeftEdit = (canEdit and (profileChrome or editFocused))
+    if m.editFocusBtn <> invalid then m.editFocusBtn.visible = showLeftEdit
+    ApplyEditFocusBtnStyle(profileChrome, editFocused, showLeftEdit)
 end sub
 
 sub ApplyCardChrome(focused as boolean)
@@ -392,7 +438,7 @@ sub ApplyScales(scale as float, offsetX as float)
     m.visualScale = scale
     m.visualOffsetX = offsetX
     ApplyCardSize(scale)
-    ApplyCardChrome(m.top.focusedState)
+    ApplyCardChrome(ProfileColumnFocused())
 
     if m.cardScaler <> invalid then
         m.cardScaler.scale = [1.0, 1.0]
@@ -400,6 +446,25 @@ sub ApplyScales(scale as float, offsetX as float)
     end if
     ApplyLabelLayout()
 end sub
+
+sub SnapSquareAvatarScale(focused as boolean)
+    if m.sizeAnimTimer <> invalid then m.sizeAnimTimer.control = "stop"
+    scale = m.REST_SCALE
+    x = m.REST_OFFSET_X
+    if focused then
+        scale = m.FOCUS_SCALE
+        x = m.FOCUS_OFFSET_X
+    end if
+    m.visualScale = scale
+    m.visualOffsetX = x
+    m.lastScale = scale
+    m.lastOffsetX = x
+    ApplyScales(scale, x)
+end sub
+
+function RefreshFocusChrome() as void
+    OnFocusChanged()
+end function
 
 sub ApplyCardSize(scale as float)
     card = m.CARD * scale
@@ -460,3 +525,141 @@ function SquareArcFrameUri(progress as float) as string
     end if
     return "pkg:/images/ui/profile_sq_arc_" + suffix + ".png"
 end function
+
+' Left edit column — parity with ProfileAvatar / userProfile.tsx ml-4 w-12.
+sub ApplyEditFocusBtnStyle(focused as boolean, editFocused as boolean, visible as boolean)
+    if m.editFocusBtn = invalid then return
+    if not visible then
+        StopEditScaleAnim()
+        m.editVisualScale = m.EDIT_REST_SCALE
+        m.editFocusBtn.scale = [1.0, 1.0]
+        ApplyEditFocusBtnSize(m.EDIT_REST_SCALE)
+        m.editBorderFlash = false
+        m.wasEditFocused = false
+        if m.editBorderFlashTimer <> invalid then m.editBorderFlashTimer.control = "stop"
+        if m.editFocusBorder <> invalid then m.editFocusBorder.visible = false
+        return
+    end if
+
+    bg = m.top.cNeutral800
+    if bg = invalid or bg = "" then bg = "0x262626ff"
+    border = "0xffffffff"
+    icon = m.top.cNeutral400
+    if icon = invalid or icon = "" then icon = "0xc8c8c8ff"
+    targetScale = m.EDIT_REST_SCALE
+    showBorder = false
+
+    if editFocused then
+        bg = m.top.portalPrimary
+        icon = "0xffffffff"
+        targetScale = m.EDIT_FOCUS_SCALE
+        if m.wasEditFocused <> true then StartEditBorderFlash()
+        showBorder = (m.editBorderFlash = true)
+    else if focused then
+        showBorder = true
+        border = m.top.cNeutral600
+        if border = invalid or border = "" then border = "0x3d3d3dff"
+    end if
+    m.wasEditFocused = editFocused
+
+    if m.editFocusBg <> invalid then m.editFocusBg.blendColor = bg
+    if m.editFocusBorder <> invalid then
+        m.editFocusBorder.visible = showBorder
+        m.editFocusBorder.blendColor = border
+    end if
+    if m.editFocusIcon <> invalid then m.editFocusIcon.blendColor = icon
+    AnimateEditScale(targetScale)
+end sub
+
+sub StartEditBorderFlash()
+    m.editBorderFlash = true
+    if m.editBorderFlashTimer <> invalid then
+        m.editBorderFlashTimer.control = "stop"
+        m.editBorderFlashTimer.control = "start"
+    end if
+end sub
+
+sub OnEditBorderFlashEnd()
+    m.editBorderFlash = false
+    if m.top.editFocused = true then
+        ApplyEditFocusBtnStyle(false, true, true)
+    end if
+end sub
+
+sub ApplyEditFocusBtnSize(scale as float)
+    if m.editFocusBtn = invalid then return
+    m.editFocusBtn.scale = [1.0, 1.0]
+    btn = m.EDIT_BTN_SIZE * scale
+    icon = m.EDIT_ICON_SIZE * scale
+    rest = m.EDIT_BTN_SIZE
+    ox = (rest - btn) / 2.0
+    oy = (rest - btn) / 2.0
+    baseY = m.editBtnBaseY
+    if baseY = invalid then baseY = 107
+    m.editFocusBtn.translation = [m.spec.editFocusX + ox, baseY + oy]
+
+    if m.editFocusBg <> invalid then
+        m.editFocusBg.translation = [0, 0]
+        m.editFocusBg.width = btn
+        m.editFocusBg.height = btn
+    end if
+    if m.editFocusBorder <> invalid then
+        m.editFocusBorder.translation = [-1 * scale, -1 * scale]
+        m.editFocusBorder.width = btn + 2 * scale
+        m.editFocusBorder.height = btn + 2 * scale
+    end if
+    if m.editFocusIcon <> invalid then
+        pad = (btn - icon) / 2.0
+        m.editFocusIcon.translation = [pad, pad]
+        m.editFocusIcon.width = icon
+        m.editFocusIcon.height = icon
+    end if
+end sub
+
+sub AnimateEditScale(targetScale as float)
+    if m.editFocusBtn = invalid then return
+    if m.editVisualScale = invalid then m.editVisualScale = m.EDIT_REST_SCALE
+    delta = m.editVisualScale - targetScale
+    if delta < 0 then delta = -delta
+    if delta < 0.01 then
+        m.editVisualScale = targetScale
+        ApplyEditFocusBtnSize(targetScale)
+        return
+    end if
+    m.editAnimFrom = m.editVisualScale
+    m.editAnimTo = targetScale
+    m.editAnimStep = 0
+    if m.editScaleTimer <> invalid then
+        m.editScaleTimer.control = "stop"
+        m.editScaleTimer.control = "start"
+    else
+        m.editVisualScale = targetScale
+        ApplyEditFocusBtnSize(targetScale)
+    end if
+end sub
+
+sub StopEditScaleAnim()
+    if m.editScaleTimer <> invalid then m.editScaleTimer.control = "stop"
+end sub
+
+sub OnEditScaleTick()
+    if m.editFocusBtn = invalid then
+        StopEditScaleAnim()
+        return
+    end if
+    m.editAnimStep = m.editAnimStep + 1
+    steps = m.EDIT_SCALE_STEPS
+    t = m.editAnimStep / steps
+    if t > 1.0 then t = 1.0
+    inv = 1.0 - t
+    eased = 1.0 - (inv * inv * inv)
+    scale = m.editAnimFrom + ((m.editAnimTo - m.editAnimFrom) * eased)
+    m.editVisualScale = scale
+    ApplyEditFocusBtnSize(scale)
+    if t >= 1.0 then StopEditScaleAnim()
+end sub
+
+sub ApplyEditFocusBtnLayout()
+    if m.editFocusBtn = invalid then return
+    ApplyEditFocusBtnSize(m.EDIT_REST_SCALE)
+end sub

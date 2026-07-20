@@ -15,6 +15,8 @@
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/theme/SkeletonConfig.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/HomeConstants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/home/CardHelper.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/CardCommon.brs" />
   <script type="text/brightscript" uri="pkg:/components/cards/VerticalCard.brs" />
 
@@ -37,6 +39,8 @@
       <Poster id="cornerBL" uri="pkg:/images/ui/round_corner_bl.png" translation="[0, 290]" width="10" height="10" />
       <Poster id="cornerBR" uri="pkg:/images/ui/round_corner_br.png" translation="[230, 290]" width="10" height="10" />
     </Group>
+    <!-- Reserved under poster; kept hidden — React paints title text immediately with card data. -->
+    <Skeleton id="titleSkeleton" translation="[3, 308]" boxWidth="172" boxHeight="22" visible="false" />
     <Label id="titleLabel" translation="[3, 308]" width="246" height="36" horizAlign="center"
       vertAlign="top" wrap="false" ellipsizeOnBoundary="true" visible="false" color="0xa3a3a3ff">
       <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="29" />

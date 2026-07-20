@@ -67,6 +67,7 @@ sub init()
     m.shellOffX = 0
     m.shellOffY = 0
     m.videoX = 0
+    m.panelHostX = -1
     m.metaX = 0
     m.metaY = 0
     m.metaColW = RL_MetaMaxW()
@@ -296,17 +297,30 @@ end sub
 
 sub ApplyReelsShellLayout()
     header = FindAppHeader(m.top)
-    m.shellOffX = ShellContentOffsetX(header)
     m.shellOffY = ShellContentOffsetY(header)
-    m.viewportW = ShellContentViewportW(header)
+    ' HomeScreen parity — only shift content when the sidebar header is active.
+    if not ThemeIsSidebarHeader() then
+        m.shellOffX = 0
+        m.viewportW = 1920
+    else
+        m.shellOffX = ShellContentOffsetX(header)
+        m.viewportW = ShellContentViewportW(header)
+    end if
     if m.contentHost <> invalid then m.contentHost.translation = [m.shellOffX, m.shellOffY]
 
     vw = RL_VideoW()
     vh = RL_VideoH()
     outerW = RL_VideoOuterW()
 
-    ' Center the outer frame (border included); metadata sits left of it.
-    m.videoX = Int((m.viewportW - outerW) / 2)
+    ' Center video when room allows; shift left when the detail panel needs space (expanded sidebar).
+    band = RL_ReelBandLayout(m.viewportW, ThemeReelLayout())
+    if band <> invalid and band.videoX <> invalid then
+        m.videoX = band.videoX
+        m.panelHostX = band.panelHostX
+    else
+        m.videoX = Int((m.viewportW - outerW) / 2)
+        m.panelHostX = -1
+    end if
     m.metaX = RL_MetaLeft() + RL_MetaPadX()
     m.metaColW = m.videoX - m.metaX - RL_MetaVideoGap()
     if m.metaColW < 400 then m.metaColW = 400
@@ -341,7 +355,28 @@ sub ApplyReelsShellLayout()
     if m.metaContentH > 0 then LayoutMetaLabels()
     PositionMetaHost()
     ApplyVideoCornerLayout()
+    ApplyReelsDetailPanelHost()
     ReelsDbg("layout", "offX=" + Str(m.shellOffX) + " offY=" + Str(m.shellOffY) + " viewportW=" + Str(m.viewportW) + " outer=" + Str(outerW) + "x" + Str(RL_VideoOuterH()) + " videoX=" + Str(m.videoX) + " corners=TLTRBLBR")
+end sub
+
+sub ApplyReelsDetailPanelHost()
+    host = m.detailPanelHost
+    if host = invalid then host = m.top.findNode("detailPanelHost")
+    if host = invalid then return
+    m.detailPanelHost = host
+    vw = m.viewportW
+    if vw < 1 then vw = 1920
+    host.translation = [m.shellOffX, 0]
+    host.clippingRect = [0, 0, vw, 1080]
+    if m.reelDetailPanel <> invalid then
+        m.reelDetailPanel.contentViewportW = vw
+        m.reelDetailPanel.videoOuterX = m.videoX
+        if m.panelHostX <> invalid and m.panelHostX >= 0 then
+            m.reelDetailPanel.panelHostX = m.panelHostX
+        else
+            m.reelDetailPanel.panelHostX = -1
+        end if
+    end if
 end sub
 
 function ReelsVideoAbsX() as integer
@@ -424,12 +459,15 @@ end sub
 
 sub ApplyPageLoaderLayout(viewportW as integer)
     if viewportW < 1 then viewportW = 1920
+    offX = 0
+    if ThemeIsSidebarHeader() and m.shellOffX <> invalid then offX = m.shellOffX
+    if m.loaderHost <> invalid then m.loaderHost.translation = [offX, 0]
     if m.loaderPageBg <> invalid then
-        m.loaderPageBg.width = 1920
+        m.loaderPageBg.width = viewportW
         m.loaderPageBg.height = 1080
     end if
-    ' Full-screen center — React Spinner is viewport-centered (not content-band offset).
-    if m.loaderCenter <> invalid then m.loaderCenter.translation = [960, 518]
+    ' HomeScreen ApplyHomeLoaderLayout — center within the content band, not full canvas.
+    if m.loaderCenter <> invalid then m.loaderCenter.translation = [Int(viewportW / 2), 518]
 end sub
 
 sub ShowPageLoader(reason as string)

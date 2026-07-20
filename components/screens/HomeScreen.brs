@@ -149,6 +149,14 @@ sub init()
     m.top.appendChild(m.rowPrefetchTimer)
     m.rowPrefetchTimer.observeField("fire", "OnRowPrefetchTimer")
 
+    ' Walk shell rows in the background while idle on hero/header so Down after idle
+    ' lands on already-built cards (fast Down still shows shimmer for unfinished rows).
+    m.prefetchWarmupTimer = m.top.findNode("prefetchWarmupTimer")
+    m.homeWarmDone = false
+    if m.prefetchWarmupTimer <> invalid then
+        m.prefetchWarmupTimer.observeField("fire", "OnHomePrefetchWarmupTick")
+    end if
+
     if m.hero <> invalid then
         m.hero.observeField("posterReady", "OnHeroPosterReady")
         m.hero.observeField("trailerPlaying", "OnHeroTrailerPlayingChanged")
@@ -221,6 +229,7 @@ sub OnDispose()
     if m.selectWatchdog <> invalid then m.selectWatchdog.control = "stop"
     if m.interactIdle <> invalid then m.interactIdle.control = "stop"
     if m.rowPrefetchTimer <> invalid then m.rowPrefetchTimer.control = "stop"
+    StopHomePrefetchWarmup()
     if m.rowsForceHideTimer <> invalid then m.rowsForceHideTimer.control = "stop"
     if m.transitionSafetyTimer <> invalid then m.transitionSafetyTimer.control = "stop"
     if m.bootDeferTimer <> invalid then m.bootDeferTimer.control = "stop"
@@ -289,6 +298,7 @@ sub OnHomeVisibleChanged()
         if m.rowBuildTimer <> invalid and m.contentRowCats <> invalid and m.rowBuildIndex < m.contentRowCats.Count() then
             m.rowBuildTimer.control = "start"
         end if
+        if m.rowsRevealed and m.interacting <> true then ScheduleHomePrefetchWarmup()
     else
         ' Covered by another screen (e.g. Detail pushed on top): stop the hero AND pause
         ' background node-building so nothing competes with the foreground screen for the
@@ -299,6 +309,8 @@ sub OnHomeVisibleChanged()
         end if
         if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
         if m.interactIdle <> invalid then m.interactIdle.control = "stop"
+        StopHomePrefetchWarmup()
+        PauseRowBuilding()
         CancelHomeSelect("covered")
     end if
 end sub
@@ -438,13 +450,25 @@ sub ApplyLayoutGeometry(animate = false as boolean)
     NormalizeOttRowsHostY()
 end sub
 
-' OTT rows default to y=702 in XML (Netflix anchor); snap to OTT anchor unless scrolled down.
+' OTT rows default to y=702 in XML (Netflix anchor); snap to anchor only at row 0.
 sub NormalizeOttRowsHostY()
     if not ThemeIsOttHome() then return
     if m.rowsHost = invalid then return
-    if m.focusZone = "rows" and m.rowIndex > 0 then return
     offX = 0
     if m.layoutOffsetX <> invalid then offX = m.layoutOffsetX
+    if m.savedRowsHostY <> invalid then
+        m.rowsHost.translation = [offX, m.savedRowsHostY]
+        return
+    end if
+    pinIdx = 0
+    if m.rowIndex <> invalid and m.rowIndex > 0 then pinIdx = m.rowIndex
+    if m.focusZone = "header" and m.headerReturnRowIndex <> invalid and m.headerReturnRowIndex > 0 then
+        pinIdx = m.headerReturnRowIndex
+    end if
+    if pinIdx > 0 then
+        m.rowsHost.translation = [offX, RowsHostAnchorForIndex(pinIdx)]
+        return
+    end if
     m.rowsHost.translation = [offX, m.layoutAnchorY]
 end sub
 
@@ -473,6 +497,7 @@ sub ApplyContentLayout(offX as integer, viewportW as integer)
     end if
     if m.rowsHost <> invalid then
         curY = m.rowsHost.translation[1]
+        if m.savedRowsHostY <> invalid then curY = m.savedRowsHostY
         m.rowsHost.translation = [offX, curY]
     end if
     if m.homeLoaderHost <> invalid then ApplyHomeLoaderLayout(offX, viewportW)
@@ -487,54 +512,25 @@ end sub
 
 
 sub StartLayoutOffsetAnim(targetOffX as integer, targetViewportW as integer)
-    fromOffX = 0
-    if m.layoutOffsetX <> invalid then fromOffX = m.layoutOffsetX
-    if fromOffX = targetOffX then
-        m.layoutOffsetX = targetOffX
-        ApplyContentLayout(targetOffX, targetViewportW)
-        return
-    end if
-
+    ' Apply the content-band shrink/expand immediately when the sidebar opens/closes.
+    ' Deferring layoutOffsetX until layoutAnim ended left rows under the expanded menu.
     m.pendingLayoutOffX = targetOffX
     m.pendingLayoutViewportW = targetViewportW
-
-    if m.heroLayoutInterp <> invalid and m.hero <> invalid then
-        fromT = m.hero.translation
-        m.heroLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
-    end if
-    if m.rowsLayoutInterp <> invalid and m.rowsHost <> invalid then
-        fromT = m.rowsHost.translation
-        m.rowsLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
-    end if
-    if m.scrimGradLayoutInterp <> invalid and m.rowsScrimGrad <> invalid then
-        fromT = m.rowsScrimGrad.translation
-        m.scrimGradLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
-    end if
-    if m.scrimLayoutInterp <> invalid and m.rowsScrim <> invalid then
-        fromT = m.rowsScrim.translation
-        m.scrimLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
-    end if
-    if m.loaderLayoutInterp <> invalid and m.homeLoaderHost <> invalid then
-        fromT = m.homeLoaderHost.translation
-        m.loaderLayoutInterp.keyValue = [fromT, [targetOffX, fromT[1]]]
-    end if
-
-    ' Width snaps at end of slide; hero clips continuously via contentWidth.
-    if m.hero <> invalid and m.hero.hasField("contentWidth") then
-        m.hero.contentWidth = targetViewportW
-    end if
-    if m.rowsScrimGrad <> invalid then m.rowsScrimGrad.width = targetViewportW
-    if m.rowsScrim <> invalid then m.rowsScrim.width = targetViewportW
-
-    m.layoutAnim.control = "start"
+    m.layoutOffsetX = targetOffX
+    if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
+    if m.layoutAnim <> invalid then m.layoutAnim.control = "stop"
+    ApplyContentLayout(targetOffX, targetViewportW)
 end sub
 
 
 sub OnLayoutAnimState()
     if m.layoutAnim = invalid then return
     if m.layoutAnim.state <> "stopped" then return
-    m.layoutOffsetX = m.pendingLayoutOffX
-    ApplyContentLayout(m.pendingLayoutOffX, m.pendingLayoutViewportW)
+    if m.pendingLayoutOffX <> invalid then m.layoutOffsetX = m.pendingLayoutOffX
+    vw = 1920
+    if m.pendingLayoutViewportW <> invalid then vw = m.pendingLayoutViewportW
+    ApplyContentLayout(m.layoutOffsetX, vw)
+    RestoreSavedRowsHostY()
 end sub
 
 

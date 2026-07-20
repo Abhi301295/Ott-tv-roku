@@ -15,6 +15,7 @@ sub EnterHeader(animateLayout = true as boolean)
     if ThemeIsSidebarHeader() then ApplyLayoutGeometry(animateLayout)
     ClearAllRowCardFocus()
     ApplyAllRowFocusStates()
+    RestoreSavedRowsHostY()
 end sub
 
 
@@ -33,6 +34,7 @@ sub ExitHeaderToRows()
     else if m.header <> invalid then
         m.header.headerActive = false
     end if
+    m.savedRowsHostY = invalid
     if ThemeIsSidebarHeader() then ApplyLayoutGeometry(true)
     m.focusZone = "rows"
     ApplyHomeFocus()
@@ -68,6 +70,8 @@ end sub
 ' Sidebar: LEFT from hero/rows opens the menu. Netflix top bar: UP opens header.
 sub EnterHeaderFromContent()
     RememberHeaderReturnZone()
+    ' Exact catalogue Y before sidebar width / focus chrome runs — source of truth.
+    if m.rowsHost <> invalid then m.savedRowsHostY = m.rowsHost.translation[1]
     EnterHeader()
 end sub
 
@@ -85,6 +89,7 @@ sub ExitHeaderToPrevious()
     if zone = "hero" and HeroAvailable() then
         target = m.headerReturnHeroFocus
         if target = invalid or target = "" then target = "next"
+        m.savedRowsHostY = invalid
         EnterHero(target)
         return
     end if
@@ -93,6 +98,7 @@ sub ExitHeaderToPrevious()
     if m.headerReturnRowIndex <> invalid then m.rowIndex = m.headerReturnRowIndex
     if m.headerReturnCardIndex <> invalid then m.cardIndex = m.headerReturnCardIndex
     ClampCardIndex()
+    m.savedRowsHostY = invalid
     ApplyHomeFocus()
 end sub
 
@@ -109,6 +115,11 @@ sub MaybeLandContentFocus()
             m.pendingContentFocus = false
             return
         end if
+        ' Sidebar: only collapse into content when focus is still on the Home menu item.
+        if not ShellSidebarFocusMatchesPage(m.vm, RouteHome(), "") then
+            m.pendingContentFocus = false
+            return
+        end if
         m.pendingContentFocus = false
         m.rowIndex = 0
         m.cardIndex = 0
@@ -118,6 +129,10 @@ sub MaybeLandContentFocus()
 
     if ThemeHasHomeNav() then
         m.pendingContentFocus = false
+        ' Do not reset sidebar selection to Home if the user already moved away.
+        if ThemeIsSidebarHeader() and not ShellSidebarFocusMatchesPage(m.vm, RouteHome(), "") then
+            return
+        end if
         if m.focusZone = "header" then
             if m.header <> invalid and m.header.headerActive <> true then
                 if ThemeIsSidebarHeader() then
@@ -396,55 +411,104 @@ end sub
 ' ── Boot sequence (parity with features/home/index.tsx) ──────────────────────
 
 
-sub ApplyHomeFocus()
-    if m.rowsHost = invalid then return
-
+' Vertical pin for a catalogue row — shared by rows focus and sidebar header (must not jump to top).
+function RowsHostAnchorForIndex(rowIdx as integer) as integer
     pitch = m.layoutRowPitch
     if pitch = invalid or pitch <= 0 then pitch = HC_RowPitchForLayout(m.homeLayout)
-    if m.focusZone = "rows" then
-        if ThemeIsOttHome() and m.rowTops <> invalid and m.rowIndex >= 0 and m.rowIndex < m.rowTops.Count() then
-            ' Parity GenreApplyVerticalScroll: ideal pin + tailPinned when content still fits.
-            ' Do NOT add +80 to viewH — that jammed the last row too low and clipped displayTitle.
-            rowTop = m.rowTops[m.rowIndex]
-            idealAnchorY = m.layoutAnchorY - rowTop
-            anchorY = idealAnchorY
-            contentH = OttRowsContentHeight()
-            if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
-            viewH = 1080 - m.layoutAnchorY
-            maxScroll = contentH - viewH
-            if maxScroll < 0 then maxScroll = 0
-            minAnchor = m.layoutAnchorY - maxScroll
-            if anchorY < minAnchor then
-                contentBottom = idealAnchorY + contentH
-                if contentBottom < 1080 then
-                    anchorY = idealAnchorY
-                else
-                    anchorY = minAnchor
-                end if
-            end if
-        else
-            idealAnchorY = m.layoutAnchorY - (m.rowIndex * pitch)
-            anchorY = idealAnchorY
-            ' Netflix path: same tail room so the last row is not stuck below the title band.
-            contentH = m.rowWidgets.Count() * pitch
-            if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
-            viewH = 1080 - m.layoutAnchorY
-            maxScroll = contentH - viewH
-            if maxScroll < 0 then maxScroll = 0
-            minAnchor = m.layoutAnchorY - maxScroll
-            if anchorY < minAnchor then
-                contentBottom = idealAnchorY + contentH
-                if contentBottom < 1080 then
-                    anchorY = idealAnchorY
-                else
-                    anchorY = minAnchor
-                end if
+    if rowIdx < 0 then rowIdx = 0
+
+    if ThemeIsOttHome() and m.rowTops <> invalid and rowIdx < m.rowTops.Count() then
+        rowTop = m.rowTops[rowIdx]
+        idealAnchorY = m.layoutAnchorY - rowTop
+        anchorY = idealAnchorY
+        contentH = OttRowsContentHeight()
+        if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
+        viewH = 1080 - m.layoutAnchorY
+        maxScroll = contentH - viewH
+        if maxScroll < 0 then maxScroll = 0
+        minAnchor = m.layoutAnchorY - maxScroll
+        if anchorY < minAnchor then
+            contentBottom = idealAnchorY + contentH
+            if contentBottom < 1080 then
+                anchorY = idealAnchorY
+            else
+                anchorY = minAnchor
             end if
         end if
     else
-        anchorY = m.layoutAnchorY
+        idealAnchorY = m.layoutAnchorY - (rowIdx * pitch)
+        anchorY = idealAnchorY
+        contentH = 0
+        if m.rowWidgets <> invalid then contentH = m.rowWidgets.Count() * pitch
+        if HC_IsDisplayTitleEnabled() then contentH = contentH + HC_CardTitleExtraH()
+        viewH = 1080 - m.layoutAnchorY
+        maxScroll = contentH - viewH
+        if maxScroll < 0 then maxScroll = 0
+        minAnchor = m.layoutAnchorY - maxScroll
+        if anchorY < minAnchor then
+            contentBottom = idealAnchorY + contentH
+            if contentBottom < 1080 then
+                anchorY = idealAnchorY
+            else
+                anchorY = minAnchor
+            end if
+        end if
     end if
     if anchorY > m.layoutAnchorY then anchorY = m.layoutAnchorY
+    return anchorY
+end function
+
+function HomePinnedRowIndex() as integer
+    if m.focusZone = "header" then
+        if m.headerReturnRowIndex <> invalid and m.headerReturnRowIndex >= 0 then
+            return m.headerReturnRowIndex
+        end if
+    end if
+    if m.rowIndex <> invalid and m.rowIndex >= 0 then return m.rowIndex
+    return 0
+end function
+
+' Re-apply vertical pin after sidebar width change (instant — layoutAnim owns the X slide).
+sub PinRowsHostToPinnedRow(instant as boolean)
+    if m.rowsHost = invalid then return
+    if m.savedRowsHostY <> invalid then
+        RestoreSavedRowsHostY()
+        return
+    end if
+    anchorY = RowsHostAnchorForIndex(HomePinnedRowIndex())
+    if instant then
+        was = m.interacting
+        m.interacting = true
+        AnimateRowsHost(anchorY)
+        m.interacting = was
+    else
+        AnimateRowsHost(anchorY)
+    end if
+end sub
+
+sub RestoreSavedRowsHostY()
+    if m.rowsHost = invalid then return
+    if m.savedRowsHostY = invalid then return
+    offX = 0
+    if m.layoutOffsetX <> invalid then offX = m.layoutOffsetX
+    ' Prefer the in-flight sidebar target so we never snap back under an expanded menu.
+    if m.pendingLayoutOffX <> invalid then offX = m.pendingLayoutOffX
+    ' Stop both anims that write rowsHost.translation — they fight and can snap Y to top.
+    if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
+    m.rowsHost.translation = [offX, m.savedRowsHostY]
+end sub
+
+sub ApplyHomeFocus()
+    if m.rowsHost = invalid then return
+
+    ' Hero focus: park rows at the top peek. Sidebar header: freeze saved scroll Y.
+    if m.focusZone = "hero" then
+        anchorY = m.layoutAnchorY
+    else if m.focusZone = "header" and m.savedRowsHostY <> invalid then
+        anchorY = m.savedRowsHostY
+    else
+        anchorY = RowsHostAnchorForIndex(HomePinnedRowIndex())
+    end if
 
     if m.focusZone = "rows" then
         lo = m.rowIndex - 1
@@ -470,7 +534,11 @@ sub ApplyHomeFocus()
         m.pendingHeroUpdate = false
     end if
     SyncHeroAutoAdvanceHold()
-    AnimateRowsHost(anchorY)
+    if m.focusZone = "header" and m.savedRowsHostY <> invalid then
+        RestoreSavedRowsHostY()
+    else
+        AnimateRowsHost(anchorY)
+    end if
     ScheduleRowPrefetch()
 end sub
 
@@ -488,12 +556,20 @@ sub ApplyRowFocusState(i as integer)
     peek = false
     if i = 0 and not m.rowsRevealed then
         peek = true
-    else if m.rowsRevealed and i = 0 and (m.focusZone = "header" or m.focusZone = "hero") then
+    else if m.rowsRevealed and i = 0 and m.focusZone = "hero" then
+        ' Hero focus: peek the first catalogue row under the banner.
+        peek = true
+    else if m.rowsRevealed and i = 0 and m.focusZone = "header" and not ThemeIsSidebarHeader() then
+        ' Netflix top bar: peek first row while the header is focused.
         peek = true
     end if
     suppressed = false
     if m.focusZone = "rows" then
         suppressed = (i < m.rowIndex)
+    else if m.focusZone = "header" and ThemeIsSidebarHeader() then
+        ' Keep the same virtualization as the row we left — hide rows above, do not reveal CW.
+        pinIdx = HomePinnedRowIndex()
+        suppressed = (i < pinIdx)
     else if not peek then
         suppressed = true
     end if

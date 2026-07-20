@@ -47,6 +47,7 @@
     <HeroBannerCinematic id="heroCardFocus" translation="[0, 0]" visible="false" contentWidth="1920" />
 
     <Group id="rowsHost" translation="[0, 702]" visible="false" />
+    <!-- translation Y is overwritten by SyncGenreRowAnchorY (702, or 620 when displayTitle). -->
 
     <Animation id="rowsAnim" duration="0.4" repeat="false" easeFunction="inOutCubic">
       <Vector2DFieldInterpolator id="rowsInterp" key="[0.0, 1.0]"
