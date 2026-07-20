@@ -90,6 +90,13 @@ sub SyncReelsDetailPanel()
     m.reelDetailPanel.likesCount = ReelLikesCount(reel)
     m.reelDetailPanel.commentsCount = ReelsCommentsCount(reel)
     m.reelDetailPanel.topInset = RL_ShellTopInset()
+    m.reelDetailPanel.contentViewportW = m.viewportW
+    m.reelDetailPanel.videoOuterX = m.videoX
+    if m.panelHostX <> invalid and m.panelHostX >= 0 then
+        m.reelDetailPanel.panelHostX = m.panelHostX
+    else
+        m.reelDetailPanel.panelHostX = -1
+    end if
     m.reelDetailPanel.focusTarget = ReelsDetailFocusTarget()
     m.reelDetailPanel.visible = true
     ' Heart pulse only on explicit like (ToggleReelLike) — not on up/down reel change.

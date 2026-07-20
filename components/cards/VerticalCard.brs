@@ -8,6 +8,7 @@ sub init()
     m.thumbFallbackLogo = m.top.findNode("thumbFallbackLogo")
     m.veil = m.top.findNode("veil")
     m.titleLabel = m.top.findNode("titleLabel")
+    m.titleSkeleton = m.top.findNode("titleSkeleton")
     m.thumb.observeField("loadStatus", "OnThumbLoad")
     m.lastThumbnailUri = ""
     m.skeletonDwellStarted = false
@@ -47,7 +48,8 @@ end function
 
 sub OnThumbLoad()
     if m.thumb.loadStatus = "failed" then
-        ShowThumbLoading()
+        CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, ThumbW(), ThumbH())
+        ApplyTitleVisual()
         return
     end if
     if m.thumb.loadStatus = "ready" and m.skeletonDwellComplete then RevealThumb()
@@ -60,6 +62,7 @@ end sub
 
 sub RevealThumb()
     CardOnPosterLoad(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, ThumbW(), ThumbH())
+    ApplyTitleVisual()
 end sub
 
 sub ApplyAll()
@@ -100,11 +103,13 @@ sub ApplyAll()
         ' the bg-white/10 animate-pulse card skeleton.
         if status = "ready" and m.skeletonDwellComplete then
             RevealThumb()
+        else if status = "failed" then
+            CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, w, h)
         else
             ShowThumbLoading()
         end if
     else
-        ShowThumbLoading()
+        CardApplyThumbPlaceholder(m.thumb, m.skeleton, m.thumbFallback, m.thumbFallbackLogo, m.top, w, h)
     end if
     ApplyFocusVisual()
     ApplyTitleVisual()
@@ -119,16 +124,30 @@ sub ShowThumbLoading()
         m.skeleton.running = true
         CardApplyHomeCardSkeleton(m.skeleton, true)
     end if
+    ' Title is independent of poster load (React verticalCard.tsx paints description
+    ' whenever displayTitle is on). Keep any leftover title-line skeleton off.
+    HideTitleSkeleton()
     if not m.skeletonDwellStarted then
         m.skeletonDwellStarted = true
         if m.thumbRevealTimer <> invalid then m.thumbRevealTimer.control = "start"
     end if
 end sub
 
+sub HideTitleSkeleton()
+    if m.titleSkeleton = invalid then return
+    m.titleSkeleton.running = false
+    m.titleSkeleton.visible = false
+end sub
+
+' React: title text is ready with the card data; only the poster waits on load.
+' Reveal title first, then poster paints when ready (or placeholder settles).
 sub ApplyTitleVisual()
     if m.titleLabel = invalid then return
+    HideTitleSkeleton()
+    wantTitle = false
+    if m.top.displayTitle then wantTitle = true
     show = false
-    if m.top.displayTitle and m.top.cardTitle <> "" then show = true
+    if wantTitle and m.top.cardTitle <> "" then show = true
     m.titleLabel.visible = show
     if not show then return
     m.titleLabel.text = m.top.cardTitle

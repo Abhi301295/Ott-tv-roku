@@ -5,8 +5,11 @@
     <field id="initials" type="string" value="" onChange="OnDataChanged" />
     <field id="profileName" type="string" value="" onChange="OnDataChanged" />
     <field id="parentalLock" type="boolean" value="false" onChange="OnFocusChanged" />
+    <field id="showEditBadge" type="boolean" value="true" onChange="OnFocusChanged" />
     <field id="focusedState" type="boolean" value="false" alwaysNotify="true" onChange="OnFocusChanged" />
+    <field id="editFocused" type="boolean" value="false" onChange="OnFocusChanged" />
     <field id="snapRest" type="boolean" value="false" />
+    <field id="scaleSnap" type="boolean" value="false" />
     <field id="selectingState" type="boolean" value="false" onChange="OnSelectingChanged" />
     <field id="skBaseColor" type="string" value="0x04478bff" onChange="OnSkColorsChanged" />
     <field id="skHighlightColor" type="string" value="0x0b75e0ff" onChange="OnSkColorsChanged" />
@@ -20,8 +23,13 @@
     <field id="nameColor" type="string" value="0xf8f8f8ff" onChange="OnColorsChanged" />
     <field id="hintBold" type="boolean" value="false" onChange="OnHintChanged" />
     <field id="hintColor" type="string" value="0xc8c8c8ff" onChange="OnColorsChanged" />
+    <field id="cNeutral800" type="string" value="0x121212ff" onChange="OnFocusChanged" />
+    <field id="cNeutral400" type="string" value="0xc8c8c8ff" onChange="OnFocusChanged" />
+    <field id="cNeutral600" type="string" value="0x3d3d3dff" onChange="OnFocusChanged" />
+    <field id="portalPrimary" type="string" value="0x0b75e0ff" onChange="OnFocusChanged" />
     <field id="rowIndex" type="integer" value="0" />
     <field id="layoutHeight" type="integer" value="0" alwaysNotify="true" />
+    <function name="RefreshFocusChrome" />
   </interface>
 
   <script type="text/brightscript" uri="pkg:/source/lib/profile/ProfileUiSpec.brs" />
@@ -30,55 +38,69 @@
   <script type="text/brightscript" uri="pkg:/components/widgets/ProfileAvatarSquare.brs" />
 
   <children>
-    <!-- Card only — labels are siblings so a scaled card cannot paint over the name. -->
-    <Group id="cardScaler" translation="[0, 0]">
-      <Group id="cardStack" translation="[0, 0]">
-        <MaskGroup id="cardClip" maskUri="pkg:/images/ui/profile_sq_mask.png"
-          maskSize="[150, 150]" maskOffset="[0, 0]">
-          <Rectangle id="cardBacking" width="150" height="150" color="0x141414ff" />
-          <Rectangle id="cardBottom" width="150" height="150" color="0x121212ff" />
-          <Poster id="cardTopRamp" width="150" height="150"
-            uri="pkg:/images/ui/profile_sq_ramp.png" blendColor="0x3d3d3dff" />
-          <MaskGroup id="cardInner" maskUri="pkg:/images/ui/profile_sq_inner_mask.png"
-            maskSize="[138, 138]" maskOffset="[6, 6]" visible="false">
-            <Rectangle id="innerBottom" width="138" height="138" color="0x121212ff" />
-            <Poster id="innerRamp" width="138" height="138"
-              uri="pkg:/images/ui/profile_sq_ramp.png" blendColor="0x3d3d3dff" />
-          </MaskGroup>
-          <Label id="initialsLabel" translation="[0, 0]" width="150" height="150"
-            horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
-            <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="30" />
-          </Label>
-          <Group id="lockBadge" translation="[59, 134]" visible="false">
-            <Poster id="lockBadgeBg" width="32" height="32"
-              uri="pkg:/images/ui/profile_sq_inner_mask.png" blendColor="0x121212ff" />
-            <Poster id="lockIcon" translation="[8, 8]" width="16" height="16"
-              uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" />
-          </Group>
-        </MaskGroup>
-        <Poster id="outerBorder" width="150" height="150"
-          uri="pkg:/images/ui/profile_sq_border.png" visible="false" />
-        <Poster id="progressTrack" width="150" height="150"
-          uri="pkg:/images/ui/profile_sq_track.png" visible="false" />
-        <Poster id="progressArc" width="150" height="150"
-          uri="pkg:/images/ui/profile_sq_arc_000.png" blendColor="0xffffffff" visible="false" />
-      </Group>
-
-      <!-- userProfile.tsx loading branch — skeleton inside the focused scale wrapper. -->
-      <Group id="selectingGroup" visible="false">
-        <ProfileSkeletonBox id="skA" glowKind="avatarSquare" boxWidth="150" boxHeight="150" />
-      </Group>
+    <!-- userProfile.tsx: left edit (ml-4 w-12) beside the mt-14 avatar column. -->
+    <Group id="editFocusBtn" translation="[16, 107]" visible="false"
+      scaleRotateCenter="[24, 24]">
+      <Poster id="editFocusBorder" width="50" height="50" translation="[-1, -1]"
+        uri="pkg:/images/ui/avatar_circle.png" blendColor="0xffffffff" visible="false" />
+      <Poster id="editFocusBg" width="48" height="48"
+        uri="pkg:/images/ui/avatar_circle.png" blendColor="0x262626ff" />
+      <Poster id="editFocusIcon" translation="[14, 14]" width="20" height="20"
+        uri="pkg:/images/ui/profile_edit_icon.png" blendColor="0xc8c8c8ff" />
     </Group>
 
-    <Label id="nameLabel" translation="[0, 170]" width="150" height="24"
-      horizAlign="center" vertAlign="top" color="0xffffffff">
-      <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="18" />
-    </Label>
-    <Label id="hintLabel" translation="[0, 196]" width="150" height="24"
-      horizAlign="center" vertAlign="top" color="0xc8c8c8ff" visible="false">
-      <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="18" />
-    </Label>
+    <!-- Avatar column: mt-14 + gap-6 after edit (React flex row). -->
+    <Group id="avatarColumn" translation="[88, 56]">
+      <Group id="cardScaler" translation="[0, 0]">
+        <Group id="cardStack" translation="[0, 0]">
+          <MaskGroup id="cardClip" maskUri="pkg:/images/ui/profile_sq_mask.png"
+            maskSize="[150, 150]" maskOffset="[0, 0]">
+            <Rectangle id="cardBacking" width="150" height="150" color="0x141414ff" />
+            <Rectangle id="cardBottom" width="150" height="150" color="0x121212ff" />
+            <Poster id="cardTopRamp" width="150" height="150"
+              uri="pkg:/images/ui/profile_sq_ramp.png" blendColor="0x3d3d3dff" />
+            <MaskGroup id="cardInner" maskUri="pkg:/images/ui/profile_sq_inner_mask.png"
+              maskSize="[138, 138]" maskOffset="[6, 6]" visible="false">
+              <Rectangle id="innerBottom" width="138" height="138" color="0x121212ff" />
+              <Poster id="innerRamp" width="138" height="138"
+                uri="pkg:/images/ui/profile_sq_ramp.png" blendColor="0x3d3d3dff" />
+            </MaskGroup>
+            <Label id="initialsLabel" translation="[0, 0]" width="150" height="150"
+              horizAlign="center" vertAlign="center" color="0xf8f1f7ff">
+              <Font role="font" uri="pkg:/fonts/Inter-SemiBold.ttf" size="30" />
+            </Label>
+            <Group id="lockBadge" translation="[59, 134]" visible="false">
+              <Poster id="lockBadgeBg" width="32" height="32"
+                uri="pkg:/images/ui/profile_sq_inner_mask.png" blendColor="0x121212ff" />
+              <Poster id="lockIcon" translation="[8, 8]" width="16" height="16"
+                uri="pkg:/images/ui/lock.png" blendColor="0xf59e0bff" />
+            </Group>
+          </MaskGroup>
+          <Poster id="outerBorder" width="150" height="150"
+            uri="pkg:/images/ui/profile_sq_border.png" visible="false" />
+          <Poster id="progressTrack" width="150" height="150"
+            uri="pkg:/images/ui/profile_sq_track.png" visible="false" />
+          <Poster id="progressArc" width="150" height="150"
+            uri="pkg:/images/ui/profile_sq_arc_000.png" blendColor="0xffffffff" visible="false" />
+        </Group>
+
+        <Group id="selectingGroup" visible="false">
+          <ProfileSkeletonBox id="skA" glowKind="avatarSquare" boxWidth="150" boxHeight="150" />
+        </Group>
+      </Group>
+
+      <Label id="nameLabel" translation="[0, 170]" width="150" height="24"
+        horizAlign="center" vertAlign="top" color="0xffffffff">
+        <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="18" />
+      </Label>
+      <Label id="hintLabel" translation="[0, 196]" width="150" height="24"
+        horizAlign="center" vertAlign="top" color="0xc8c8c8ff" visible="false">
+        <Font role="font" uri="pkg:/fonts/Inter-Black.ttf" size="18" />
+      </Label>
+    </Group>
 
     <Timer id="sizeAnimTimer" duration="0.012" repeat="true" />
+    <Timer id="editScaleTimer" duration="0.016" repeat="true" />
+    <Timer id="editBorderFlashTimer" duration="0.28" repeat="false" />
   </children>
 </component>

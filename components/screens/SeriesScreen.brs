@@ -416,6 +416,17 @@ end sub
 sub SeriesHandoffContentFocus()
     if m.rows.Count() = 0 then return
     if SeriesEmptyVisible() then return
+    route = RouteSeries()
+    typeVal = ""
+    if m.vm <> invalid and m.vm.currentRoute <> invalid and m.vm.currentRoute <> "" then
+        route = m.vm.currentRoute
+    end if
+    if route = RouteGenere() and m.listType <> invalid then typeVal = m.listType
+    ' Only collapse sidebar when focus is still on this screen's menu entry.
+    if not ShellSidebarFocusMatchesPage(m.vm, route, typeVal) then
+        BrowseDbg("series_focus", "skip handoff — sidebar focus elsewhere")
+        return
+    end if
     m.rowIdx = 0
     m.colIdx = 0
     ApplyFocus()

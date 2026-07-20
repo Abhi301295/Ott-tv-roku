@@ -44,10 +44,12 @@ sub init()
     m.cardIndex = 0
     m.layoutAnchorY = GL_RowAnchorY()
     m.firstRowWatch = invalid
+    m.heroUnlocked = false
     m.pageBgRest = SK_LoadingPageBg()
     m.prefetchWarmupIdx = 1
     m.interacting = false
     m.pendingPrefetchWarmup = false
+    SyncGenreRowAnchorY(true)
 
     m.interactIdle = CreateObject("roSGNode", "Timer")
     m.interactIdle.duration = 0.25
@@ -135,22 +137,13 @@ sub ShowLoader(show as boolean)
         BrowseHidePageLoader(m, m.pageBgRest)
         if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
         if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "stop"
-        DetachGenrePaintWatch()
     end if
 end sub
 
 sub OnBrowseLoaderTimeout()
     if not BrowsePageLoaderRunning(m) then return
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
-    if m.rowWidgets.Count() > 0 then
-        row0 = m.rowWidgets[0]
-        if row0 <> invalid then
-            row0.callFunc("BuildCardsNow", 6)
-            row0.callFunc("ForceReveal", invalid)
-        end if
-    end if
-    if not m.rowsRevealed then PrepareGenreReveal()
-    if BrowsePageLoaderRunning(m) then CompleteGenreReveal()
+    if not m.rowsRevealed then RevealGenreOnApiData()
 end sub
 
 sub OnShellEnterContent()
@@ -158,8 +151,9 @@ sub OnShellEnterContent()
     m.top.shellEnterContent = false
     if not m.rowsRevealed then return
     if m.categories.Count() = 0 then return
-    m.rowIndex = 0
-    m.cardIndex = 0
+    ' Keep the row/card the user left when opening the header/sidebar (React spatial
+    ' nav returns to the last CONTENT focus). Do not snap to row 0 / card 0.
+    ClampCardIndex()
     ApplyGenreFocus()
 end sub
 
@@ -178,7 +172,6 @@ sub OnDispose()
     BrowseDbg("genre_dispose", "stopping timers + row builds + catalogue fetch")
     m.loading = false
     m.hasMore = false
-    DetachGenrePaintWatch()
     DetachFirstRowWatch()
     AbortAllGenreRowBuilds()
     if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
@@ -219,6 +212,10 @@ sub OnBusinessResolved()
     ApplyHeroTheme()
     RefreshRowThemes()
     ApplyGenreShellLayout()
+    ' displayTitle can flip the row pin (702 → 620). Snap before the next paint so
+    ' skeletons and cards never start at the XML 702 default then animate up.
+    SyncGenreRowAnchorY(true)
+    if m.rowsRevealed then ApplyGenreFocus()
     if BrowsePageLoaderRunning(m) then
         BrowseApplyPageLoaderColors(m)
         BrowseApplyLoaderVeil(m, true, m.pageBgRest)
@@ -288,6 +285,7 @@ sub ResetAndFetch()
     m.cardIndex = 0
     m.rowContentHeight = 0
     m.rowsRevealed = false
+    m.heroUnlocked = false
     m.initialLoad = true
     DetachFirstRowWatch()
     ClearRows()
@@ -300,8 +298,7 @@ sub ResetAndFetch()
 end sub
 
 sub OnHeroSkeletonTimeout()
-    if not m.rowsRevealed then PrepareGenreReveal()
-    if m.pageLoader <> invalid and m.pageLoader.running = true then CompleteGenreReveal()
+    ' Hero meta is shown with the catalogue reveal; nothing to force here.
 end sub
 
 sub FetchNextPage()
@@ -360,13 +357,17 @@ sub OnCatalogueResponse()
     end if
 
     ShowEmpty(false)
-    PrimeHeroFromCategories()
     if m.rowWidgets.Count() = 0 then
         StartInitialGenreHeroPrefetch()
-        StartRowBuild()
-        ' React drops the initial Spinner when the catalogue promise resolves.
-        ' Card posters continue loading behind their VerticalCard skeletons.
-        PrepareGenreReveal()
+        ' Mount row-0 title + card skeletons BEFORE dropping the loader so there is
+        ' never a black frame between Spinner and catalogue chrome.
+        MountGenreFirstRowShell()
+        RevealGenreOnApiData()
+        if m.pendingInitialCardRow <> invalid then OnInitialCardBuild()
+        if m.rowBuildIndex < m.categories.Count() and m.rowBuildTimer <> invalid then
+            m.rowBuildTimer.control = "start"
+            BrowseDbg("genre_rows", "continue build from idx=" + Str(m.rowBuildIndex))
+        end if
     else
         AppendRowsFrom(m.categories.Count() - added)
         ApplyGenreFocus()
@@ -407,18 +408,14 @@ sub PrimeHeroFromCategories()
             end if
         end for
     end if
-    if item <> invalid then
-        if m.useCardFocusHero then
-            m.hero.bannerItems = [item]
-            m.hero.callFunc("PauseAutoAdvance", invalid)
-        else
-            m.hero.activeItem = item
-        end if
-        BrowseDbg("genre_hero", "primed title=" + BrowseDbgStr(item.title))
-        if m.loaderHost <> invalid and m.loaderHost.visible = true then
-            if m.heroSkeletonTimeout <> invalid then m.heroSkeletonTimeout.control = "start"
-        end if
+    if item = invalid then return
+    if m.useCardFocusHero then
+        m.hero.bannerItems = [item]
+        m.hero.callFunc("PauseAutoAdvance", invalid)
+    else
+        m.hero.activeItem = item
     end if
+    BrowseDbg("genre_hero", "meta primed title=" + BrowseDbgStr(item.title))
 end sub
 
 sub StartRowBuild()
@@ -429,14 +426,60 @@ sub StartRowBuild()
     BrowseDbg("genre_rows", "build start count=" + Str(m.categories.Count()))
 end sub
 
+' Pin rowsHost to the final catalogue Y before skeletons/cards are shown
+' (702 default, or 620 when displayTitle is on — same Y for shimmer and painted cards).
+sub SyncGenreRowAnchorY(snapHost = true as boolean)
+    m.layoutAnchorY = GL_RowAnchorY()
+    if not snapHost then return
+    if m.rowsHost = invalid then return
+    if m.rowsAnim <> invalid then m.rowsAnim.control = "stop"
+    m.rowsHost.translation = [0, m.layoutAnchorY]
+end sub
+
+' Sync-mount first catalogue row (title + shimmer slots) while the page loader is still up.
+sub MountGenreFirstRowShell()
+    m.rowBuildIndex = 0
+    m.rowContentHeight = 0
+    m.rowTops = []
+    m.pendingInitialCardRow = invalid
+    SyncGenreRowAnchorY(true)
+    if m.categories.Count() = 0 then return
+    cat = m.categories[0]
+    if cat = invalid then
+        m.rowBuildIndex = 1
+        return
+    end if
+    theme = GenreRowTheme()
+    row = CRC_CreateDataRow(m.rowsHost, cat, 0, theme, 0, true)
+    if row = invalid then
+        m.rowBuildIndex = 1
+        return
+    end if
+    row.rowPeekVisible = true
+    CRC_AppendRowRecord(m, row, 0, cat)
+    ApplyRowFocusState(0)
+    EnsureGenreRow0Visible()
+    ' Skeletons must be on-screen under the loader veil before we hide it.
+    if m.rowsHost <> invalid then m.rowsHost.visible = true
+    m.pendingInitialCardRow = row
+    m.rowBuildIndex = 1
+    BrowseDbg("genre_rows", "row0 titles+skeletons mounted pre-loader-hide anchorY=" + Str(m.layoutAnchorY))
+end sub
+
+' Priority window for the focused row — first 3 cards paint first; the rest stay on shimmer.
+function GenrePriorityCardCount() as integer
+    return 3
+end function
+
 sub OnInitialCardBuild()
     row = m.pendingInitialCardRow
     m.pendingInitialCardRow = invalid
     if row <> invalid then
         if row.hasField("deferCardBuild") then row.deferCardBuild = false
+        ' Prioritize first-row window; ResumeBuild keeps shimmer → paint for the rest.
+        row.callFunc("BuildCardsNow", GenrePriorityCardCount())
         row.callFunc("ResumeBuild", invalid)
     end if
-    ApplyGenreFocus()
     if m.rowBuildTimer <> invalid and m.rowBuildIndex < m.categories.Count() then
         m.rowBuildTimer.control = "start"
     end if
@@ -452,12 +495,6 @@ sub OnRowBuildTick()
         if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
         BrowseDbg("genre_rows", "build complete widgets=" + Str(m.rowWidgets.Count()) + " contentH=" + Str(m.rowContentHeight))
         GenreLogRowTops("build_done")
-        if not m.rowsRevealed and m.rowWidgets.Count() > 0 then
-            row0 = m.rowWidgets[0]
-            if row0 <> invalid and row0.cardCount = 0 then
-                PrepareGenreReveal()
-            end if
-        end if
         return
     end if
 
@@ -470,29 +507,25 @@ sub OnRowBuildTick()
     theme = GenreRowTheme()
     y = m.rowContentHeight
     if m.rowBuildIndex = 0 then
+        ' Title + skeleton slots first (step 2–3); real cards via OnInitialCardBuild.
         row = CRC_CreateDataRow(m.rowsHost, cat, y, theme, 0, true)
         if row <> invalid then
             row.rowPeekVisible = true
-            if row.cardCount = 0 then
-                PrepareGenreReveal()
-            else
-                m.pendingInitialCardRow = row
-                BrowseDbg("genre_rows", "row0 skeleton slots mounted")
-                PrepareGenreReveal()
-            end if
+            m.pendingInitialCardRow = row
+            BrowseDbg("genre_rows", "row0 titles+skeletons mounted")
         end if
     else
         row = CRC_CreateShellRow(m.rowsHost, cat, y, theme)
     end if
     if row <> invalid then CRC_AppendRowRecord(m, row, y, cat)
     ApplyRowFocusState(m.rowWidgets.Count() - 1)
-    if m.rowsRevealed then
-        if m.rowBuildIndex = 0 then
-            if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
-            if m.initialCardBuildTimer <> invalid then m.initialCardBuildTimer.control = "start"
-        else
-            MaterializePrefetchWindow()
-        end if
+    if m.rowBuildIndex = 0 then
+        if m.rowBuildTimer <> invalid then m.rowBuildTimer.control = "stop"
+        EnsureGenreRow0Visible()
+        ApplyGenreFocus()
+        OnInitialCardBuild()
+    else if m.rowsRevealed then
+        MaterializePrefetchWindow()
     end if
     m.rowBuildIndex = m.rowBuildIndex + 1
 end sub
@@ -503,75 +536,69 @@ sub AppendRowsFrom(startIdx as integer)
 end sub
 
 sub OnRowsSkeletonTimeout()
-    BrowseDbg("genre_reveal", "loader timeout — force reveal")
+    BrowseDbg("genre_reveal", "rows skeleton timeout")
     if m.rowsSkeletonTimeout <> invalid then m.rowsSkeletonTimeout.control = "stop"
     if m.rowWidgets.Count() > 0 then
         row0 = m.rowWidgets[0]
         if row0 <> invalid then
-            row0.callFunc("BuildCardsNow", 6)
+            row0.callFunc("BuildCardsNow", GenrePriorityCardCount())
+            row0.callFunc("ResumeBuild", invalid)
             row0.callFunc("ForceReveal", invalid)
         end if
     end if
-    if not m.rowsRevealed then PrepareGenreReveal()
-    if m.pageLoader <> invalid and m.pageLoader.running = true then CompleteGenreReveal()
+    if not m.rowsRevealed then RevealGenreOnApiData()
 end sub
 
-sub PrepareGenreReveal()
-    if m.rowsRevealed then return
+' Step 1: API done → drop page loader. Reveal row host + hero meta from first card
+' (React Content sets Banner from result[0] with the rows). Poster loads via the hero's
+' own meta-first handoff while card skeletons paint.
+sub RevealGenreOnApiData()
+    if m.rowsRevealed then
+        if BrowsePageLoaderRunning(m) then BrowseHidePageLoader(m, m.pageBgRest)
+        return
+    end if
     m.rowsRevealed = true
-    if m.hero <> invalid then m.hero.visible = true
-    if m.rowsHost <> invalid then m.rowsHost.visible = true
+    m.heroUnlocked = true
     m.pendingPrefetchWarmup = true
-    CompleteGenreReveal()
-end sub
-
-function GenrePaintGateOpen() as boolean
-    heroOk = false
-    if m.hero <> invalid and m.hero.posterReady = true then heroOk = true
-    rowOk = false
-    if m.rowWidgets.Count() > 0 then
-        row0 = m.rowWidgets[0]
-        if row0 <> invalid and row0.hasField("paintedReady") and row0.paintedReady = true then rowOk = true
-    end if
-    return heroOk OR rowOk
-end function
-
-sub AttachGenrePaintWatch()
-    DetachGenrePaintWatch()
-    if m.hero <> invalid then m.hero.observeField("posterReady", "OnGenrePaintReady")
-    if m.rowWidgets.Count() > 0 then
-        row0 = m.rowWidgets[0]
-        if row0 <> invalid then
-            m.firstRowWatch = row0
-            row0.observeField("paintedReady", "OnGenrePaintReady")
-        end if
-    end if
-end sub
-
-sub DetachGenrePaintWatch()
-    if m.hero <> invalid then m.hero.unobserveField("posterReady")
-    DetachFirstRowWatch()
-end sub
-
-sub OnGenrePaintReady()
-    if not m.rowsRevealed then return
-    if not BrowsePageLoaderRunning(m) then return
-    if GenrePaintGateOpen() then CompleteGenreReveal()
-end sub
-
-sub CompleteGenreReveal()
-    if not BrowsePageLoaderRunning(m) then return
+    SyncGenreRowAnchorY(true)
     if m.rowsHost <> invalid then m.rowsHost.visible = true
-    if m.hero <> invalid then m.hero.visible = true
     BrowseHidePageLoader(m, m.pageBgRest)
-    ApplyGenreFocus()
-    if m.vm <> invalid and m.categories.Count() > 0 and not GenreEmptyVisible() then
-        wasHeader = false
-        if m.vm.shellFocus = "header" then wasHeader = true
-        ShellEnterContent(m.vm)
-        BrowseDbg("genre_reveal", "handoff_to_rows categories=" + Str(m.categories.Count()) + " fromHeader=" + BrowseDbgStr(wasHeader))
+    ShowGenreHeroMeta()
+    ' Collapse sidebar into content only when the focused menu item is still this page
+    ' (Movies/Series). If the user moved elsewhere in the sidebar while loading, keep it.
+    if ShellSidebarFocusMatchesPage(m.vm, RouteGenere(), m.listType) then
+        ApplyGenreFocus()
+        if m.vm <> invalid and m.categories.Count() > 0 and not GenreEmptyVisible() then
+            wasHeader = false
+            if m.vm.shellFocus = "header" then wasHeader = true
+            ShellEnterContent(m.vm)
+            BrowseDbg("genre_reveal", "handoff_to_rows categories=" + Str(m.categories.Count()) + " fromHeader=" + BrowseDbgStr(wasHeader))
+        end if
+    else
+        ClearGenreRowCardFocus()
+        BrowseDbg("genre_reveal", "skip content handoff — sidebar focus left this module")
     end if
-    BrowseDbg("genre_reveal", "loader off — catalogue data ready; card skeletons cover poster paint")
+    BrowseDbg("genre_reveal", "loader off — row titles + hero meta from first card")
+end sub
+
+sub ShowGenreHeroMeta()
+    if m.hero = invalid then return
+    PrimeHeroFromCategories()
+    m.hero.visible = true
+    UpdateGenreHeroFromFocus()
+end sub
+
+sub EnsureGenreRow0Visible()
+    if m.rowWidgets.Count() = 0 then return
+    row0 = m.rowWidgets[0]
+    if row0 = invalid then return
+    row0.rowPeekVisible = true
+    row0.opacity = 1.0
+    host = row0.findNode("cardsHost")
+    if host <> invalid and host.opacity < 1.0 then host.opacity = 1.0
+    title = row0.findNode("rowTitle")
+    if title <> invalid and title.opacity < 1.0 then title.opacity = 1.0
+    if m.rowsHost <> invalid then m.rowsHost.visible = true
 end sub
 
 sub WarmGenreRow(row as object)
@@ -664,6 +691,7 @@ end sub
 
 sub UpdateGenreHeroFromFocus()
     if m.hero = invalid then return
+    if not m.heroUnlocked then return
     row = invalid
     cardCount = 0
     if m.rowIndex >= 0 and m.rowIndex < m.rowWidgets.Count() then
@@ -999,7 +1027,6 @@ sub OnKey()
     if key = "up" then
         if m.rowIndex = 0 then
             if NavUpOpensHeaderFromContent() then
-                print "[GENRE_DBG] up_row0_to_header cardIdx=" + Str(m.cardIndex)
                 EnterGenreHeader()
                 ClearGenreRowCardFocus()
             end if

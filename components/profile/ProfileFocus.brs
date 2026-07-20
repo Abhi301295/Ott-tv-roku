@@ -44,6 +44,12 @@ sub BuildAvatars()
             ' userProfile.tsx: unfocused text-neutral-400; focus applied in ApplyProfileFocus.
             av.nameColor = m.cNeutral400
             av.hintColor = m.cNeutral400
+            if av.hasField("showEditBadge") then av.showEditBadge = ProfileEditBadgeVisibleForRow(i)
+            if av.hasField("editFocused") then av.editFocused = false
+            if av.hasField("cNeutral800") then av.cNeutral800 = m.cNeutral800
+            if av.hasField("cNeutral400") then av.cNeutral400 = m.cNeutral400
+            if av.hasField("cNeutral600") then av.cNeutral600 = m.cNeutral600
+            if av.hasField("portalPrimary") then av.portalPrimary = m.cPrimary500
             av.observeField("layoutHeight", "OnAvatarLayoutChanged")
         else
             av.bgColor = m.cAvatarBg

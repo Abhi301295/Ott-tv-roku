@@ -179,3 +179,8 @@ end function
 function HC_OttPosterReadyMaxSec() as float
     return 2.0
 end function
+
+' Cards to sync-append per idle warm tick (rest of the row stays on the progressive timer).
+function HC_HomeWarmCardsPerTick() as integer
+    return 2
+end function
