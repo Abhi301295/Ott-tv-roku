@@ -9,6 +9,12 @@ function LT_NowTickMs() as integer
     return 15000
 end function
 
+' ⚠ Parity Note: React uses browser scrollTo({ behavior: 'smooth' }) (~300–500ms).
+' Roku approximates with SceneGraph Vector2D ease (Series/Home inOutCubic).
+function LT_ScrollAnimSec() as float
+    return 0.35
+end function
+
 function LT_DisplayTimelineStartMs() as longinteger
     return LT_LocalMidnightMs()
 end function

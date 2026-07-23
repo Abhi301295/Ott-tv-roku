@@ -31,57 +31,83 @@
   <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvConstants.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvMockData.brs" />
   <script type="text/brightscript" uri="pkg:/source/lib/livetv/LiveTvService.brs" />
+  <script type="text/brightscript" uri="pkg:/source/lib/grid/GridScrollAnim.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/LiveTvScreen.brs" />
 
   <children>
     <Rectangle id="bg" width="1920" height="1080" color="0x0C111Aff" />
 
     <Group id="contentHost" translation="[0, 0]">
-      <!-- Layer 1: hero backdrop only (clipped to 45vh). -->
-      <Group id="heroBackdropHost" translation="[0, 0]">
+      <!-- EPG first — scroll may paint above its clip on some runtimes; hero is drawn after to mask bleed. -->
+      <Group id="epgHost" translation="[0, 486]" clippingRect="[0, 0, 1920, 594]"
+        clippingRectClipsChildren="true">
+        <Rectangle id="epgBg" width="1920" height="594" color="0x0C111Aff" />
+        <Rectangle id="epgTopBorder" width="1920" height="1" color="0xffffff0d" />
+
+        <Group id="gridClip" translation="[0, 56]" clippingRect="[0, 0, 1920, 538]"
+          clippingRectClipsChildren="true">
+          <Rectangle id="gridScrollBg" width="1920" height="538" color="0x0C111Aff" />
+          <Group id="programGridHost" translation="[200, 0]" clippingRect="[0, 0, 1720, 538]"
+            clippingRectClipsChildren="true">
+            <Group id="programScrollHost" clippingRect="[0, 0, 1720, 538]"
+              clippingRectClipsChildren="true">
+              <Group id="programScroll">
+                <Rectangle id="liveLine" width="2" height="538" color="0xE5007Aff" visible="false" />
+              </Group>
+            </Group>
+          </Group>
+        </Group>
+
+        <!-- Sticky channel column (React left-0 z-20): after programs so H-scroll cannot paint over it;
+             opaque underlay blocks V-scroll bleed into the Today corner / hero on the left. -->
+        <Group id="channelColHost" translation="[0, 56]" clippingRect="[0, 0, 200, 538]"
+          clippingRectClipsChildren="true">
+          <Rectangle id="channelColUnderlay" width="200" height="538" color="0x0C111Aff" />
+          <Rectangle id="channelColBg" width="200" height="538" color="0x0C111Aff" />
+          <Rectangle id="channelColBorder" translation="[199, 0]" width="1" height="538" color="0xffffff0d" />
+          <Group id="channelRowsHost" clippingRect="[0, 0, 200, 538]"
+            clippingRectClipsChildren="true">
+            <Group id="channelScroll" />
+          </Group>
+        </Group>
+
+        <!-- Sticky timeline row (React sticky top-0 z-30 bg-[#0C111A]). -->
+        <Rectangle id="timelineRowBg" width="1920" height="56" color="0x0C111Aff" />
+        <Group id="timelineHost" translation="[200, 0]" clippingRect="[0, 0, 1720, 56]"
+          clippingRectClipsChildren="true">
+          <Group id="timelineScroll">
+            <Group id="liveDotHost" translation="[0, 46]" visible="false">
+              <Poster id="liveDotRing" width="18" height="18" translation="[-4, -4]"
+                uri="pkg:/images/ui/avatar_circle.png" blendColor="0xE5007A4d" />
+              <Poster id="liveDot" width="10" height="10" uri="pkg:/images/ui/avatar_circle.png" blendColor="0xE5007Aff" />
+            </Group>
+          </Group>
+        </Group>
+        <!-- Today corner AFTER markers (React sticky left-0 z-40 bg-[#0C111A]) so H-scroll times cannot paint through it. -->
+        <Group id="timelineCornerHost" clippingRect="[0, 0, 200, 56]"
+          clippingRectClipsChildren="true">
+          <Rectangle id="timelineCornerUnderlay" width="200" height="56" color="0x0C111Aff" />
+          <Rectangle id="timelineCornerBg" width="200" height="56" color="0x0C111Aff" />
+          <Rectangle id="timelineCornerBorder" translation="[199, 0]" width="1" height="56" color="0xffffff0d" />
+          <Label id="timelineTodayLbl" translation="[0, 16]" width="200" height="24" text="Today"
+            horizAlign="center" vertAlign="center" color="0xd1d5dbff">
+            <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="14" />
+          </Label>
+        </Group>
+        <Rectangle id="timelineBottomBorder" translation="[0, 55]" width="1920" height="1" color="0xffffff0d" />
+      </Group>
+
+      <!-- Hero after EPG: opaque underlay + posters. Underlay blocks scroll bleed (posters are /70). -->
+      <Group id="heroBackdropHost" translation="[0, 0]" clippingRect="[0, 0, 1920, 486]"
+        clippingRectClipsChildren="true">
+        <Rectangle id="heroOpaqueUnderlay" width="1920" height="486" color="0x0C111Aff" />
         <Poster id="heroBackdropA" width="1920" height="486" loadDisplayMode="scaleToZoom" opacity="0.7" />
         <Poster id="heroBackdropB" width="1920" height="486" loadDisplayMode="scaleToZoom" opacity="0.0" />
         <Poster id="heroGradL" uri="pkg:/images/ui/grad_left.png" width="1152" height="486"
           loadDisplayMode="scaleToFill" />
       </Group>
 
-      <!-- Layer 2: EPG — scrollable grid under sticky timeline (React sticky top-0 z-30). -->
-      <Group id="epgHost" translation="[0, 486]">
-        <Rectangle id="epgBg" width="1920" height="594" color="0x0C111Aff" />
-        <Rectangle id="epgTopBorder" width="1920" height="1" color="0xffffff0d" />
-
-        <Group id="gridClip" translation="[0, 56]" clippingRect="[0, 0, 1920, 538]">
-          <Rectangle id="gridScrollBg" width="1920" height="538" color="0x0C111Aff" />
-          <Group id="programGridHost" translation="[200, 0]" clippingRect="[0, 0, 1720, 538]">
-            <Group id="programScrollHost" clippingRect="[0, 0, 1720, 538]" />
-            <Rectangle id="liveLine" width="2" height="538" color="0xE5007Aff" visible="false" />
-          </Group>
-          <Group id="channelColHost" clippingRect="[0, 0, 200, 538]">
-            <Rectangle id="channelColBg" width="200" height="538" color="0x0C111Aff" />
-            <Rectangle id="channelColBorder" translation="[199, 0]" width="1" height="538" color="0xffffff0d" />
-            <Group id="channelRowsHost" clippingRect="[0, 0, 200, 538]" />
-          </Group>
-        </Group>
-
-        <!-- Timeline paints above grid so virtualized rows never bleed into time markers. -->
-        <Rectangle id="timelineRowBg" width="1920" height="56" color="0x0C111Aff" />
-        <Rectangle id="timelineCornerBg" width="200" height="56" color="0x0C111Aff" />
-        <Rectangle id="timelineCornerBorder" translation="[199, 0]" width="1" height="56" color="0xffffff0d" />
-        <Label id="timelineTodayLbl" translation="[0, 16]" width="200" height="24" text="Today"
-          horizAlign="center" vertAlign="center" color="0xd1d5dbff">
-          <Font role="font" uri="pkg:/fonts/Inter-Medium.ttf" size="14" />
-        </Label>
-        <Group id="timelineHost" translation="[200, 0]" />
-        <Rectangle id="timelineBottomBorder" translation="[0, 55]" width="1920" height="1" color="0xffffff0d" />
-
-        <Group id="liveDotHost" translation="[200, 46]" visible="false">
-          <Poster id="liveDotRing" width="18" height="18" translation="[-4, -4]"
-            uri="pkg:/images/ui/avatar_circle.png" blendColor="0xE5007A4d" />
-          <Poster id="liveDot" width="10" height="10" uri="pkg:/images/ui/avatar_circle.png" blendColor="0xE5007Aff" />
-        </Group>
-      </Group>
-
-      <!-- Layer 3: hero copy + buttons fixed above EPG (React absolute bottom-6 left-10). -->
+      <!-- Hero copy + buttons above EPG and above any residual bleed. -->
       <Group id="heroControlsHost" translation="[0, 0]">
         <Group id="heroMeta" translation="[40, 180]">
           <Label id="spotlightLbl" width="960" height="18" wrap="false" vertAlign="top" color="0xec4899ff">
@@ -138,6 +164,19 @@
     <Timer id="backdropSwapTimer" duration="0.15" repeat="false" />
     <Animation id="backdropFadeAnim" duration="0.3" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="backdropFadeInterp" key="[0.0, 1.0]" fieldToInterp="heroBackdropA.opacity" />
+    </Animation>
+    <!-- EPG scroll — approximates React scrollTo({ behavior: 'smooth' }). -->
+    <Animation id="channelScrollAnim" duration="0.35" repeat="false" easeFunction="inOutCubic">
+      <Vector2DFieldInterpolator id="channelScrollInterp" key="[0.0, 1.0]"
+        fieldToInterp="channelScroll.translation" />
+    </Animation>
+    <Animation id="programScrollAnim" duration="0.35" repeat="false" easeFunction="inOutCubic">
+      <Vector2DFieldInterpolator id="programScrollInterp" key="[0.0, 1.0]"
+        fieldToInterp="programScroll.translation" />
+    </Animation>
+    <Animation id="timelineScrollAnim" duration="0.35" repeat="false" easeFunction="inOutCubic">
+      <Vector2DFieldInterpolator id="timelineScrollInterp" key="[0.0, 1.0]"
+        fieldToInterp="timelineScroll.translation" />
     </Animation>
   </children>
 </component>

@@ -5,10 +5,13 @@ sub init()
     m.sidebarOccluder = m.top.findNode("sidebarOccluder")
     m.contentHost = m.top.findNode("contentHost")
     m.heroBackdropHost = m.top.findNode("heroBackdropHost")
+    m.heroOpaqueUnderlay = m.top.findNode("heroOpaqueUnderlay")
     m.heroControlsHost = m.top.findNode("heroControlsHost")
     m.epgBg = m.top.findNode("epgBg")
     m.timelineRowBg = m.top.findNode("timelineRowBg")
+    m.timelineCornerHost = m.top.findNode("timelineCornerHost")
     m.timelineCornerBg = m.top.findNode("timelineCornerBg")
+    m.timelineCornerUnderlay = m.top.findNode("timelineCornerUnderlay")
     m.timelineCornerBorder = m.top.findNode("timelineCornerBorder")
     m.timelineTodayLbl = m.top.findNode("timelineTodayLbl")
     m.timelineBottomBorder = m.top.findNode("timelineBottomBorder")
@@ -38,17 +41,31 @@ sub init()
     m.liveDotHost = m.top.findNode("liveDotHost")
     m.gridClip = m.top.findNode("gridClip")
     m.channelColHost = m.top.findNode("channelColHost")
+    m.channelColUnderlay = m.top.findNode("channelColUnderlay")
     m.channelColBg = m.top.findNode("channelColBg")
     m.channelColBorder = m.top.findNode("channelColBorder")
     m.channelRowsHost = m.top.findNode("channelRowsHost")
+    m.channelScroll = m.top.findNode("channelScroll")
     m.programGridHost = m.top.findNode("programGridHost")
     m.programScrollHost = m.top.findNode("programScrollHost")
+    m.programScroll = m.top.findNode("programScroll")
     m.liveLine = m.top.findNode("liveLine")
+    m.timelineScroll = m.top.findNode("timelineScroll")
     m.nowTimer = m.top.findNode("nowTimer")
     m.initialFocusTimer = m.top.findNode("initialFocusTimer")
     m.backdropSwapTimer = m.top.findNode("backdropSwapTimer")
     m.backdropFadeAnim = m.top.findNode("backdropFadeAnim")
     m.backdropFadeInterp = m.top.findNode("backdropFadeInterp")
+    m.channelScrollAnim = m.top.findNode("channelScrollAnim")
+    m.channelScrollInterp = m.top.findNode("channelScrollInterp")
+    m.programScrollAnim = m.top.findNode("programScrollAnim")
+    m.programScrollInterp = m.top.findNode("programScrollInterp")
+    m.timelineScrollAnim = m.top.findNode("timelineScrollAnim")
+    m.timelineScrollInterp = m.top.findNode("timelineScrollInterp")
+
+    if m.channelScrollAnim <> invalid then m.channelScrollAnim.duration = LT_ScrollAnimSec()
+    if m.programScrollAnim <> invalid then m.programScrollAnim.duration = LT_ScrollAnimSec()
+    if m.timelineScrollAnim <> invalid then m.timelineScrollAnim.duration = LT_ScrollAnimSec()
 
     m.vm = FindViewManager(m.top)
     m.viewportW = LT_CanvasW()
@@ -75,7 +92,7 @@ sub init()
     UpdateNowTime()
     LoadEpgData()
     InitScrollToNow()
-    RenderAll()
+    RenderAll(false)
 
     if m.nowTimer <> invalid then
         m.nowTimer.duration = LT_NowTickMs() / 1000.0
@@ -100,12 +117,12 @@ end sub
 
 sub OnShellEnterContent()
     ApplyShellLayout()
-    RenderAll()
+    RenderAll(false)
 end sub
 
 sub OnShellLayoutRev()
     ApplyShellLayout()
-    RenderAll()
+    RenderAll(false)
 end sub
 
 sub OnBusinessResolved()
@@ -116,7 +133,7 @@ sub OnInitialFocusTimer()
     m.focusZone = "program"
     m.heroBtnIndex = 0
     CenterScrollForFocus()
-    RenderAll()
+    RenderAll(true)
 end sub
 
 sub ApplyShellLayout()
@@ -132,6 +149,9 @@ sub ApplyShellLayout()
     if m.contentHost <> invalid then
         m.contentHost.translation = [offX, 0]
         m.contentHost.clippingRect = [0, 0, vw, LT_CanvasH()]
+        if m.contentHost.hasField("clippingRectClipsChildren") then
+            m.contentHost.clippingRectClipsChildren = true
+        end if
     end if
     if m.bg <> invalid then
         m.bg.translation = [offX, 0]
@@ -154,6 +174,10 @@ sub ApplyShellLayout()
         m.heroBackdropB.width = vw
         m.heroBackdropB.height = heroH
     end if
+    if m.heroOpaqueUnderlay <> invalid then
+        m.heroOpaqueUnderlay.width = vw
+        m.heroOpaqueUnderlay.height = heroH
+    end if
     if m.heroGradL <> invalid then
         m.heroGradL.width = gradLW
         m.heroGradL.height = heroH
@@ -169,7 +193,13 @@ sub ApplyShellLayout()
     if m.timeLbl <> invalid then m.timeLbl.width = metaW
     ApplyHeroBtnLayout()
     ApplyHeroMetaStack(tl)
-    if m.epgHost <> invalid then m.epgHost.translation = [0, heroH]
+    if m.epgHost <> invalid then
+        m.epgHost.translation = [0, heroH]
+        m.epgHost.clippingRect = [0, 0, vw, epgH]
+        if m.epgHost.hasField("clippingRectClipsChildren") then
+            m.epgHost.clippingRectClipsChildren = true
+        end if
+    end if
     if m.epgBg <> invalid then
         m.epgBg.width = vw
         m.epgBg.height = epgH
@@ -180,14 +210,29 @@ sub ApplyShellLayout()
         m.timelineRowBg.width = vw
         m.timelineRowBg.height = tlH
     end if
+    ' Today corner (React sticky left-0 z-40 bg-[#0C111A]) — opaque lid over H-scrolled markers.
+    if m.timelineCornerHost <> invalid then
+        m.timelineCornerHost.clippingRect = [0, 0, LT_ChannelColWidth(), tlH]
+        if m.timelineCornerHost.hasField("clippingRectClipsChildren") then
+            m.timelineCornerHost.clippingRectClipsChildren = true
+        end if
+    end if
     if m.timelineCornerBg <> invalid then
         m.timelineCornerBg.width = LT_ChannelColWidth()
         m.timelineCornerBg.height = tlH
+        m.timelineCornerBg.color = "0x0C111Aff"
+    end if
+    if m.timelineCornerUnderlay <> invalid then
+        m.timelineCornerUnderlay.width = LT_ChannelColWidth()
+        m.timelineCornerUnderlay.height = tlH
+        m.timelineCornerUnderlay.color = "0x0C111Aff"
     end if
     if m.timelineCornerBorder <> invalid then
+        m.timelineCornerBorder.translation = [LT_ChannelColWidth() - 1, 0]
         m.timelineCornerBorder.height = tlH
     end if
     if m.timelineTodayLbl <> invalid then
+        m.timelineTodayLbl.width = LT_ChannelColWidth()
         m.timelineTodayLbl.translation = [0, Int((tlH - 24) / 2)]
     end if
     if m.timelineBottomBorder <> invalid then
@@ -201,9 +246,28 @@ sub ApplyShellLayout()
     if m.gridClip <> invalid then
         m.gridClip.translation = [0, tlH]
         m.gridClip.clippingRect = [0, 0, vw, gridH]
+        if m.gridClip.hasField("clippingRectClipsChildren") then
+            m.gridClip.clippingRectClipsChildren = true
+        end if
     end if
-    if m.channelColHost <> invalid then m.channelColHost.clippingRect = [0, 0, LT_ChannelColWidth(), gridH]
-    if m.channelRowsHost <> invalid then m.channelRowsHost.clippingRect = [0, 0, LT_ChannelColWidth(), gridH]
+    ' Sticky left channel column — sibling of gridClip at same Y (React sticky left-0 z-20).
+    if m.channelColHost <> invalid then
+        m.channelColHost.translation = [0, tlH]
+        m.channelColHost.clippingRect = [0, 0, LT_ChannelColWidth(), gridH]
+        if m.channelColHost.hasField("clippingRectClipsChildren") then
+            m.channelColHost.clippingRectClipsChildren = true
+        end if
+    end if
+    if m.channelRowsHost <> invalid then
+        m.channelRowsHost.clippingRect = [0, 0, LT_ChannelColWidth(), gridH]
+        if m.channelRowsHost.hasField("clippingRectClipsChildren") then
+            m.channelRowsHost.clippingRectClipsChildren = true
+        end if
+    end if
+    if m.channelColUnderlay <> invalid then
+        m.channelColUnderlay.width = LT_ChannelColWidth()
+        m.channelColUnderlay.height = gridH
+    end if
     if m.channelColBg <> invalid then
         m.channelColBg.width = LT_ChannelColWidth()
         m.channelColBg.height = gridH
@@ -214,9 +278,18 @@ sub ApplyShellLayout()
     end if
     if m.programGridHost <> invalid then
         m.programGridHost.clippingRect = [0, 0, vw - LT_ChannelColWidth(), gridH]
+        if m.programGridHost.hasField("clippingRectClipsChildren") then
+            m.programGridHost.clippingRectClipsChildren = true
+        end if
     end if
     if m.programScrollHost <> invalid then
         m.programScrollHost.clippingRect = [0, 0, vw - LT_ChannelColWidth(), gridH]
+        if m.programScrollHost.hasField("clippingRectClipsChildren") then
+            m.programScrollHost.clippingRectClipsChildren = true
+        end if
+    end if
+    if m.timelineHost <> invalid then
+        m.timelineHost.clippingRect = [0, 0, vw - LT_ChannelColWidth(), LT_TimelineHeight()]
     end if
     if m.liveLine <> invalid then m.liveLine.height = gridH
 end sub
@@ -364,12 +437,13 @@ sub SyncSelectedProgram()
     m.selectedProgram = ch.programs[m.programIndex]
 end sub
 
-sub RenderAll()
+sub RenderAll(animateScroll = false as boolean)
     UpdateHero()
     RenderTimeline()
     RenderRows()
     UpdateLiveLine()
     UpdateFocusChrome()
+    ApplyLiveTvScroll(animateScroll)
 end sub
 
 sub UpdateHero()
@@ -409,12 +483,17 @@ end sub
 sub StartBackdropCrossfade(url as string)
     m.pendingBackdropUrl = url
     front = m.heroBackdropA
-    if not m.backdropFrontIsA then front = m.heroBackdropB
+    frontField = "heroBackdropA.opacity"
+    if not m.backdropFrontIsA then
+        front = m.heroBackdropB
+        frontField = "heroBackdropB.opacity"
+    end if
     if front = invalid then
         SetBackdropImmediate(url)
         return
     end if
     if m.backdropFadeInterp <> invalid and m.backdropFadeAnim <> invalid then
+        m.backdropFadeInterp.fieldToInterp = frontField
         m.backdropFadeInterp.keyValue = [LT_BackdropOpacity(), LT_BackdropFadeOpacity()]
         m.backdropFadeAnim.control = "start"
     else
@@ -453,19 +532,32 @@ sub SetBackdropImmediate(url as string)
 end sub
 
 sub RenderTimeline()
-    if m.timelineHost = invalid then return
-    m.timelineHost.removeChildrenIndex(m.timelineHost.getChildCount(), 0)
+    if m.timelineScroll = invalid then return
+    ' Keep liveDotHost; replace marker labels only.
+    keepDot = m.liveDotHost
+    m.timelineScroll.removeChildrenIndex(m.timelineScroll.getChildCount(), 0)
+    if keepDot <> invalid then m.timelineScroll.appendChild(keepDot)
+
     ppm = LT_PixelsPerMinute()
     marker = m.displayTimelineStart
     gridW = m.viewportW - LT_ChannelColWidth()
     tlH = LT_TimelineHeight()
     markW = 56
+    ' Same as program cull: cover target scrollLeft and in-flight timelineScroll X.
+    scrollA = m.scrollLeft
+    scrollB = m.scrollLeft
+    t = m.timelineScroll.translation
+    if t <> invalid then scrollB = Int(-t[0])
+    ' Markers use content X; timelineScroll translation supplies -scrollLeft.
     while marker <= m.displayTimelineEnd
-        x = Int(((marker - m.displayTimelineStart) / (60& * 1000&)) * ppm) - m.scrollLeft
-        if x >= -markW and x <= gridW + markW then
+        x = Int(((marker - m.displayTimelineStart) / (60& * 1000&)) * ppm)
+        viewA = x - scrollA
+        viewB = x - scrollB
+        visible = (viewA >= -markW - gridW and viewA <= gridW + markW + gridW) or (viewB >= -markW - gridW and viewB <= gridW + markW + gridW)
+        if visible then
             lbl = LT_MakeLabel(LT_FormatTimelineTime(marker), "pkg:/fonts/Inter-SemiBold.ttf", LT_FsTimelineMarker(), LT_ColorGray400(), markW, 16, "center", false)
             lbl.translation = [x - Int(markW / 2), Int((tlH - 16) / 2)]
-            m.timelineHost.appendChild(lbl)
+            m.timelineScroll.appendChild(lbl)
         end if
         marker = marker + (30& * 60& * 1000&)
     end while
@@ -500,9 +592,11 @@ sub AppendLiveTvBorder(parent as object, x as integer, y as integer, w as intege
 end sub
 
 sub RenderRows()
-    if m.channelRowsHost = invalid or m.programScrollHost = invalid then return
-    m.channelRowsHost.removeChildrenIndex(m.channelRowsHost.getChildCount(), 0)
-    m.programScrollHost.removeChildrenIndex(m.programScrollHost.getChildCount(), 0)
+    if m.channelScroll = invalid or m.programScroll = invalid then return
+    keepLine = m.liveLine
+    m.channelScroll.removeChildrenIndex(m.channelScroll.getChildCount(), 0)
+    m.programScroll.removeChildrenIndex(m.programScroll.getChildCount(), 0)
+    if keepLine <> invalid then m.programScroll.appendChild(keepLine)
     if m.channels.Count() = 0 then return
 
     rowH = LT_RowHeight()
@@ -523,16 +617,29 @@ sub RenderRows()
     if ceilIdx > endIdx then endIdx = ceilIdx
     if endIdx > m.channels.Count() then endIdx = m.channels.Count()
 
-    chScroll = CreateObject("roSGNode", "Group")
-    chScroll.translation = [0, -m.scrollTop]
-    m.channelRowsHost.appendChild(chScroll)
+    chScroll = m.channelScroll
+    progScroll = m.programScroll
 
-    progScroll = CreateObject("roSGNode", "Group")
-    progScroll.translation = [Int(-m.scrollLeft), Int(-m.scrollTop)]
-    m.programScrollHost.appendChild(progScroll)
-
+    ' Cull must cover the in-flight animated viewport AND the logical target.
+    ' React keeps the full EPG in the DOM; Roku virtualizes. Rebuilding for
+    ' scrollLeft while programScroll is still mid-animation leaves the visible
+    ' band empty (fast Left/Right).
     winLeft = m.scrollLeft
     winRight = m.scrollLeft + gridW
+    if progScroll <> invalid then
+        t = progScroll.translation
+        if t <> invalid then
+            curLeft = Int(-t[0])
+            if curLeft < winLeft then winLeft = curLeft
+            curRight = curLeft + gridW
+            if curRight > winRight then winRight = curRight
+        end if
+    end if
+    ' Extra viewport of slack for rapid keypresses before the next anim frame.
+    winLeft = winLeft - gridW
+    if winLeft < 0 then winLeft = 0
+    winRight = winRight + gridW
+    cardCount = 0
 
     for absIdx = startIdx to endIdx - 1
         channel = m.channels[absIdx]
@@ -681,16 +788,17 @@ sub RenderRows()
                 end if
 
                 progRow.appendChild(card)
+                cardCount = cardCount + 1
             end for
         end if
 
         progScroll.appendChild(progRow)
     end for
+    print "[LIVETV_DBG] rows cards="; cardCount; " win="; winLeft; "-"; winRight; " scrollLeft="; m.scrollLeft; " rows="; startIdx; "-"; endIdx
 end sub
 
 sub UpdateLiveLine()
-    chW = LT_ChannelColWidth()
-    gridTop = LT_TimelineHeight()
+    tlH = LT_TimelineHeight()
     if m.currentTime < m.displayTimelineStart or m.currentTime > m.displayTimelineEnd then
         if m.liveLine <> invalid then m.liveLine.visible = false
         if m.liveDotHost <> invalid then m.liveDotHost.visible = false
@@ -698,12 +806,13 @@ sub UpdateLiveLine()
     end if
     ppm = LT_PixelsPerMinute()
     nowX = Int(((m.currentTime - m.displayTimelineStart) / (60& * 1000&)) * ppm)
+    ' Content-space X — programScroll / timelineScroll supply -scrollLeft.
     if m.liveLine <> invalid then
-        m.liveLine.translation = [Int(nowX - m.scrollLeft), 0]
+        m.liveLine.translation = [nowX, 0]
         m.liveLine.visible = true
     end if
     if m.liveDotHost <> invalid then
-        m.liveDotHost.translation = [Int(chW + nowX - m.scrollLeft - 5), gridTop - 10]
+        m.liveDotHost.translation = [nowX - 5, tlH - 10]
         m.liveDotHost.visible = true
     end if
 end sub
@@ -770,13 +879,42 @@ sub CenterScrollForFocus()
         if m.scrollLeft < 0 then m.scrollLeft = 0
     end if
 
+    ' React: targetScrollTop = rowTop - VIEWPORT_HEIGHT/2 + ROW_HEIGHT/2
     rowTop = m.channelIndex * rowH
-    targetTop = rowTop - Int(clipH / 2) + Int(rowH / 2)
+    targetTop = rowTop - Int(LT_ViewportHeight() / 2) + Int(rowH / 2)
     if targetTop < 0 then targetTop = 0
     maxTop = m.channels.Count() * rowH - clipH
     if maxTop < 0 then maxTop = 0
     if targetTop > maxTop then targetTop = maxTop
     m.scrollTop = targetTop
+end sub
+
+' Apply logical scrollLeft/scrollTop to persistent hosts (smooth = React scrollTo behavior).
+sub ApplyLiveTvScroll(animate as boolean)
+    targetCh = [0, -m.scrollTop]
+    targetProg = [Int(-m.scrollLeft), Int(-m.scrollTop)]
+    targetTl = [Int(-m.scrollLeft), 0]
+    print "[LIVETV_DBG] scroll animate="; animate; " left="; m.scrollLeft; " top="; m.scrollTop
+
+    if not animate then
+        if m.channelScrollAnim <> invalid then m.channelScrollAnim.control = "stop"
+        if m.programScrollAnim <> invalid then m.programScrollAnim.control = "stop"
+        if m.timelineScrollAnim <> invalid then m.timelineScrollAnim.control = "stop"
+        if m.channelScroll <> invalid then m.channelScroll.translation = targetCh
+        if m.programScroll <> invalid then m.programScroll.translation = targetProg
+        if m.timelineScroll <> invalid then m.timelineScroll.translation = targetTl
+        return
+    end if
+
+    if m.channelScroll <> invalid then
+        GridAnimateTranslation(m.channelScroll, m.channelScroll.translation, targetCh, m.channelScrollAnim, m.channelScrollInterp, true, "")
+    end if
+    if m.programScroll <> invalid then
+        GridAnimateTranslation(m.programScroll, m.programScroll.translation, targetProg, m.programScrollAnim, m.programScrollInterp, true, "")
+    end if
+    if m.timelineScroll <> invalid then
+        GridAnimateTranslation(m.timelineScroll, m.timelineScroll.translation, targetTl, m.timelineScrollAnim, m.timelineScrollInterp, true, "")
+    end if
 end sub
 
 sub EnterLiveTvHeader()
@@ -843,7 +981,7 @@ sub HandleUp()
     if m.focusZone = "program" and m.channelIndex = 0 then
         m.focusZone = "hero"
         m.heroBtnIndex = 0
-        RenderAll()
+        RenderAll(true)
         return
     end if
     if m.focusZone = "program" then
@@ -855,12 +993,12 @@ sub HandleUp()
             m.channelIndex = m.channelIndex - 1
             SyncSelectedProgram()
             CenterScrollForFocus()
-            RenderAll()
+            RenderAll(true)
             return
         end if
         m.focusZone = "hero"
         m.heroBtnIndex = 0
-        RenderAll()
+        RenderAll(true)
     end if
 end sub
 
@@ -868,7 +1006,7 @@ sub HandleDown()
     if m.focusZone = "hero" then
         m.focusZone = "program"
         CenterScrollForFocus()
-        RenderAll()
+        RenderAll(true)
         return
     end if
     if m.focusZone = "channel" then
@@ -876,7 +1014,7 @@ sub HandleDown()
             m.channelIndex = m.channelIndex + 1
             SyncSelectedProgram()
             CenterScrollForFocus()
-            RenderAll()
+            RenderAll(true)
         end if
         return
     end if
@@ -897,7 +1035,7 @@ sub MoveProgramVertical(dir as integer)
     m.programIndex = LT_FindProgramOverlapping(ch, ref.startTime, ref.endTime)
     SyncSelectedProgram()
     CenterScrollForFocus()
-    RenderAll()
+    RenderAll(true)
 end sub
 
 sub HandleLeft()
@@ -913,7 +1051,7 @@ sub HandleLeft()
         if LT_IsFirstVisibleProgramAtScroll(ch, prog, m.displayTimelineStart, m.scrollLeft, LT_PixelsPerMinute()) then
             m.focusZone = "channel"
             print "[LIVETV_DBG] focus program->channel row="; m.channelIndex; " prog="; m.programIndex
-            RenderAll()
+            RenderAll(true)
             return
         end if
         nIdx = LT_FindProgramLeftNeighbor(ch, prog)
@@ -921,7 +1059,7 @@ sub HandleLeft()
             m.programIndex = nIdx
             SyncSelectedProgram()
             CenterScrollForFocus()
-            RenderAll()
+            RenderAll(true)
         end if
         return
     end if
@@ -934,7 +1072,7 @@ sub HandleLeft()
         m.scrollLeft = m.scrollLeft - (30 * LT_PixelsPerMinute())
         if m.scrollLeft < 0 then m.scrollLeft = 0
         print "[LIVETV_DBG] channel scrollLeft="; m.scrollLeft
-        RenderAll()
+        RenderAll(true)
     end if
 end sub
 
@@ -953,7 +1091,7 @@ sub HandleRight()
             end if
             SyncSelectedProgram()
             CenterScrollForFocus()
-            RenderAll()
+            RenderAll(true)
         end if
         return
     end if
@@ -966,7 +1104,7 @@ sub HandleRight()
             m.programIndex = nIdx
             SyncSelectedProgram()
             CenterScrollForFocus()
-            RenderAll()
+            RenderAll(true)
         end if
     end if
 end sub
@@ -976,6 +1114,9 @@ sub OnDispose()
     if m.nowTimer <> invalid then m.nowTimer.control = "stop"
     if m.initialFocusTimer <> invalid then m.initialFocusTimer.control = "stop"
     if m.backdropSwapTimer <> invalid then m.backdropSwapTimer.control = "stop"
+    if m.channelScrollAnim <> invalid then m.channelScrollAnim.control = "stop"
+    if m.programScrollAnim <> invalid then m.programScrollAnim.control = "stop"
+    if m.timelineScrollAnim <> invalid then m.timelineScrollAnim.control = "stop"
     if m.global <> invalid and m.global.hasField("businessResolved") then
         m.global.unobserveField("businessResolved")
     end if
